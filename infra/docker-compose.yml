@@ -1,0 +1,54 @@
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../.env.example
+    volumes:
+      - ..:/app
+    depends_on:
+      - api
+
+  api:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "echo 'Install NestJS API package before running production API' && sleep infinity"
+    ports:
+      - "4000:4000"
+    env_file:
+      - ../.env.example
+    depends_on:
+      - postgres
+      - redis
+
+  judge-worker:
+    image: node:22-alpine
+    working_dir: /worker
+    command: sh -c "echo 'Judge worker placeholder: replace with isolated runner image' && sleep infinity"
+    env_file:
+      - ../.env.example
+    depends_on:
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nexorithm
+      POSTGRES_USER: nexorithm
+      POSTGRES_PASSWORD: nexorithm
+    ports:
+      - "5432:5432"
+    volumes:
+      - nexorithm-postgres:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  nexorithm-postgres:

@@ -1,64 +1,256 @@
-import Image from "next/image";
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Award,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Lock,
+  Search,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
+import { DAILY_PRIZE_PROBLEMS, MOCK_PROBLEMS, QUESTION_COUNT, type Difficulty } from "@/lib/mockData";
+
+const difficultyOptions: Array<"All" | Difficulty> = ["All", "Easy", "Medium", "Hard", "Very Hard"];
+const topics = ["All", ...Array.from(new Set(MOCK_PROBLEMS.map((problem) => problem.topic)))];
+const pageSize = 100;
+
+const difficultyClass = (difficulty: Difficulty) => {
+  if (difficulty === "Easy") return "text-emerald-300 border-emerald-400/20 bg-emerald-400/10";
+  if (difficulty === "Medium") return "text-amber-300 border-amber-400/20 bg-amber-400/10";
+  if (difficulty === "Hard") return "text-rose-300 border-rose-400/20 bg-rose-400/10";
+  return "text-cyan-200 border-cyan-300/20 bg-cyan-300/10";
+};
 
 export default function Home() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [difficulty, setDifficulty] = useState<"All" | Difficulty>("All");
+  const [topic, setTopic] = useState("All");
+  const [page, setPage] = useState(1);
+
+  const filteredProblems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return MOCK_PROBLEMS.filter((problem) => {
+      const matchesSearch =
+        !query ||
+        problem.title.toLowerCase().includes(query) ||
+        problem.topic.toLowerCase().includes(query) ||
+        problem.pattern.toLowerCase().includes(query) ||
+        String(problem.level).includes(query);
+      const matchesDifficulty = difficulty === "All" || problem.difficulty === difficulty;
+      const matchesTopic = topic === "All" || problem.topic === topic;
+      return matchesSearch && matchesDifficulty && matchesTopic;
+    });
+  }, [difficulty, searchQuery, topic]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProblems.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleProblems = filteredProblems.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const updateDifficulty = (nextDifficulty: "All" | Difficulty) => {
+    setDifficulty(nextDifficulty);
+    setPage(1);
+  };
+
+  const updateTopic = (nextTopic: string) => {
+    setTopic(nextTopic);
+    setPage(1);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="app-shell">
+      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="font-mono text-lg font-black tracking-tight text-white">
+            NEXO<span className="text-primary">RITHM</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/problems" className="btn-secondary h-9 px-3 text-xs">
+              Problems
+            </Link>
+            <Link href="/profile/guest" className="btn-secondary h-9 px-3 text-xs">
+              Profile
+            </Link>
+            <Link href="/pro" className="btn-secondary h-9 gap-1.5 px-3 text-xs">
+              <Lock className="h-3.5 w-3.5" />
+              Membership
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main>
+        <section className="border-b border-white/10">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_440px] lg:px-8 lg:py-14">
+            <div className="surface-panel rounded-lg p-6 sm:p-8">
+              <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-bold text-blue-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                Daily practice board
+              </div>
+              <h1 className="max-w-3xl text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl">
+                Build algorithm skill without fighting the interface.
+              </h1>
+              <p className="mt-5 max-w-2xl text-sm leading-6 text-zinc-300 sm:text-base">
+                A focused question bank, clean filters, and a full workspace for drafting solutions. The real judge and rewards can plug in when the backend is ready.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link href="/problems" className="btn-primary h-10 gap-2 px-4 text-xs">
+                  Browse Problems
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <Link href="/rankings" className="btn-secondary h-10 px-4 text-xs">
+                  View Rankings
+                </Link>
+              </div>
+              <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {[
+                  { label: "Questions", value: QUESTION_COUNT.toLocaleString(), icon: BookOpen },
+                  { label: "Difficulty bands", value: "4", icon: Trophy },
+                  { label: "Learning tracks", value: "12", icon: Filter },
+                ].map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <div key={stat.label} className="surface-card rounded-lg p-4">
+                      <Icon className="mb-3 h-4 w-4 text-primary" />
+                      <div className="text-2xl font-black text-white">{stat.value}</div>
+                      <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-zinc-500">{stat.label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <aside className="surface-panel rounded-lg p-5">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-black text-white">Prize Practice</h2>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">Reserved for verified contests and payout wiring.</p>
+                </div>
+                <Award className="h-5 w-5 text-amber-300" />
+              </div>
+              <div className="space-y-3">
+                {DAILY_PRIZE_PROBLEMS.map((problem) => (
+                  <Link
+                    key={problem.id}
+                    href={`/workspace/${problem.id}`}
+                    className="interactive-card block rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <span className={`rounded border px-2 py-0.5 text-[10px] font-bold ${difficultyClass(problem.difficulty)}`}>
+                          {problem.difficulty}
+                        </span>
+                        <h3 className="mt-3 text-sm font-black text-white">{problem.title}</h3>
+                        <p className="mt-1 text-xs text-zinc-500">{problem.topic} / {problem.pattern}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-lg font-black text-emerald-300">Rs. {problem.prizeMoneyInr?.toLocaleString("en-IN")}</div>
+                        <div className="text-[10px] font-bold uppercase text-zinc-600">Pool</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="surface-panel rounded-lg p-4 sm:p-5">
+            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-2xl font-black tracking-tight text-white">Question Bank</h2>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Showing {visibleProblems.length} of {filteredProblems.length.toLocaleString()} matching questions.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Search level, topic, pattern..."
+                    className="subtle-input h-10 w-full rounded-md py-2 pl-9 pr-3 text-xs"
+                  />
+                </div>
+                <select
+                  value={difficulty}
+                  onChange={(event) => updateDifficulty(event.target.value as "All" | Difficulty)}
+                  className="subtle-input h-10 rounded-md px-3 text-xs"
+                >
+                  {difficultyOptions.map((item) => <option key={item}>{item}</option>)}
+                </select>
+                <select
+                  value={topic}
+                  onChange={(event) => updateTopic(event.target.value)}
+                  className="subtle-input h-10 rounded-md px-3 text-xs"
+                >
+                  {topics.map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-white/10">
+              <div className="hidden grid-cols-[72px_1fr_130px_120px] gap-3 border-b border-white/10 bg-white/[0.04] px-4 py-3 text-[10px] font-black uppercase tracking-wider text-zinc-500 sm:grid">
+                <span>Level</span>
+                <span>Question</span>
+                <span>Difficulty</span>
+                <span className="text-right">Action</span>
+              </div>
+              {visibleProblems.map((problem) => (
+                <Link
+                  key={problem.id}
+                  href={`/workspace/${problem.id}`}
+                  className="grid gap-3 border-b border-white/5 px-4 py-4 text-xs transition-colors last:border-b-0 hover:bg-white/[0.04] sm:grid-cols-[72px_1fr_130px_120px]"
+                >
+                  <span className="font-mono text-zinc-500">#{problem.level}</span>
+                  <div>
+                    <div className="font-bold text-zinc-100">{problem.title}</div>
+                    <div className="mt-1 text-[11px] text-zinc-500">{problem.topic} / {problem.pattern}</div>
+                  </div>
+                  <span className={`w-fit self-start rounded border px-2 py-0.5 text-[10px] font-bold ${difficultyClass(problem.difficulty)}`}>
+                    {problem.difficulty}
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-bold text-primary sm:justify-end">
+                    Attempt
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={safePage === 1}
+                className="btn-secondary h-10 gap-1 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Previous
+              </button>
+              <div className="text-center text-xs font-semibold text-zinc-500">
+                Page {safePage} of {totalPages}
+              </div>
+              <button
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={safePage === totalPages}
+                className="btn-secondary h-10 gap-1 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );

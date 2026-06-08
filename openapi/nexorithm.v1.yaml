@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: NEXORITHM API
+  version: 1.0.0
+  description: Production API contract for competitive coding, rewards, reputation, hiring, and premium membership.
+servers:
+  - url: https://api.nexorithm.com
+  - url: http://localhost:4000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+  /problems/daily:
+    get:
+      summary: List daily Easy, Medium, and Hard challenges
+      responses:
+        "200":
+          description: Daily challenge list
+  /problems/{slug}:
+    get:
+      summary: Get a problem by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Problem detail
+  /submissions/run:
+    post:
+      summary: Run code against visible/custom test cases
+      responses:
+        "202":
+          description: Run queued
+  /submissions:
+    post:
+      summary: Submit code for judging
+      responses:
+        "202":
+          description: Submission queued
+  /leaderboards/{scope}:
+    get:
+      summary: Get leaderboard by scope
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [global, college, friends, monthly, all-time]
+      responses:
+        "200":
+          description: Leaderboard entries
+  /profiles/{username}:
+    get:
+      summary: Get public developer profile
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public profile
+  /recruiter/candidates:
+    get:
+      summary: Search verified candidates
+      responses:
+        "200":
+          description: Candidate results
+  /billing/razorpay/order:
+    post:
+      summary: Create Razorpay order for NEXORITHM PRO
+      responses:
+        "201":
+          description: Checkout order
+  /billing/razorpay/webhook:
+    post:
+      summary: Receive Razorpay webhook
+      responses:
+        "204":
+          description: Webhook accepted

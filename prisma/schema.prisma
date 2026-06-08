@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Problem {
+  id             String       @id
+  slug           String       @unique
+  title          String
+  difficulty     String
+  level          Int          @unique
+  topic          String
+  pattern        String
+  judgeKind      String
+  xpReward       Int
+  coinReward     Int
+  prizeMoneyInr  Int?
+  description    String
+  starterCode    Json
+  testCases      Json
+  submissions    Submission[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Submission {
+  id             String   @id @default(cuid())
+  problemId      String
+  language       String
+  code           String
+  status         String
+  passedCount    Int
+  totalCount     Int
+  runtimeMs      Int
+  output         Json
+  createdAt      DateTime @default(now())
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([problemId])
+  @@index([createdAt])
+}
