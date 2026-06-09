@@ -75,6 +75,13 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
         <section className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-8">
+            <Link
+              href="/settings"
+              className="inline-block btn-secondary h-9 px-4 text-xs"
+            >
+              Settings
+            </Link>
+            <p className="text-sm text-zinc-400">Email: {user.email}</p>
             <div>
               <h2 className="mb-4 text-xs font-black uppercase tracking-wider text-zinc-500">Daily Prize Questions</h2>
               <div className="space-y-3">

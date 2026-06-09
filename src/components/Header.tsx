@@ -4,13 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
+import { SignInButton } from "@clerk/nextjs";
 import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Clock, Trophy, UserRound } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
   const pathname = usePathname();
-  const { user } = useApp();
+  const { user, isAuthenticated } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
 
   const navItems = [
     { name: "Problems", href: "/problems", icon: BookOpen },
@@ -90,38 +92,36 @@ export default function Header() {
           </div>
 
           {/* User Profile Access */}
-          <Link
-            href={`/profile/${user.username}`}
-            className="flex items-center gap-2 pl-1 group"
-          >
-            {user.isPro ? (
-              <div className="relative p-0.5 rounded-full bg-gradient-to-tr from-primary to-blue-400">
-                <Image
-                  src={user.avatarUrl}
-                  alt={user.fullName}
-                  width={28}
-                  height={28}
-                  className="w-7 h-7 rounded-full object-cover border border-black bg-zinc-800"
+          {!isAuthenticated ? (
+            <SignInButton mode="modal" forceRedirectUrl="/problems">
+              <button className="btn-primary text-xs px-3 py-1.5 rounded-md font-bold cursor-pointer transition-all hover:scale-105 active:scale-95">
+                Sign In
+              </button>
+            </SignInButton>
+          ) : (
+            <Link
+              href="/settings"
+              className="flex items-center gap-2 pl-1 group"
+            >
+              <svg
+                className="h-5 w-5 text-zinc-400 group-hover:text-white transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v1m0 14v1m8-8h1M3 12h1m15.364 6.364l.707.707M5.636 5.636l.707.707m12.728 0l.707-.707M5.636 18.364l.707-.707"
                 />
-              </div>
-            ) : (
-              <Image
-                src={user.avatarUrl}
-                alt={user.fullName}
-                width={28}
-                height={28}
-                className="w-7 h-7 rounded-full object-cover border border-zinc-800 bg-zinc-800"
-              />
-            )}
-            <span className="hidden lg:block text-xs font-medium text-zinc-300 group-hover:text-white transition-colors">
-              {user.fullName}
-            </span>
-            {user.isPro && (
-              <span className="hidden lg:inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
-                PRO
+              </svg>
+              <span className="hidden lg:block text-xs font-medium text-zinc-300 group-hover:text-white transition-colors">
+                Settings
               </span>
-            )}
-          </Link>
+            </Link>
+          )}
 
           {/* Mobile Navigation Trigger */}
           <button

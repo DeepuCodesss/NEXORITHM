@@ -49,10 +49,14 @@ export interface LeaderboardEntry {
   devRank: number;
 }
 
+export type AuthProvider = "guest" | "google" | "github" | "email";
+
 export interface UserState {
   fullName: string;
   username: string;
+  email: string;
   avatarUrl: string;
+  authProvider: AuthProvider;
   xp: number;
   coins: number;
   reputation: number;
@@ -299,7 +303,9 @@ export const DAILY_PRIZE_PROBLEMS = MOCK_PROBLEMS.slice(0, 3).map((problem, inde
 export const INITIAL_USER: UserState = {
   fullName: "Guest Developer",
   username: "guest",
+  email: "",
   avatarUrl: "/next.svg",
+  authProvider: "guest",
   xp: 0,
   coins: 0,
   reputation: 0,
