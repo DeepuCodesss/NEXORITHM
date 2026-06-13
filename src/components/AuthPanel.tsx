@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Mail, UserRound } from "lucide-react";
+import { Mail, UserRound } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
 
 type AuthMode = "signup" | "signin";
 
@@ -41,8 +40,10 @@ function GitHubIcon() {
 
 export default function AuthPanel() {
   const router = useRouter();
-  const { isAuthenticated, user, signOut } = useApp();
+  const { isAuthenticated, user, signOut, signInWithProvider, signInWithEmail } = useApp();
   const [mode, setMode] = useState<AuthMode>("signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   if (isAuthenticated) {
     return (
@@ -59,7 +60,7 @@ export default function AuthPanel() {
         <p className="text-sm leading-6 text-zinc-400">
           You are signed in with{" "}
           <span className="font-semibold text-zinc-200">
-            Clerk Authentication
+            Nexorithm local account
           </span>
           . Start solving prize problems and climb the leaderboard.
         </p>
@@ -111,57 +112,62 @@ export default function AuthPanel() {
       <div className="space-y-3">
         {mode === "signup" ? (
           <>
-            <SignUpButton mode="modal" forceRedirectUrl="/problems">
-              <button type="button" className="auth-provider-btn">
-                <GoogleIcon />
-                Sign up with Google
-              </button>
-            </SignUpButton>
-            <SignUpButton mode="modal" forceRedirectUrl="/problems">
-              <button type="button" className="auth-provider-btn">
-                <GitHubIcon />
-                Sign up with GitHub
-              </button>
-            </SignUpButton>
+            <button type="button" onClick={() => signInWithProvider("google")} className="auth-provider-btn">
+              <GoogleIcon />
+              Sign up with Google
+            </button>
+            <button type="button" onClick={() => signInWithProvider("github")} className="auth-provider-btn">
+              <GitHubIcon />
+              Sign up with GitHub
+            </button>
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">or use email</span>
               <div className="h-px flex-1 bg-white/10" />
             </div>
-            <SignUpButton mode="modal" forceRedirectUrl="/problems">
-              <button type="button" className="btn-primary h-11 w-full text-sm">
-                <Mail className="inline-block mr-2 h-4 w-4" />
-                Sign up with Email
-              </button>
-            </SignUpButton>
           </>
         ) : (
           <>
-            <SignInButton mode="modal" forceRedirectUrl="/problems">
-              <button type="button" className="auth-provider-btn">
-                <GoogleIcon />
-                Sign in with Google
-              </button>
-            </SignInButton>
-            <SignInButton mode="modal" forceRedirectUrl="/problems">
-              <button type="button" className="auth-provider-btn">
-                <GitHubIcon />
-                Sign in with GitHub
-              </button>
-            </SignInButton>
+            <button type="button" onClick={() => signInWithProvider("google")} className="auth-provider-btn">
+              <GoogleIcon />
+              Sign in with Google
+            </button>
+            <button type="button" onClick={() => signInWithProvider("github")} className="auth-provider-btn">
+              <GitHubIcon />
+              Sign in with GitHub
+            </button>
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">or use email</span>
               <div className="h-px flex-1 bg-white/10" />
             </div>
-            <SignInButton mode="modal" forceRedirectUrl="/problems">
-              <button type="button" className="btn-primary h-11 w-full text-sm">
-                <Mail className="inline-block mr-2 h-4 w-4" />
-                Sign in with Email
-              </button>
-            </SignInButton>
           </>
         )}
+        <input
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          className="subtle-input h-11 w-full rounded-md px-3 text-sm"
+          placeholder="you@example.com"
+          type="email"
+        />
+        <input
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className="subtle-input h-11 w-full rounded-md px-3 text-sm"
+          placeholder="Password"
+          type="password"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const result = signInWithEmail({ email, password, isSignUp: mode === "signup" });
+            if (result.ok) router.push("/problems");
+          }}
+          className="btn-primary h-11 w-full text-sm"
+        >
+          <Mail className="inline-block mr-2 h-4 w-4" />
+          {mode === "signup" ? "Sign up with Email" : "Sign in with Email"}
+        </button>
       </div>
 
       <p className="mt-4 text-center text-[11px] leading-5 text-zinc-500">

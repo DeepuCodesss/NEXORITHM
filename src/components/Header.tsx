@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
-import { SignInButton } from "@clerk/nextjs";
 import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Clock, Trophy, UserRound } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
   const pathname = usePathname();
-  const { user, isAuthenticated } = useApp();
+  const { user, isAuthenticated, signInWithProvider } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 
@@ -93,11 +91,12 @@ export default function Header() {
 
           {/* User Profile Access */}
           {!isAuthenticated ? (
-            <SignInButton mode="modal" forceRedirectUrl="/problems">
-              <button className="btn-primary text-xs px-3 py-1.5 rounded-md font-bold cursor-pointer transition-all hover:scale-105 active:scale-95">
-                Sign In
-              </button>
-            </SignInButton>
+            <button
+              onClick={() => signInWithProvider("github")}
+              className="btn-primary text-xs px-3 py-1.5 rounded-md font-bold cursor-pointer transition-all hover:scale-105 active:scale-95"
+            >
+              Sign In
+            </button>
           ) : (
             <Link
               href="/settings"

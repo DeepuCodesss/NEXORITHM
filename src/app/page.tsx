@@ -4,24 +4,149 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   ArrowRight,
+  Bolt,
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  Coins,
+  CheckCircle2,
+  Crown,
+  Flame,
   IndianRupee,
+  Medal,
+  Rocket,
   Search,
   Sparkles,
+  Target,
   Trophy,
-  TrendingUp,
+  Users,
+  Wallet,
   Zap,
 } from "lucide-react";
 import AuthPanel from "@/components/AuthPanel";
 import LandingHeader from "@/components/LandingHeader";
-import { DAILY_PRIZE_PROBLEMS, MOCK_PROBLEMS, QUESTION_COUNT, type Difficulty } from "@/lib/mockData";
+import { MOCK_PROBLEMS, type Difficulty } from "@/lib/mockData";
 
 const difficultyOptions: Array<"All" | Difficulty> = ["All", "Easy", "Medium", "Hard", "Very Hard"];
 const topics = ["All", ...Array.from(new Set(MOCK_PROBLEMS.map((problem) => problem.topic)))];
 const pageSize = 100;
+
+const howItWorks = [
+  {
+    step: "01",
+    title: "Sign Up",
+    copy: "Create your free account and set up your coding profile.",
+    icon: Users,
+  },
+  {
+    step: "02",
+    title: "Solve Daily Problems",
+    copy: "Choose today's challenge, submit your solution, and pass the judge.",
+    icon: Zap,
+  },
+  {
+    step: "03",
+    title: "Earn Rewards",
+    copy: "Top solvers and milestone achievers unlock real wallet rewards.",
+    icon: Wallet,
+  },
+  {
+    step: "04",
+    title: "Build Streaks",
+    copy: "Stay consistent, grow your streak, and unlock bonus milestones.",
+    icon: Flame,
+  },
+];
+
+const rewardMilestones = [
+  {
+    title: "Daily Challenge",
+    label: "Rank Reward",
+    amount: "₹5",
+    detail: "Top 1 gets ₹5 • Top 3 gets ₹3 • Top 10 gets XP",
+    icon: Trophy,
+    accent: "text-amber-300 border-amber-400/60 bg-amber-400/10",
+    amountClass: "text-amber-300",
+    glow: "from-amber-500/20 via-orange-500/10",
+    line: "bg-amber-400",
+  },
+  {
+    title: "7 Days",
+    label: "Streak Reward",
+    amount: "₹5",
+    detail: "Solve daily for 7 straight days",
+    icon: Flame,
+    accent: "text-orange-300 border-orange-400/60 bg-orange-400/10",
+    amountClass: "text-orange-300",
+    glow: "from-orange-500/20 via-amber-500/10",
+    line: "bg-orange-400",
+  },
+  {
+    title: "15 Days",
+    label: "Streak Reward",
+    amount: "₹10",
+    detail: "Keep your streak alive for 15 days",
+    icon: Target,
+    accent: "text-red-300 border-red-400/60 bg-red-400/10",
+    amountClass: "text-red-300",
+    glow: "from-red-500/20 via-rose-500/10",
+    line: "bg-red-400",
+  },
+  {
+    title: "30 Days",
+    label: "Streak Reward",
+    amount: "₹25",
+    detail: "Complete a full 30-day streak",
+    icon: Rocket,
+    accent: "text-purple-300 border-purple-400/60 bg-purple-400/10",
+    amountClass: "text-purple-300",
+    glow: "from-purple-500/20 via-fuchsia-500/10",
+    line: "bg-purple-400",
+  },
+  {
+    title: "40 Easy Problems",
+    label: "Problem Reward",
+    amount: "₹5",
+    detail: "Finish the beginner Easy track",
+    icon: CheckCircle2,
+    accent: "text-cyan-300 border-cyan-400/60 bg-cyan-400/10",
+    amountClass: "text-cyan-300",
+    glow: "from-cyan-500/20 via-sky-500/10",
+    line: "bg-cyan-400",
+  },
+  {
+    title: "100 Problems Solved",
+    label: "Progress Reward",
+    amount: "₹25",
+    detail: "Reach 100 total accepted solutions",
+    icon: Medal,
+    accent: "text-violet-300 border-violet-400/60 bg-violet-400/10",
+    amountClass: "text-violet-300",
+    glow: "from-violet-500/20 via-indigo-500/10",
+    line: "bg-violet-400",
+  },
+  {
+    title: "250 Problems Solved",
+    label: "Power Reward",
+    amount: "₹100",
+    detail: "Reach 250 total accepted solutions",
+    icon: Bolt,
+    accent: "text-yellow-300 border-yellow-400/60 bg-yellow-400/10",
+    amountClass: "text-yellow-300",
+    glow: "from-yellow-500/20 via-lime-500/10",
+    line: "bg-yellow-400",
+  },
+  {
+    title: "365-Day Streak",
+    label: "Legend Reward",
+    amount: "₹500",
+    detail: "Special badge plus cash reward",
+    icon: Crown,
+    accent: "text-fuchsia-300 border-fuchsia-400/60 bg-fuchsia-400/10",
+    amountClass: "text-fuchsia-300",
+    glow: "from-fuchsia-500/20 via-pink-500/10",
+    line: "bg-fuchsia-400",
+  },
+];
 
 const difficultyClass = (difficulty: Difficulty) => {
   if (difficulty === "Easy") return "text-emerald-300 border-emerald-400/20 bg-emerald-400/10";
@@ -72,23 +197,22 @@ export default function Home() {
       <main>
         <section className="relative overflow-hidden border-b border-white/10">
           <div className="hero-glow" />
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_420px] lg:px-8 lg:py-16">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_420px] lg:px-8 lg:py-14">
             <div className="relative surface-panel rounded-xl p-6 sm:p-8">
               <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-bold text-emerald-200">
                 <IndianRupee className="h-3.5 w-3.5" />
-                Solve code. Rank up. Earn cash.
+                Learn coding. Stay consistent. Earn rewards.
               </div>
               <h1 className="max-w-3xl text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Code your way to the{" "}
-                <span className="text-glow-blue text-primary">top of the board</span> and win real prizes.
+                Solve. Streak. <span className="text-glow-blue text-primary">Earn.</span>
               </h1>
               <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
-                Nexorithm is a competitive coding arena. Solve algorithm problems, climb daily rankings,
-                and share verified prize pools when you finish among the best solvers.
+                Complete daily coding challenges, build streaks, climb leaderboards, and earn rewards
+                directly to your wallet. The reward is a bonus; the real win is becoming sharper every day.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link href="/problems" className="btn-primary h-11 gap-2 px-5 text-sm">
-                  Start Solving
+                  Start Solving Today
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link href="/rankings" className="btn-secondary h-11 px-5 text-sm">
@@ -101,54 +225,44 @@ export default function Home() {
 
               <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {[
-                  { label: "Questions", value: QUESTION_COUNT.toLocaleString(), icon: BookOpen },
-                  { label: "Prize pools", value: "Rs. 8.5K+", icon: Coins },
-                  { label: "Difficulty bands", value: "4", icon: Trophy },
+                  { label: "Daily practice", copy: "New coding challenges keep your routine moving.", icon: BookOpen },
+                  { label: "Streak pressure", copy: "Miss fewer days by turning consistency into a visible goal.", icon: Flame },
+                  { label: "Wallet unlocks", copy: "Rewards appear when milestones are actually completed.", icon: Wallet },
                 ].map((stat) => {
                   const Icon = stat.icon;
                   return (
                     <div key={stat.label} className="surface-card rounded-lg p-4">
                       <Icon className="mb-3 h-4 w-4 text-primary" />
-                      <div className="text-2xl font-black text-white">{stat.value}</div>
-                      <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-zinc-500">{stat.label}</div>
+                      <div className="text-sm font-black text-white">{stat.label}</div>
+                      <div className="mt-2 text-xs leading-5 text-zinc-500">{stat.copy}</div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-3">
-                {[
-                  {
-                    step: "01",
-                    title: "Sign up free",
-                    copy: "Create your account with Google, GitHub, or email in seconds.",
-                    icon: Sparkles,
-                  },
-                  {
-                    step: "02",
-                    title: "Solve & submit",
-                    copy: "Pick prize problems, write code in the workspace, and pass the judge.",
-                    icon: Zap,
-                  },
-                  {
-                    step: "03",
-                    title: "Rank & earn",
-                    copy: "Top performers on the board share the daily cash prize pool.",
-                    icon: TrendingUp,
-                  },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={item.step} className="step-card rounded-lg p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-[11px] font-black tracking-[0.2em] text-primary">{item.step}</span>
-                        <Icon className="h-4 w-4 text-zinc-500" />
+              <div className="mt-8">
+                <div className="mb-4 flex items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-black text-white">How It Works</h2>
+                    <p className="mt-1 text-xs text-zinc-500">Understand the platform in 10 seconds.</p>
+                  </div>
+                  <Sparkles className="hidden h-5 w-5 text-primary sm:block" />
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  {howItWorks.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.step} className="step-card rounded-lg p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="text-[11px] font-black tracking-[0.2em] text-primary">{item.step}</span>
+                          <Icon className="h-4 w-4 text-zinc-500" />
+                        </div>
+                        <h3 className="text-sm font-black text-white">{item.title}</h3>
+                        <p className="mt-2 text-xs leading-5 text-zinc-500">{item.copy}</p>
                       </div>
-                      <h3 className="text-sm font-black text-white">{item.title}</h3>
-                      <p className="mt-2 text-xs leading-5 text-zinc-500">{item.copy}</p>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -159,44 +273,59 @@ export default function Home() {
         </section>
 
         <section className="border-b border-white/10">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+            <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-black tracking-tight text-white">Today&apos;s Prize Problems</h2>
-                <p className="mt-1 text-sm text-zinc-500">
-                  Solve fast, rank higher, and compete for verified cash pools.
+                <div className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-black text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Reward path
+                </div>
+                <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Milestones That Pay You Back</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                  Every card shows the target and reward openly. Build skill, keep your streak alive,
+                  and let the rewards become the bonus that keeps you moving.
                 </p>
               </div>
-              <Link href="/rankings" className="btn-secondary h-10 px-4 text-xs">
-                See who is winning
+              <Link href="/problems" className="btn-primary h-11 gap-2 px-5 text-sm">
+                Start Earning
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {DAILY_PRIZE_PROBLEMS.map((problem) => (
-                <Link
-                  key={problem.id}
-                  href={`/workspace/${problem.id}`}
-                  className="interactive-card surface-panel block rounded-xl p-5"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className={`rounded border px-2 py-0.5 text-[10px] font-bold ${difficultyClass(problem.difficulty)}`}>
-                        {problem.difficulty}
-                      </span>
-                      <h3 className="mt-3 text-base font-black text-white">{problem.title}</h3>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {problem.topic} / {problem.pattern}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-xl font-black text-emerald-300">
-                        Rs. {problem.prizeMoneyInr?.toLocaleString("en-IN")}
+
+            <div className="relative">
+              <div className="absolute left-8 right-8 top-[4.25rem] hidden h-0.5 bg-gradient-to-r from-orange-400 via-red-400 to-fuchsia-400 opacity-70 md:block" />
+              <div className="absolute left-8 right-8 top-[4.25rem] hidden border-t border-dashed border-white/25 md:block" />
+
+              <div className="grid grid-cols-1 gap-x-5 gap-y-10 sm:grid-cols-2 xl:grid-cols-4">
+                {rewardMilestones.map((milestone) => {
+                  const Icon = milestone.icon;
+                  return (
+                    <Link
+                      key={milestone.title}
+                      href="/problems"
+                      className="group relative flex min-h-[21rem] flex-col items-center pt-12"
+                    >
+                      <div className={`absolute top-0 z-10 flex h-20 w-20 items-center justify-center rounded-full border ${milestone.accent} shadow-[0_0_34px_rgba(255,255,255,0.08)] transition-transform duration-200 group-hover:-translate-y-1`}>
+                        <Icon className={`h-9 w-9 ${milestone.amountClass}`} />
                       </div>
-                      <div className="text-[10px] font-bold uppercase text-zinc-600">Prize pool</div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                      <div className={`absolute top-20 h-8 w-0.5 ${milestone.line}`} />
+                      <div className={`relative flex h-full w-full flex-col items-center overflow-hidden rounded-xl border bg-gradient-to-b ${milestone.glow} to-white/[0.025] px-5 pb-6 pt-16 text-center transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_18px_70px_rgba(0,0,0,0.38)] ${milestone.accent}`}>
+                        <div className={`absolute inset-x-8 top-0 h-px ${milestone.line}`} />
+                        <div className="text-2xl font-black uppercase tracking-wide text-white">{milestone.title}</div>
+                        <div className={`mt-4 h-1 w-16 rounded-full ${milestone.line}`} />
+                        <div className="mt-7 text-lg font-bold text-zinc-300">{milestone.label}</div>
+                        <div className={`mt-5 text-6xl font-black leading-none tracking-tight ${milestone.amountClass}`}>
+                          {milestone.amount}
+                        </div>
+                        <div className="mt-7 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/20 text-zinc-500">
+                          <Wallet className="h-5 w-5" />
+                        </div>
+                        <p className="mt-5 min-h-10 text-xs font-semibold leading-5 text-zinc-400">{milestone.detail}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>

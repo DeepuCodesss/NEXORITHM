@@ -1,7 +1,6 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useUser, useClerk } from "@clerk/nextjs";
 import {
   UserState,
   INITIAL_USER,
@@ -96,9 +95,6 @@ const emptyReward = (): SolveRewardResult => ({
 });
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
-  const { signOut: clerkSignOut } = useClerk();
-  
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [hydrated, setHydrated] = useState(false);
 
@@ -107,29 +103,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [leaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
 
   useEffect(() => {
-    if (!isLoaded) return;
-
-    if (isSignedIn && clerkUser) {
-      const stored = loadStoredUser(clerkUser.id);
-      setUser({
-        ...stored,
-        fullName: clerkUser.fullName || clerkUser.firstName || "Coder",
-        username: clerkUser.username || usernameFromEmail(clerkUser.primaryEmailAddress?.emailAddress || "") || "coder",
-        email: clerkUser.primaryEmailAddress?.emailAddress || "",
-        avatarUrl: clerkUser.imageUrl,
-        authProvider: "email",
-      });
-    } else {
-      setUser(loadStoredUser());
-    }
+    setUser(loadStoredUser());
     setHydrated(true);
-  }, [isLoaded, isSignedIn, clerkUser]);
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    const storageKey = isSignedIn && clerkUser ? `${USER_STORAGE_KEY}-${clerkUser.id}` : USER_STORAGE_KEY;
-    localStorage.setItem(storageKey, JSON.stringify(user));
-  }, [user, hydrated, isSignedIn, clerkUser]);
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  }, [user, hydrated]);
 
   const buyStreakShield = (): boolean => {
     return false;
@@ -140,18 +121,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const isProblemSolved = (problemId: string) => user.solvedProblemIds.includes(problemId);
 
   const signInWithProvider = (provider: Exclude<AuthProvider, "guest" | "email">) => {
-    // No-op or simulated, Clerk handles provider flows
+    setUser((current) => ({
+      ...current,
+      ...providerProfiles[provider],
+      authProvider: provider,
+    }));
   };
 
   const signInWithEmail = ({ fullName, email, password, isSignUp = false }: SignInWithEmailInput) => {
-    // No-op, Clerk handles email sign in
+    if (!email.trim()) return { ok: false as const, error: "Enter an email address." };
+    if (!password.trim()) return { ok: false as const, error: "Enter a password." };
+    setUser((current) => ({
+      ...current,
+      fullName: fullName?.trim() || current.fullName || "Nexorithm Coder",
+      username: usernameFromEmail(email),
+      email,
+      authProvider: "email",
+      avatarUrl: `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+    }));
     return { ok: true as const };
   };
 
   const signOut = () => {
-    if (clerkSignOut) {
-      clerkSignOut();
-    }
     setUser(INITIAL_USER);
   };
 
@@ -206,7 +197,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         missions,
         leaderboard,
         isPro: user.isPro,
-        isAuthenticated: !!isSignedIn,
+        isAuthenticated: user.authProvider !== "guest",
         solvedCount: user.solvedProblemIds.length,
         isProblemSolved,
         buyStreakShield,
@@ -229,4 +220,3 @@ export function useApp() {
   }
   return context;
 }
-

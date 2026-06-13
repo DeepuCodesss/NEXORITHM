@@ -14,6 +14,30 @@ export interface Problem {
   coinReward: number;
   prizeMoneyInr?: number;
   description: string;
+  discussions: {
+    id: string;
+    author: string;
+    role: string;
+    postedAgo: string;
+    title: string;
+    body: string;
+    upvotes: number;
+    replies: number;
+  }[];
+  editorial: {
+    overview: string;
+    approach: string[];
+    complexity: {
+      time: string;
+      space: string;
+    };
+  };
+  optimizedSolutions: {
+    language: JudgeLanguage;
+    label: string;
+    code: string;
+    explanation: string;
+  }[];
   judge: {
     kind: "sum" | "max" | "count-even" | "reverse-words" | "gcd" | "range-sum";
   };
@@ -222,6 +246,122 @@ const taskCopy: Record<JudgeKind, { title: string; body: string }> = {
   },
 };
 
+const formatHtmlBlock = (value: string) => value.trim().replace(/\n/g, "<br />");
+
+const problemGuides: Record<
+  JudgeKind,
+  {
+    statement: string;
+    inputFormat: string[];
+    outputFormat: string;
+    constraints: string[];
+    explanation: (testCase: Problem["testCases"][number]) => string[];
+  }
+> = {
+  sum: {
+    statement:
+      "You are given a list of integers. Your task is to compute the total sum of all values in the list.",
+    inputFormat: [
+      "The first line contains an integer n, the number of values.",
+      "The second line contains n space-separated integers.",
+    ],
+    outputFormat: "Return one integer: the sum of the given values.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      return [
+        `The values are ${nums.slice(1).join(", ")}.`,
+        `Adding them gives ${testCase.expected}.`,
+      ];
+    },
+  },
+  max: {
+    statement:
+      "You are given a list of integers. Find the largest value present in the list.",
+    inputFormat: [
+      "The first line contains an integer n, the number of values.",
+      "The second line contains n space-separated integers.",
+    ],
+    outputFormat: "Return one integer: the maximum value in the list.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => [
+      `Scanning all values, the largest one is ${testCase.expected}.`,
+      "No other value in the list is greater than it.",
+    ],
+  },
+  "count-even": {
+    statement:
+      "You are given a list of integers. Count how many of them are even.",
+    inputFormat: [
+      "The first line contains an integer n, the number of values.",
+      "The second line contains n space-separated integers.",
+    ],
+    outputFormat: "Return one integer: the number of even values.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number).slice(1) ?? [];
+      const evens = nums.filter((value) => value % 2 === 0);
+      return [
+        `The even values are ${evens.join(", ")}.`,
+        `There are ${testCase.expected} even values, so the answer is ${testCase.expected}.`,
+      ];
+    },
+  },
+  "reverse-words": {
+    statement:
+      "You are given a sequence of words. Return the same words in reverse order, separated by a single space.",
+    inputFormat: [
+      "The first line contains an integer n, the number of words.",
+      "The remaining input contains n lowercase words.",
+    ],
+    outputFormat: "Return one line containing the words in reverse order.",
+    constraints: ["1 <= n <= 10^5", "Each word contains only lowercase English letters."],
+    explanation: (testCase) => {
+      const words = testCase.input.trim().split(/\s+/).slice(1);
+      return [
+        `The original order is ${words.join(" -> ")}.`,
+        `After reversing, the order becomes ${testCase.expected}.`,
+      ];
+    },
+  },
+  gcd: {
+    statement:
+      "You are given two positive integers. Find their greatest common divisor, the largest integer that divides both numbers.",
+    inputFormat: ["The input contains two positive integers a and b."],
+    outputFormat: "Return one integer: gcd(a, b).",
+    constraints: ["1 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      return [
+        `For ${nums[0]} and ${nums[1]}, the largest shared divisor is ${testCase.expected}.`,
+        `Therefore, gcd(${nums[0]}, ${nums[1]}) = ${testCase.expected}.`,
+      ];
+    },
+  },
+  "range-sum": {
+    statement:
+      "You are given an array and one inclusive 1-indexed range. Compute the sum of the values inside that range.",
+    inputFormat: [
+      "The first line contains an integer n, the number of values.",
+      "The second line contains n space-separated integers.",
+      "The third line contains two integers l and r, the inclusive 1-indexed range.",
+    ],
+    outputFormat: "Return one integer: the sum of values from index l through index r.",
+    constraints: ["1 <= n <= 10^5", "1 <= l <= r <= n", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      const n = nums[0];
+      const values = nums.slice(1, n + 1);
+      const left = nums[n + 1];
+      const right = nums[n + 2];
+      return [
+        `The requested range is from position ${left} to ${right}.`,
+        `The selected values are ${values.slice(left - 1, right).join(", ")}, and their sum is ${testCase.expected}.`,
+      ];
+    },
+  },
+};
+
 const buildInput = (kind: JudgeKind, seed: number) => {
   if (kind === "reverse-words") {
     const words = ["alpha", "bravo", "code", "delta", "logic", "matrix", "nexo", "query"];
@@ -256,6 +396,212 @@ const buildTestCases = (kind: JudgeKind, level: number) =>
     };
   });
 
+const buildDescription = (
+  kind: JudgeKind,
+  difficulty: Difficulty,
+  topic: string,
+  pattern: string,
+  testCases: Problem["testCases"],
+) => {
+  const guide = problemGuides[kind];
+  const sample = testCases[0];
+  const sampleExplanation = guide.explanation(sample);
+
+  return `
+<p>${guide.statement}</p>
+<p>This problem is part of <strong>${topic}</strong> practice and is designed to strengthen the <strong>${pattern}</strong> pattern.</p>
+
+<h3 class="mt-7 text-base font-bold text-white">Input Format</h3>
+<ul class="mt-3 list-disc space-y-1 pl-5 text-zinc-300">
+  ${guide.inputFormat.map((line) => `<li>${line}</li>`).join("")}
+</ul>
+
+<h3 class="mt-7 text-base font-bold text-white">Output Format</h3>
+<p>${guide.outputFormat}</p>
+
+<h3 class="mt-7 text-base font-bold text-white">Example 1</h3>
+<div class="mt-3 border-l-2 border-zinc-700 pl-4">
+  <p class="font-semibold text-zinc-200">Input:</p>
+  <pre class="mt-2 overflow-x-auto rounded border border-white/10 bg-white/[0.04] p-3 font-mono text-xs leading-5 text-zinc-200">${formatHtmlBlock(sample.input)}</pre>
+  <p class="mt-4 font-semibold text-zinc-200">Output:</p>
+  <pre class="mt-2 overflow-x-auto rounded border border-white/10 bg-white/[0.04] p-3 font-mono text-xs leading-5 text-zinc-200">${sample.expected}</pre>
+  <p class="mt-4 font-semibold text-zinc-200">Explanation:</p>
+  <ul class="mt-2 list-disc space-y-1 pl-5 text-zinc-300">
+    ${sampleExplanation.map((line) => `<li>${line}</li>`).join("")}
+  </ul>
+</div>
+
+<h3 class="mt-7 text-base font-bold text-white">Constraints</h3>
+<ul class="mt-3 list-disc space-y-1 pl-5 text-zinc-300">
+  ${guide.constraints.map((line) => `<li><code>${line}</code></li>`).join("")}
+</ul>
+
+<h3 class="mt-7 text-base font-bold text-white">Return Requirement</h3>
+<p>Implement the starter function for this <strong>${difficulty}</strong> problem. Read from the raw input string and return only the required answer, with no labels or debug text.</p>
+
+<h3 class="mt-7 text-base font-bold text-white">Judge Behavior</h3>
+<p><strong>Run Code</strong> checks the visible sample cases. <strong>Submit</strong> checks those samples plus additional hidden cases that follow the same input format and constraints.</p>
+  `;
+};
+
+const buildEditorial = (
+  kind: JudgeKind,
+  difficulty: Difficulty,
+  topic: string,
+  pattern: string,
+): Problem["editorial"] => {
+  const approachByKind: Record<JudgeKind, string[]> = {
+    sum: [
+      "Parse the count and values from the raw input.",
+      "Accumulate every value after the first number in one running total.",
+      "Return the total as the exact output string.",
+    ],
+    max: [
+      "Parse the count and values from the raw input.",
+      "Track the largest value while scanning the array once.",
+      "Return the maximum value as the exact output string.",
+    ],
+    "count-even": [
+      "Parse the count and values from the raw input.",
+      "Scan every value once and increment the answer when value % 2 equals 0.",
+      "Return the final counter as the exact output string.",
+    ],
+    "reverse-words": [
+      "Ignore the first line count after using it to understand the input format.",
+      "Split the remaining text into words, reverse their order, and join with one space.",
+      "Return the joined sentence without extra leading or trailing spaces.",
+    ],
+    gcd: [
+      "Parse the two positive integers from the input.",
+      "Apply Euclid's algorithm: repeatedly replace a, b with b, a % b.",
+      "When b becomes zero, a is the greatest common divisor.",
+    ],
+    "range-sum": [
+      "Parse n, the n values, and the 1-indexed inclusive range l r.",
+      "For one query, slice the requested range and add the values.",
+      "Return the range total as the exact output string.",
+    ],
+  };
+
+  return {
+    overview: `This ${difficulty.toLowerCase()} ${topic} problem is a direct practice round for the ${pattern} pattern. The key is to keep input parsing predictable, then solve with one small deterministic pass.`,
+    approach: approachByKind[kind],
+    complexity: {
+      time: kind === "gcd" ? "O(log min(a, b))" : "O(n)",
+      space: kind === "reverse-words" ? "O(n)" : "O(1) extra space",
+    },
+  };
+};
+
+const buildOptimizedSolutions = (kind: JudgeKind): Problem["optimizedSolutions"] => {
+  const javascript: Record<JudgeKind, string> = {
+    sum: `function solve(input) {
+  const nums = input.match(/-?\\d+/g).map(Number);
+  return String(nums.slice(1).reduce((sum, value) => sum + value, 0));
+}`,
+    max: `function solve(input) {
+  const nums = input.match(/-?\\d+/g).map(Number);
+  return String(Math.max(...nums.slice(1)));
+}`,
+    "count-even": `function solve(input) {
+  const nums = input.match(/-?\\d+/g).map(Number);
+  return String(nums.slice(1).filter((value) => value % 2 === 0).length);
+}`,
+    "reverse-words": `function solve(input) {
+  return input
+    .trim()
+    .split(/\\r?\\n/)
+    .slice(1)
+    .join(" ")
+    .trim()
+    .split(/\\s+/)
+    .reverse()
+    .join(" ");
+}`,
+    gcd: `function solve(input) {
+  let [a, b] = input.match(/-?\\d+/g).map(Number);
+  while (b !== 0) {
+    [a, b] = [b, a % b];
+  }
+  return String(Math.abs(a));
+}`,
+    "range-sum": `function solve(input) {
+  const nums = input.match(/-?\\d+/g).map(Number);
+  const n = nums[0];
+  const values = nums.slice(1, n + 1);
+  const left = nums[n + 1];
+  const right = nums[n + 2];
+  return String(values.slice(left - 1, right).reduce((sum, value) => sum + value, 0));
+}`,
+  };
+
+  const python: Record<JudgeKind, string> = {
+    sum: `def solve(input):
+    nums = list(map(int, input.split()))
+    return str(sum(nums[1:]))`,
+    max: `def solve(input):
+    nums = list(map(int, input.split()))
+    return str(max(nums[1:]))`,
+    "count-even": `def solve(input):
+    nums = list(map(int, input.split()))
+    return str(sum(1 for value in nums[1:] if value % 2 == 0))`,
+    "reverse-words": `def solve(input):
+    lines = input.strip().splitlines()
+    return " ".join(" ".join(lines[1:]).split()[::-1])`,
+    gcd: `def solve(input):
+    a, b = map(int, input.split())
+    while b:
+        a, b = b, a % b
+    return str(abs(a))`,
+    "range-sum": `def solve(input):
+    nums = list(map(int, input.split()))
+    n = nums[0]
+    values = nums[1:n + 1]
+    left, right = nums[n + 1], nums[n + 2]
+    return str(sum(values[left - 1:right]))`,
+  };
+
+  return [
+    {
+      language: "javascript",
+      label: "JavaScript",
+      code: javascript[kind],
+      explanation: "Uses the same raw-input function style as the editor starter and keeps parsing close to the computation.",
+    },
+    {
+      language: "python",
+      label: "Python",
+      code: python[kind],
+      explanation: "Compact reference solution focused on the core pattern without extra framework code.",
+    },
+  ];
+};
+
+const buildDiscussions = (level: number, kind: JudgeKind, topic: string, pattern: string): Problem["discussions"] => [
+  {
+    id: `d-${level}-1`,
+    author: "mira_codes",
+    role: "Level Mentor",
+    postedAgo: "2h ago",
+    title: `Clean way to think about ${pattern}`,
+    body: `For this ${topic} exercise, separate parsing from the actual ${pattern.toLowerCase()} idea. Once the values are shaped correctly, the solution is usually just one pass.`,
+    upvotes: 18 + (level % 40),
+    replies: 4 + (level % 7),
+  },
+  {
+    id: `d-${level}-2`,
+    author: "devranker",
+    role: "Contest Solver",
+    postedAgo: "1d ago",
+    title: "Common wrong answer trap",
+    body: kind === "reverse-words"
+      ? "Watch for extra spaces and newlines. Joining all lines after the count before splitting avoids most formatting mistakes."
+      : "The judge compares exact output, so return only the answer. Extra labels, logs, or whitespace can turn a correct idea into a wrong answer.",
+    upvotes: 11 + (level % 25),
+    replies: 2 + (level % 5),
+  },
+];
+
 const generateProblem = (level: number): Problem => {
   const track = tracks[(level - 1) % tracks.length];
   const pattern = track.patterns[Math.floor((level - 1) / tracks.length) % track.patterns.length];
@@ -277,14 +623,10 @@ const generateProblem = (level: number): Problem => {
     pattern,
     ...rewards,
     prizeMoneyInr: level <= 3 ? [1000, 2500, 5000][level - 1] : undefined,
-    description: `
-<p>Solve a <strong>${difficulty}</strong> problem from <strong>${track.topic}</strong>, focused on <strong>${pattern}</strong>.</p>
-<p>${taskCopy[kind].body}</p>
-<h4 class="text-sm font-semibold mt-4 text-zinc-300">Task</h4>
-<p>Implement the function so it accepts the raw input string and returns the exact expected output as a string or number.</p>
-<h4 class="text-sm font-semibold mt-4 text-zinc-300">Note</h4>
-<p>The backend judge runs every sample for Run Code and all generated cases for Submit.</p>
-    `,
+    description: buildDescription(kind, difficulty, track.topic, pattern, testCases),
+    discussions: buildDiscussions(level, kind, track.topic, pattern),
+    editorial: buildEditorial(kind, difficulty, track.topic, pattern),
+    optimizedSolutions: buildOptimizedSolutions(kind),
     judge: { kind },
     starterCode: starterCode(functionName),
     testCases,
