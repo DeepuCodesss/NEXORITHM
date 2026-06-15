@@ -5,7 +5,7 @@ export default function ProPage() {
   return (
     <div className="app-shell">
       <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-        <Link href="/" className="mb-8 inline-flex items-center gap-1 text-xs font-semibold text-zinc-500 hover:text-white">
+        <Link href="/" className="mb-8 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-white">
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to question bank
         </Link>
@@ -15,7 +15,7 @@ export default function ProPage() {
             <Clock className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">NEXORITHM Membership Is Coming Soon</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-zinc-400">
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-secondary-text">
             Membership, payments, premium contests, visibility boosts, and subscription benefits are intentionally disabled for now. No checkout is simulated and no payment UI is active until Razorpay and backend entitlements are implemented.
           </p>
         </section>
@@ -32,7 +32,7 @@ export default function ProPage() {
               <div key={item.title} className="surface-card rounded-lg p-5">
                 <Icon className="mb-3 h-5 w-5 text-primary" />
                 <h2 className="text-sm font-bold text-white">{item.title}</h2>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">{item.text}</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.text}</p>
               </div>
             );
           })}

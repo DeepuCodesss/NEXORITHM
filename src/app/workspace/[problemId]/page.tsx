@@ -25,7 +25,7 @@ import {
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center bg-[#1e1e1e] font-mono text-sm text-zinc-400">
+    <div className="flex h-full items-center justify-center bg-[#1e1e1e] font-mono text-sm text-secondary-text">
       Loading editor...
     </div>
   ),
@@ -54,15 +54,15 @@ type JudgeResponse = {
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
   const { problems, solveProblem, isProblemSolved } = useApp();
-  
+
   const problem = problems.find((p) => p.id === problemId) || problems[0];
 
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
   const [code, setCode] = useState(problem.starterCode.javascript);
-  
+
   type LeftTab = "description" | "editorial" | "solutions" | "discussions" | "testcases";
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
-  
+
   type BottomTab = "testcase" | "console";
 
   // Console state
@@ -110,7 +110,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
     if (reward?.awarded) {
       lines.push("");
-      lines.push(`+${reward.xpGained} XP  +${reward.coinsGained} coins  +${reward.reputationGained} reputation`);
+      lines.push(`+${reward.xpGained} XP  +${reward.coinsGained} coins  +${reward.moneyGainedInr} INR  +${reward.reputationGained} reputation`);
     } else if (reward?.alreadySolved && result.status === "Accepted") {
       lines.push("");
       lines.push("Already solved — no additional XP for this problem.");
@@ -253,25 +253,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   return (
     <div className="fixed inset-x-0 bottom-0 top-14 flex flex-col overflow-hidden bg-background">
       {rewardBanner?.awarded && (
-        <div className="flex items-center justify-between gap-4 border-b border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
+        <div className="flex items-center justify-between gap-4 border-b border-success/20 bg-success/10 px-4 py-3">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+            <CheckCircle2 className="h-5 w-5 text-success" />
             <div>
-              <p className="text-sm font-bold text-emerald-200">Accepted — problem solved!</p>
-              <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs font-mono text-emerald-100/90">
+              <p className="text-sm font-bold text-success">Accepted — problem solved!</p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs font-mono text-success/90">
                 <span className="inline-flex items-center gap-1">
                   <Award className="h-3.5 w-3.5" />+{rewardBanner.xpGained} XP
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Coins className="h-3.5 w-3.5" />+{rewardBanner.coinsGained} coins
                 </span>
+                {rewardBanner.moneyGainedInr > 0 && <span>+₹{rewardBanner.moneyGainedInr} cash</span>}
                 <span>+{rewardBanner.reputationGained} reputation</span>
               </p>
             </div>
           </div>
           <button
             onClick={() => setRewardBanner(null)}
-            className="text-xs font-mono uppercase text-emerald-200/70 hover:text-emerald-100"
+            className="text-xs font-mono uppercase text-success/70 hover:text-success"
           >
             Dismiss
           </button>
@@ -279,22 +280,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       )}
 
       {isProblemSolved(problem.id) && !rewardBanner?.awarded && (
-        <div className="border-b border-white/10 bg-white/[0.03] px-4 py-2 text-xs text-zinc-400">
+        <div className="border-b border-border bg-card px-4 py-2 text-xs text-secondary-text">
           You have already solved this problem. Submit again to practice — no extra XP.
         </div>
       )}
       {/* Workbench Header */}
-      <div className="flex h-11 items-center justify-between border-b border-white/10 bg-white/[0.04] px-4 backdrop-blur-xl">
+      <div className="flex h-11 items-center justify-between border-b border-border bg-hover px-4 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white transition-colors"
+            className="flex items-center gap-1 text-xs text-secondary-text hover:text-white transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
           </Link>
-          <span className="text-zinc-600">/</span>
-          <span className="text-xs font-semibold text-zinc-300">{problem.title}</span>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-xs font-semibold text-secondary-text">{problem.title}</span>
         </div>
 
         {/* Action Options */}
@@ -315,7 +316,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
           {/* Reset Code */}
           <button
             onClick={handleResetCode}
-            className="rounded border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-colors hover:text-white"
+            className="rounded border border-border bg-hover p-1.5 text-secondary-text transition-colors hover:text-white"
             title="Reset Starter Template"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -330,18 +331,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
           className="flex min-h-0 w-full min-w-0 flex-col bg-background/80 md:w-auto md:[flex-basis:var(--left-panel-width)]"
           style={leftPanelStyle}
         >
-          <div className="flex overflow-x-auto border-b border-white/10 bg-white/[0.04] px-2">
+          <div className="flex overflow-x-auto border-b border-border bg-hover px-2">
             {leftTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setLeftTab(tab.id)}
-                  className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                    leftTab === tab.id
+                  className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${leftTab === tab.id
                       ? "border-primary text-white"
-                      : "border-transparent text-zinc-500 hover:text-zinc-300"
-                  }`}
+                      : "border-transparent text-muted-foreground hover:text-secondary-text"
+                    }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {tab.label}
@@ -352,20 +352,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
           <div className="min-h-0 flex-1 overflow-y-auto p-5 scrollbar-thin">
             {leftTab === "description" && (
-              <div className="prose prose-invert max-w-none text-zinc-300 text-sm">
+              <div className="prose prose-invert max-w-none text-secondary-text text-sm">
                 <h1 className="text-lg font-bold text-white mb-2">{problem.title}</h1>
                 <div className="flex items-center gap-3 mb-6 text-xs font-mono">
-                  <span className={`px-2 py-0.5 rounded border ${
-                    problem.difficulty === "Easy"
-                      ? "text-emerald-400 border-emerald-950 bg-emerald-950/20"
+                  <span className={`px-2 py-0.5 rounded border ${problem.difficulty === "Easy"
+                      ? "text-success border-success bg-success/20"
                       : problem.difficulty === "Medium"
-                      ? "text-amber-500 border-amber-950 bg-amber-950/20"
-                      : "text-red-400 border-red-950 bg-red-950/20"
-                  }`}>
+                        ? "text-primary0 border-primary bg-primary/20"
+                        : "text-destructive border-destructive bg-destructive/20"
+                    }`}>
                     {problem.difficulty}
                   </span>
-                  <span className="text-zinc-500">Level: {problem.level}</span>
-                  <span className="text-zinc-500">Topic: {problem.topic}</span>
+                  <span className="text-muted-foreground">Level: {problem.level}</span>
+                  <span className="text-muted-foreground">Topic: {problem.topic}</span>
                 </div>
                 {/* Embedded HTML Problem Description */}
                 <div
@@ -376,17 +375,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
             )}
 
             {leftTab === "editorial" && (
-              <div className="space-y-6 text-sm text-zinc-300">
+              <div className="space-y-6 text-sm text-secondary-text">
                 <div>
                   <h1 className="text-lg font-bold text-white">Editorial</h1>
-                  <p className="mt-2 leading-6 text-zinc-400">{problem.editorial.overview}</p>
+                  <p className="mt-2 leading-6 text-secondary-text">{problem.editorial.overview}</p>
                 </div>
                 <div>
-                  <h2 className="mb-3 text-xs font-mono font-bold uppercase tracking-wider text-zinc-500">Approach</h2>
+                  <h2 className="mb-3 text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">Approach</h2>
                   <ol className="space-y-3">
                     {problem.editorial.approach.map((step, index) => (
-                      <li key={step} className="flex gap-3 rounded border border-white/10 bg-white/[0.03] p-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary/15 font-mono text-xs font-bold text-blue-200">
+                      <li key={step} className="flex gap-3 rounded border border-border bg-card p-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary/15 font-mono text-xs font-bold text-primary">
                           {index + 1}
                         </span>
                         <span className="leading-6">{step}</span>
@@ -395,12 +394,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                   </ol>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded border border-white/10 bg-white/[0.04] p-4">
-                    <div className="text-xs font-mono uppercase text-zinc-500">Time</div>
+                  <div className="rounded border border-border bg-hover p-4">
+                    <div className="text-xs font-mono uppercase text-muted-foreground">Time</div>
                     <div className="mt-1 font-mono text-sm font-bold text-white">{problem.editorial.complexity.time}</div>
                   </div>
-                  <div className="rounded border border-white/10 bg-white/[0.04] p-4">
-                    <div className="text-xs font-mono uppercase text-zinc-500">Space</div>
+                  <div className="rounded border border-border bg-hover p-4">
+                    <div className="text-xs font-mono uppercase text-muted-foreground">Space</div>
                     <div className="mt-1 font-mono text-sm font-bold text-white">{problem.editorial.complexity.space}</div>
                   </div>
                 </div>
@@ -411,20 +410,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
               <div className="space-y-5">
                 <div>
                   <h1 className="text-lg font-bold text-white">Optimized Solutions</h1>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  <p className="mt-2 text-sm leading-6 text-secondary-text">
                     Reference implementations that pass this problem with the intended complexity.
                   </p>
                 </div>
                 {problem.optimizedSolutions.map((solution) => (
-                  <div key={solution.language} className="overflow-hidden rounded border border-white/10 bg-white/[0.03]">
-                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                  <div key={solution.language} className="overflow-hidden rounded border border-border bg-card">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
                       <div className="text-sm font-bold text-white">{solution.label}</div>
-                      <span className="rounded border border-blue-400/20 bg-blue-400/10 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-200">
+                      <span className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
                         Optimized
                       </span>
                     </div>
-                    <p className="px-4 py-3 text-sm leading-6 text-zinc-400">{solution.explanation}</p>
-                    <pre className="overflow-x-auto border-t border-white/10 bg-black/25 p-4 text-xs leading-5 text-zinc-200">
+                    <p className="px-4 py-3 text-sm leading-6 text-secondary-text">{solution.explanation}</p>
+                    <pre className="overflow-x-auto border-t border-border bg-black/25 p-4 text-xs leading-5 text-foreground">
                       <code>{solution.code}</code>
                     </pre>
                   </div>
@@ -436,26 +435,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
               <div className="space-y-4">
                 <div>
                   <h1 className="text-lg font-bold text-white">Discussions</h1>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  <p className="mt-2 text-sm leading-6 text-secondary-text">
                     Community notes, pitfalls, and hints for this problem.
                   </p>
                 </div>
                 {problem.discussions.map((discussion) => (
-                  <article key={discussion.id} className="rounded border border-white/10 bg-white/[0.03] p-4">
+                  <article key={discussion.id} className="rounded border border-border bg-card p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h2 className="text-sm font-bold text-white">{discussion.title}</h2>
-                        <p className="mt-1 text-xs text-zinc-500">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {discussion.author} / {discussion.role} / {discussion.postedAgo}
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-zinc-400">
+                      <div className="flex shrink-0 items-center gap-1 rounded border border-border bg-hover px-2 py-1 text-xs text-secondary-text">
                         <ThumbsUp className="h-3.5 w-3.5" />
                         {discussion.upvotes}
                       </div>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300">{discussion.body}</p>
-                    <div className="mt-4 text-xs font-semibold text-zinc-500">{discussion.replies} replies</div>
+                    <p className="mt-3 text-sm leading-6 text-secondary-text">{discussion.body}</p>
+                    <div className="mt-4 text-xs font-semibold text-muted-foreground">{discussion.replies} replies</div>
                   </article>
                 ))}
               </div>
@@ -464,17 +463,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
             {leftTab === "testcases" && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-3 font-bold">SAMPLE TEST CASES</h3>
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3 font-bold">SAMPLE TEST CASES</h3>
                   <div className="flex gap-2 mb-4">
                     {problem.testCases.map((tc) => (
                       <button
                         key={tc.id}
                         onClick={() => setSelectedTestCase(tc.id)}
-                        className={`px-3 py-1.5 text-xs font-mono rounded border transition-colors ${
-                          selectedTestCase === tc.id
-                            ? "bg-zinc-800 border-zinc-700 text-white"
-                            : "bg-zinc-900/50 border-zinc-900 text-zinc-400 hover:text-white"
-                        }`}
+                        className={`px-3 py-1.5 text-xs font-mono rounded border transition-colors ${selectedTestCase === tc.id
+                            ? "bg-card border-border text-white"
+                            : "bg-card border-border text-secondary-text hover:text-white"
+                          }`}
                       >
                         Case {tc.id}
                       </button>
@@ -487,12 +485,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                     return (
                       <div key={tc.id} className="space-y-3 font-mono text-xs">
                         <div className="space-y-1">
-                          <span className="text-zinc-500">Input:</span>
-                          <pre className="rounded border border-white/10 bg-white/[0.04] p-3 text-zinc-300">{tc.input}</pre>
+                          <span className="text-muted-foreground">Input:</span>
+                          <pre className="rounded border border-border bg-hover p-3 text-secondary-text">{tc.input}</pre>
                         </div>
                         <div className="space-y-1">
-                          <span className="text-zinc-500">Expected Output:</span>
-                          <pre className="rounded border border-white/10 bg-white/[0.04] p-3 text-zinc-300">{tc.expected}</pre>
+                          <span className="text-muted-foreground">Expected Output:</span>
+                          <pre className="rounded border border-border bg-hover p-3 text-secondary-text">{tc.expected}</pre>
                         </div>
                       </div>
                     );
@@ -505,10 +503,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
         <div
           onPointerDown={handleMainResizeStart}
-          className="group hidden w-2 shrink-0 cursor-col-resize items-center justify-center border-x border-white/10 bg-[#111318] transition-colors hover:bg-white/[0.06] md:flex"
+          className="group hidden w-2 shrink-0 cursor-col-resize items-center justify-center border-x border-border bg-[#111318] transition-colors hover:bg-white/[0.06] md:flex"
           title="Resize panels"
         >
-          <div className="h-12 w-1 rounded-full bg-zinc-700 transition-colors group-hover:bg-zinc-500" />
+          <div className="h-12 w-1 rounded-full bg-border transition-colors group-hover:bg-secondary-text" />
         </div>
 
         {/* Right Side Panel: Editor & Code Execution Console */}
@@ -545,33 +543,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
           {/* Testcase and Console Panel */}
           <div
-            className={`flex shrink-0 flex-col border-t border-white/10 bg-background ${
-              consoleOpen ? "" : "h-11"
-            }`}
+            className={`flex shrink-0 flex-col border-t border-border bg-background ${consoleOpen ? "" : "h-11"
+              }`}
             style={consoleOpen ? { height: `${bottomPanelHeight}px` } : undefined}
           >
             {consoleOpen && (
               <div
                 onPointerDown={handlePanelResizeStart}
-                className="group flex h-3 cursor-row-resize items-center justify-center bg-white/[0.02]"
+                className="group flex h-3 cursor-row-resize items-center justify-center bg-card"
                 title="Resize panel"
               >
-                <div className="h-1 w-12 rounded-full bg-zinc-700 transition-colors group-hover:bg-zinc-500" />
+                <div className="h-1 w-12 rounded-full bg-border transition-colors group-hover:bg-secondary-text" />
               </div>
             )}
 
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 bg-[#111318] px-3">
+            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-[#111318] px-3">
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => {
                     setBottomTab("testcase");
                     setConsoleOpen(true);
                   }}
-                  className={`flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition-colors ${
-                    bottomTab === "testcase" && consoleOpen
-                      ? "bg-white/10 text-white"
-                      : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-300"
-                  }`}
+                  className={`flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition-colors ${bottomTab === "testcase" && consoleOpen
+                      ? "bg-hover text-white"
+                      : "text-muted-foreground hover:bg-white/[0.05] hover:text-secondary-text"
+                    }`}
                 >
                   <Terminal className="h-3.5 w-3.5" />
                   Testcase
@@ -581,11 +577,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                     setBottomTab("console");
                     setConsoleOpen(true);
                   }}
-                  className={`flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition-colors ${
-                    bottomTab === "console" && consoleOpen
-                      ? "bg-white/10 text-white"
-                      : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-300"
-                  }`}
+                  className={`flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition-colors ${bottomTab === "console" && consoleOpen
+                      ? "bg-hover text-white"
+                      : "text-muted-foreground hover:bg-white/[0.05] hover:text-secondary-text"
+                    }`}
                 >
                   <FileText className="h-3.5 w-3.5" />
                   Console
@@ -593,7 +588,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
               </div>
               <button
                 onClick={() => setConsoleOpen((current) => !current)}
-                className="rounded px-2 py-1 text-xs font-mono uppercase text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-white"
+                className="rounded px-2 py-1 text-xs font-mono uppercase text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-white"
               >
                 {consoleOpen ? "Collapse" : "Expand"}
               </button>
@@ -608,11 +603,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                         <button
                           key={tc.id}
                           onClick={() => setSelectedTestCase(tc.id)}
-                          className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${
-                            selectedTestCase === tc.id
-                              ? "bg-zinc-700 text-white"
-                              : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white"
-                          }`}
+                          className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${selectedTestCase === tc.id
+                              ? "bg-border text-white"
+                              : "bg-hover text-secondary-text hover:bg-hover hover:text-white"
+                            }`}
                         >
                           Case {tc.id}
                         </button>
@@ -624,14 +618,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                       return (
                         <div key={tc.id} className="grid gap-3 text-xs lg:grid-cols-2">
                           <div>
-                            <div className="mb-1.5 font-bold text-zinc-400">Input</div>
-                            <pre className="min-h-20 overflow-x-auto rounded border border-white/10 bg-white/[0.04] p-3 font-mono leading-5 text-zinc-200">
+                            <div className="mb-1.5 font-bold text-secondary-text">Input</div>
+                            <pre className="min-h-20 overflow-x-auto rounded border border-border bg-hover p-3 font-mono leading-5 text-foreground">
                               {tc.input}
                             </pre>
                           </div>
                           <div>
-                            <div className="mb-1.5 font-bold text-zinc-400">Expected Output</div>
-                            <pre className="min-h-20 overflow-x-auto rounded border border-white/10 bg-white/[0.04] p-3 font-mono leading-5 text-zinc-200">
+                            <div className="mb-1.5 font-bold text-secondary-text">Expected Output</div>
+                            <pre className="min-h-20 overflow-x-auto rounded border border-border bg-hover p-3 font-mono leading-5 text-foreground">
                               {tc.expected}
                             </pre>
                           </div>
@@ -642,30 +636,30 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                 )}
 
                 {bottomTab === "console" && (
-                  <div className="font-mono text-xs text-zinc-400">
+                  <div className="font-mono text-xs text-secondary-text">
                     {consoleLogs ? (
                       <pre className="whitespace-pre-wrap leading-relaxed">{consoleLogs}</pre>
                     ) : (
-                      <span className="text-zinc-600">
+                      <span className="text-muted-foreground">
                         Console is idle. Click &apos;Run Code&apos; or &apos;Submit Code&apos; to see judge output.
                       </span>
                     )}
                   </div>
                 )}
               </div>
-              )}
+            )}
           </div>
 
           {/* Workbench Footer Bar */}
-          <div className="relative z-10 flex h-14 shrink-0 items-center justify-end border-t border-white/10 bg-[#111318] px-4 shadow-[0_-12px_28px_rgba(0,0,0,0.24)]">
+          <div className="relative z-10 flex h-14 shrink-0 items-center justify-end border-t border-border bg-[#111318] px-4 shadow-[0_-12px_28px_rgba(0,0,0,0.24)]">
             <div className="flex gap-3">
               {/* Run Code */}
-            <button
-              onClick={handleRunCode}
+              <button
+                onClick={handleRunCode}
                 disabled={isRunning || isSubmitting}
                 className="btn-secondary px-4 py-1.5 text-xs disabled:opacity-50"
               >
-                <Play className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
+                <Play className="w-3.5 h-3.5 mr-1.5 text-secondary-text" />
                 {isRunning ? "Running" : "Run Code"}
               </button>
 

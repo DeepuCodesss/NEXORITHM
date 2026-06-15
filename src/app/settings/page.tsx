@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/context/AppContext";
 import { useRouter } from "next/navigation";
@@ -17,14 +17,15 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Sync state with clerkUser when loaded
   useEffect(() => {
-    if (clerkUser) {
+    if (!clerkUser) return;
+
+    queueMicrotask(() => {
       setFirstName(clerkUser.firstName || "");
       setLastName(clerkUser.lastName || "");
       setUsername(clerkUser.username || "");
-    }
-  }, [clerkUser]);
+    });
+  }, [clerkUser, clerkUser?.firstName, clerkUser?.lastName, clerkUser?.username]);
 
   if (!isLoaded) {
     return (
@@ -38,7 +39,7 @@ export default function SettingsPage() {
     return (
       <div className="app-shell flex min-h-screen flex-col items-center justify-center p-4">
         <h1 className="text-xl font-black text-white">Access Denied</h1>
-        <p className="mt-2 max-w-md text-center text-sm leading-6 text-zinc-400">
+        <p className="mt-2 max-w-md text-center text-sm leading-6 text-secondary-text">
           Please sign in to access settings.
         </p>
         <button
@@ -63,11 +64,12 @@ export default function SettingsPage() {
         username: username.trim() || undefined,
       });
       setStatus({ type: "success", message: "Profile updated successfully!" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const clerkError = err as { errors?: { longMessage?: string }[]; message?: string };
       setStatus({
         type: "error",
-        message: err?.errors?.[0]?.longMessage || err?.message || "Failed to update profile.",
+        message: clerkError.errors?.[0]?.longMessage || clerkError.message || "Failed to update profile.",
       });
     } finally {
       setLoading(false);
@@ -90,7 +92,7 @@ export default function SettingsPage() {
       <main className="mx-auto max-w-3xl px-4 pt-8 sm:px-6 lg:px-8">
         <div className="mb-6">
           <h1 className="text-3xl font-black text-white">Settings</h1>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="mt-2 text-sm text-secondary-text">
             Manage your account settings, edit your profile details, and configure preferences.
           </p>
         </div>
@@ -99,18 +101,18 @@ export default function SettingsPage() {
           <div
             className={`mb-6 flex items-start gap-3 rounded-lg border p-4 text-sm ${
               status.type === "success"
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-                : "border-rose-500/20 bg-rose-500/10 text-rose-300"
+                ? "border-success0/20 bg-success0/10 text-success"
+                : "border-primary0/20 bg-primary0/10 text-primary"
             }`}
           >
             {status.type === "success" ? (
-              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-success" />
             ) : (
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             )}
             <div>
               <p className="font-bold">{status.type === "success" ? "Success" : "Error"}</p>
-              <p className="mt-1 text-xs text-zinc-400">{status.message}</p>
+              <p className="mt-1 text-xs text-secondary-text">{status.message}</p>
             </div>
           </div>
         )}
@@ -125,7 +127,7 @@ export default function SettingsPage() {
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">
+                  <label htmlFor="firstName" className="block text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">
                     First Name
                   </label>
                   <input
@@ -139,7 +141,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="lastName" className="block text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">
+                  <label htmlFor="lastName" className="block text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">
                     Last Name
                   </label>
                   <input
@@ -155,11 +157,11 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label htmlFor="username" className="block text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">
+                <label htmlFor="username" className="block text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">
                   Username
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-zinc-500">@</span>
+                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">@</span>
                   <input
                     id="username"
                     type="text"
@@ -191,17 +193,17 @@ export default function SettingsPage() {
               <Mail className="h-5 w-5 text-primary" />
               Account Verification & Info
             </h2>
-            <div className="space-y-4 text-sm text-zinc-400">
-              <div className="flex justify-between py-2 border-b border-white/5">
-                <span className="font-semibold text-zinc-300">Email Address</span>
+            <div className="space-y-4 text-sm text-secondary-text">
+              <div className="flex justify-between py-2 border-b border-border">
+                <span className="font-semibold text-secondary-text">Email Address</span>
                 <span className="text-white font-mono text-xs">{emailAddress}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-white/5">
-                <span className="font-semibold text-zinc-300">Member Since</span>
+              <div className="flex justify-between py-2 border-b border-border">
+                <span className="font-semibold text-secondary-text">Member Since</span>
                 <span className="text-white text-xs">{joinedDate}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-white/5">
-                <span className="font-semibold text-zinc-300">Connected Accounts</span>
+              <div className="flex justify-between py-2 border-b border-border">
+                <span className="font-semibold text-secondary-text">Connected Accounts</span>
                 <span className="text-white text-xs">
                   {linkedProviders.length > 0 ? linkedProviders.join(", ") : "Email only"}
                 </span>
@@ -210,12 +212,12 @@ export default function SettingsPage() {
           </section>
 
           {/* Danger Zone Panel (Logout) */}
-          <section className="surface-panel border border-rose-500/20 rounded-lg p-6 bg-rose-950/5">
-            <h2 className="text-lg font-black text-rose-300 flex items-center gap-2 mb-2">
-              <ShieldAlert className="h-5 w-5 text-rose-400" />
+          <section className="surface-panel border border-primary0/20 rounded-lg p-6 bg-primary/5">
+            <h2 className="text-lg font-black text-primary flex items-center gap-2 mb-2">
+              <ShieldAlert className="h-5 w-5 text-primary" />
               Danger Zone
             </h2>
-            <p className="text-xs text-zinc-400 mb-4">
+            <p className="text-xs text-secondary-text mb-4">
               Once you log out, you will need to authenticate again to continue solving and competing.
             </p>
             <div>
@@ -225,7 +227,7 @@ export default function SettingsPage() {
                   signOut();
                   router.push("/");
                 }}
-                className="btn-secondary border-rose-500/30 text-rose-300 hover:bg-rose-500/10 h-10 px-4 text-xs font-bold flex items-center gap-2"
+                className="btn-secondary border-primary0/30 text-primary hover:bg-primary0/10 h-10 px-4 text-xs font-bold flex items-center gap-2"
               >
                 <LogOut className="h-4 w-4" />
                 Sign Out / Logout

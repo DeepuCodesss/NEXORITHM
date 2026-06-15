@@ -15,6 +15,44 @@ import {
 } from "@/lib/mockData";
 
 const USER_STORAGE_KEY = "nexorithm-user-state";
+const LIVE_REWARD_STORAGE_KEY = "nexorithm-live-reward";
+
+export interface LiveRewardConfig {
+  problemId: string;
+  rewardMoneyInr: number;
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+}
+
+export interface UpcomingRewardItem {
+  problemId: string;
+}
+
+export interface ProblemBoardConfig {
+  showUpcomingRewards: boolean;
+  upcomingRewardItems: UpcomingRewardItem[];
+}
+
+const createDefaultLiveReward = (): LiveRewardConfig => {
+  const now = Date.now();
+  return {
+    problemId: MOCK_PROBLEMS[0]?.id ?? "",
+    rewardMoneyInr: 5,
+    startsAt: new Date(now - 18 * 60 * 1000).toISOString(),
+    endsAt: new Date(now + 42 * 60 * 1000 + 15 * 1000).toISOString(),
+    isActive: true,
+  };
+};
+
+const createDefaultProblemBoardConfig = (): ProblemBoardConfig => ({
+  showUpcomingRewards: true,
+  upcomingRewardItems: [
+    { problemId: MOCK_PROBLEMS[1]?.id ?? "" },
+    { problemId: MOCK_PROBLEMS[2]?.id ?? "" },
+    { problemId: MOCK_PROBLEMS[3]?.id ?? "" },
+  ],
+});
 
 const loadStoredUser = (userId?: string): UserState => {
   if (typeof window === "undefined") return INITIAL_USER;
@@ -35,6 +73,44 @@ const loadStoredUser = (userId?: string): UserState => {
   }
 };
 
+const loadStoredLiveReward = (): LiveRewardConfig => {
+  if (typeof window === "undefined") return createDefaultLiveReward();
+
+  try {
+    const raw = localStorage.getItem(LIVE_REWARD_STORAGE_KEY);
+    if (!raw) return createDefaultLiveReward();
+
+    const parsed = JSON.parse(raw) as Partial<LiveRewardConfig>;
+    return {
+      ...createDefaultLiveReward(),
+      ...parsed,
+      rewardMoneyInr: Number(parsed.rewardMoneyInr) > 0 ? Number(parsed.rewardMoneyInr) : 5,
+      isActive: parsed.isActive !== false,
+    };
+  } catch {
+    return createDefaultLiveReward();
+  }
+};
+
+const loadStoredProblemBoardConfig = (): ProblemBoardConfig => {
+  if (typeof window === "undefined") return createDefaultProblemBoardConfig();
+
+  try {
+    const raw = localStorage.getItem("nexorithm-problem-board");
+    if (!raw) return createDefaultProblemBoardConfig();
+
+    const parsed = JSON.parse(raw) as Partial<ProblemBoardConfig>;
+    return {
+      showUpcomingRewards: parsed.showUpcomingRewards !== false,
+      upcomingRewardItems: Array.isArray(parsed.upcomingRewardItems)
+        ? parsed.upcomingRewardItems.slice(0, 3).map((item) => ({ problemId: item?.problemId ?? "" }))
+        : createDefaultProblemBoardConfig().upcomingRewardItems,
+    };
+  } catch {
+    return createDefaultProblemBoardConfig();
+  }
+};
+
 interface SignInWithEmailInput {
   fullName?: string;
   email: string;
@@ -47,6 +123,8 @@ interface AppContextType {
   problems: Problem[];
   missions: Mission[];
   leaderboard: LeaderboardEntry[];
+  liveReward: LiveRewardConfig;
+  problemBoardConfig: ProblemBoardConfig;
   isPro: boolean;
   isAuthenticated: boolean;
   solvedCount: number;
@@ -54,6 +132,8 @@ interface AppContextType {
   buyStreakShield: () => boolean;
   upgradeToPro: () => void;
   solveProblem: (problemId: string) => SolveRewardResult;
+  saveLiveReward: (config: LiveRewardConfig) => void;
+  saveProblemBoardConfig: (config: ProblemBoardConfig) => void;
   signInWithProvider: (provider: Exclude<AuthProvider, "guest" | "email">) => void;
   signInWithEmail: (input: SignInWithEmailInput) => { ok: true } | { ok: false; error: string };
   signOut: () => void;
@@ -91,26 +171,43 @@ const emptyReward = (): SolveRewardResult => ({
   alreadySolved: false,
   xpGained: 0,
   coinsGained: 0,
+  moneyGainedInr: 0,
   reputationGained: 0,
 });
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [hydrated, setHydrated] = useState(false);
+  const [liveReward, setLiveReward] = useState<LiveRewardConfig>(() => createDefaultLiveReward());
+  const [problemBoardConfig, setProblemBoardConfig] = useState<ProblemBoardConfig>(() => createDefaultProblemBoardConfig());
 
   const [problems] = useState<Problem[]>(MOCK_PROBLEMS);
   const [missions, setMissions] = useState<Mission[]>(MOCK_MISSIONS);
   const [leaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
 
   useEffect(() => {
-    setUser(loadStoredUser());
-    setHydrated(true);
+    queueMicrotask(() => {
+      setUser(loadStoredUser());
+      setLiveReward(loadStoredLiveReward());
+      setProblemBoardConfig(loadStoredProblemBoardConfig());
+      setHydrated(true);
+    });
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || typeof window === "undefined") return;
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
   }, [user, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    localStorage.setItem(LIVE_REWARD_STORAGE_KEY, JSON.stringify(liveReward));
+  }, [liveReward, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    localStorage.setItem("nexorithm-problem-board", JSON.stringify(problemBoardConfig));
+  }, [problemBoardConfig, hydrated]);
 
   const buyStreakShield = (): boolean => {
     return false;
@@ -128,7 +225,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const signInWithEmail = ({ fullName, email, password, isSignUp = false }: SignInWithEmailInput) => {
+  const signInWithEmail = ({ fullName, email, password }: SignInWithEmailInput) => {
     if (!email.trim()) return { ok: false as const, error: "Enter an email address." };
     if (!password.trim()) return { ok: false as const, error: "Enter a password." };
     setUser((current) => ({
@@ -155,6 +252,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     const reputationGained = Math.max(5, Math.floor(problem.xpReward / 10));
+    const now = Date.now();
+    const isLiveRewardProblem =
+      liveReward.isActive &&
+      liveReward.problemId === problemId &&
+      new Date(liveReward.startsAt).getTime() <= now &&
+      new Date(liveReward.endsAt).getTime() > now;
+    const moneyGainedInr = isLiveRewardProblem ? liveReward.rewardMoneyInr : 0;
 
     setUser((current) => {
       const nextXp = current.xp + problem.xpReward;
@@ -164,6 +268,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...current,
         xp: nextXp,
         coins: current.coins + problem.coinReward,
+        moneyEarnedInr: (current.moneyEarnedInr ?? 0) + moneyGainedInr,
         reputation: current.reputation + reputationGained,
         devRank: Math.floor(nextXp / 200),
         currentStreak: nextStreak,
@@ -185,8 +290,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       alreadySolved: false,
       xpGained: problem.xpReward,
       coinsGained: problem.coinReward,
+      moneyGainedInr,
       reputationGained,
     };
+  };
+
+  const saveLiveReward = (config: LiveRewardConfig) => {
+    setLiveReward({
+      ...config,
+      rewardMoneyInr: Math.max(1, Math.round(Number(config.rewardMoneyInr) || 1)),
+      isActive: config.isActive,
+    });
+  };
+
+  const saveProblemBoardConfig = (config: ProblemBoardConfig) => {
+    setProblemBoardConfig({
+      showUpcomingRewards: config.showUpcomingRewards,
+      upcomingRewardItems: config.upcomingRewardItems.slice(0, 3).map((item) => ({
+        problemId: item.problemId,
+      })),
+    });
   };
 
   return (
@@ -196,6 +319,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         problems,
         missions,
         leaderboard,
+        liveReward,
+        problemBoardConfig,
         isPro: user.isPro,
         isAuthenticated: user.authProvider !== "guest",
         solvedCount: user.solvedProblemIds.length,
@@ -203,6 +328,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         buyStreakShield,
         upgradeToPro,
         solveProblem,
+        saveLiveReward,
+        saveProblemBoardConfig,
         signInWithProvider,
         signInWithEmail,
         signOut,

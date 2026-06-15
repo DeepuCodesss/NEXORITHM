@@ -49,17 +49,17 @@ export default function AuthPanel() {
     return (
       <div className="auth-panel surface-panel rounded-xl p-6">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10">
-            <UserRound className="h-5 w-5 text-emerald-300" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-success/30 bg-success/10">
+            <UserRound className="h-5 w-5 text-success" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-emerald-300">Account ready</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-success">Account ready</p>
             <h2 className="text-lg font-black text-white">Welcome, {user.fullName.split(" ")[0]}</h2>
           </div>
         </div>
-        <p className="text-sm leading-6 text-zinc-400">
+        <p className="text-sm leading-6 text-secondary-text">
           You are signed in with{" "}
-          <span className="font-semibold text-zinc-200">
+          <span className="font-semibold text-foreground">
             Nexorithm local account
           </span>
           . Start solving prize problems and climb the leaderboard.
@@ -87,12 +87,12 @@ export default function AuthPanel() {
         <h2 className="mt-2 text-xl font-black text-white">
           {mode === "signup" ? "Create your account" : "Welcome back"}
         </h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-400">
+        <p className="mt-2 text-sm leading-6 text-secondary-text">
           Solve coding problems, rank on the board, and compete for real cash prize pools.
         </p>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+      <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg border border-border bg-black/20 p-1">
         {(["signup", "signin"] as const).map((tab) => (
           <button
             key={tab}
@@ -100,9 +100,8 @@ export default function AuthPanel() {
             onClick={() => {
               setMode(tab);
             }}
-            className={`rounded-md px-3 py-2 text-xs font-bold transition-colors ${
-              mode === tab ? "bg-primary text-white" : "text-zinc-400 hover:text-white"
-            }`}
+            className={`rounded-md px-3 py-2 text-xs font-bold transition-colors ${mode === tab ? "bg-primary text-white" : "text-secondary-text hover:text-white"
+              }`}
           >
             {tab === "signup" ? "Sign Up" : "Sign In"}
           </button>
@@ -121,9 +120,9 @@ export default function AuthPanel() {
               Sign up with GitHub
             </button>
             <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">or use email</span>
-              <div className="h-px flex-1 bg-white/10" />
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">or use email</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
           </>
         ) : (
@@ -137,9 +136,9 @@ export default function AuthPanel() {
               Sign in with GitHub
             </button>
             <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">or use email</span>
-              <div className="h-px flex-1 bg-white/10" />
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">or use email</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
           </>
         )}
@@ -170,7 +169,7 @@ export default function AuthPanel() {
         </button>
       </div>
 
-      <p className="mt-4 text-center text-[11px] leading-5 text-zinc-500">
+      <p className="mt-4 text-center text-[11px] leading-5 text-muted-foreground">
         By continuing, you agree to Nexorithm&apos;s contest rules and payout terms.
       </p>
     </div>

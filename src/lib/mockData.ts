@@ -83,6 +83,7 @@ export interface UserState {
   authProvider: AuthProvider;
   xp: number;
   coins: number;
+  moneyEarnedInr: number;
   reputation: number;
   devRank: number;
   currentStreak: number;
@@ -98,6 +99,7 @@ export interface SolveRewardResult {
   alreadySolved: boolean;
   xpGained: number;
   coinsGained: number;
+  moneyGainedInr: number;
   reputationGained: number;
 }
 
@@ -412,7 +414,7 @@ const buildDescription = (
 <p>This problem is part of <strong>${topic}</strong> practice and is designed to strengthen the <strong>${pattern}</strong> pattern.</p>
 
 <h3 class="mt-7 text-base font-bold text-white">Input Format</h3>
-<ul class="mt-3 list-disc space-y-1 pl-5 text-zinc-300">
+<ul class="mt-3 list-disc space-y-1 pl-5 text-secondary-text">
   ${guide.inputFormat.map((line) => `<li>${line}</li>`).join("")}
 </ul>
 
@@ -420,19 +422,19 @@ const buildDescription = (
 <p>${guide.outputFormat}</p>
 
 <h3 class="mt-7 text-base font-bold text-white">Example 1</h3>
-<div class="mt-3 border-l-2 border-zinc-700 pl-4">
-  <p class="font-semibold text-zinc-200">Input:</p>
-  <pre class="mt-2 overflow-x-auto rounded border border-white/10 bg-white/[0.04] p-3 font-mono text-xs leading-5 text-zinc-200">${formatHtmlBlock(sample.input)}</pre>
-  <p class="mt-4 font-semibold text-zinc-200">Output:</p>
-  <pre class="mt-2 overflow-x-auto rounded border border-white/10 bg-white/[0.04] p-3 font-mono text-xs leading-5 text-zinc-200">${sample.expected}</pre>
-  <p class="mt-4 font-semibold text-zinc-200">Explanation:</p>
-  <ul class="mt-2 list-disc space-y-1 pl-5 text-zinc-300">
+<div class="mt-3 border-l-2 border-border pl-4">
+  <p class="font-semibold text-foreground">Input:</p>
+  <pre class="mt-2 overflow-x-auto rounded border border-border bg-hover p-3 font-mono text-xs leading-5 text-foreground">${formatHtmlBlock(sample.input)}</pre>
+  <p class="mt-4 font-semibold text-foreground">Output:</p>
+  <pre class="mt-2 overflow-x-auto rounded border border-border bg-hover p-3 font-mono text-xs leading-5 text-foreground">${sample.expected}</pre>
+  <p class="mt-4 font-semibold text-foreground">Explanation:</p>
+  <ul class="mt-2 list-disc space-y-1 pl-5 text-secondary-text">
     ${sampleExplanation.map((line) => `<li>${line}</li>`).join("")}
   </ul>
 </div>
 
 <h3 class="mt-7 text-base font-bold text-white">Constraints</h3>
-<ul class="mt-3 list-disc space-y-1 pl-5 text-zinc-300">
+<ul class="mt-3 list-disc space-y-1 pl-5 text-secondary-text">
   ${guide.constraints.map((line) => `<li><code>${line}</code></li>`).join("")}
 </ul>
 
@@ -622,7 +624,7 @@ const generateProblem = (level: number): Problem => {
     topic: track.topic,
     pattern,
     ...rewards,
-    prizeMoneyInr: level <= 3 ? [1000, 2500, 5000][level - 1] : undefined,
+    prizeMoneyInr: level <= 3 ? [5, 10, 25][level - 1] : undefined,
     description: buildDescription(kind, difficulty, track.topic, pattern, testCases),
     discussions: buildDiscussions(level, kind, track.topic, pattern),
     editorial: buildEditorial(kind, difficulty, track.topic, pattern),
@@ -638,22 +640,24 @@ export const MOCK_PROBLEMS: Problem[] = Array.from({ length: QUESTION_COUNT }, (
 
 export const DAILY_PRIZE_PROBLEMS = MOCK_PROBLEMS.slice(0, 3).map((problem, index) => ({
   ...problem,
-  title: ["Beginner Cash Sprint", "Logic Builder Prize Round", "Very Hard Grand Challenge"][index],
-  prizeMoneyInr: [1000, 2500, 5000][index],
+  title: ["Easy Challenge", "Medium Challenge", "Hard Challenge"][index],
+  difficulty: (["Easy", "Medium", "Hard"] as const)[index],
+  prizeMoneyInr: [5, 10, 25][index],
 }));
 
 export const INITIAL_USER: UserState = {
-  fullName: "Guest Developer",
+  fullName: "Alex Rivera",
   username: "guest",
-  email: "",
-  avatarUrl: "/next.svg",
+  email: "alex.rivera@gmail.com",
+  avatarUrl: "https://api.dicebear.com/9.x/avataaars/svg?seed=AlexRivera",
   authProvider: "guest",
-  xp: 0,
-  coins: 0,
+  xp: 120,
+  coins: 85,
+  moneyEarnedInr: 0,
   reputation: 0,
-  devRank: 0,
-  currentStreak: 0,
-  longestStreak: 0,
+  devRank: 1245,
+  currentStreak: 5,
+  longestStreak: 5,
   streakShields: 0,
   isPro: false,
   college: "Connect authentication to set college",
