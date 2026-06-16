@@ -27,14 +27,6 @@ import {
 import { useApp } from "@/context/AppContext";
 import { DAILY_PRIZE_PROBLEMS } from "@/lib/mockData";
 
-const navItems = [
-  { label: "Overview", href: "/profile/guest", icon: Home },
-  { label: "Problems", href: "/problems", icon: BookOpen },
-  { label: "Contests", href: "/contests", icon: Trophy },
-  { label: "Rankings", href: "/rankings", icon: Medal },
-  { label: "Rewards", href: "/rewards", icon: Gift },
-];
-
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const difficultyStyles = {
@@ -47,7 +39,14 @@ const difficultyStyles = {
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { user, missions, problems, solvedCount, isAuthenticated } = useApp();
-  const isOwnProfile = username === "guest" || username === user.username;
+  const isOwnProfile = username === user.username || username === "me";
+  const navItems = [
+    { label: "Overview", href: isAuthenticated ? `/profile/${user.username}` : "/settings", icon: Home },
+    { label: "Problems", href: "/problems", icon: BookOpen },
+    { label: "Contests", href: "/contests", icon: Trophy },
+    { label: "Rankings", href: "/rankings", icon: Medal },
+    { label: "Rewards", href: "/rewards", icon: Gift },
+  ];
 
   const streakGoal = 7;
   const streakProgress = Math.min(user.currentStreak, streakGoal);
@@ -63,7 +62,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   const stats = [
     { label: "Current Streak", value: `${user.currentStreak} Days`, detail: `Best: ${user.longestStreak} days`, icon: Flame, tone: "text-success" },
-    { label: "Global Rank", value: `#${user.devRank.toLocaleString()}`, detail: isAuthenticated ? "From your earned XP" : "Local guest rank", icon: Trophy, tone: "text-primary" },
+    { label: "Global Rank", value: `#${user.devRank.toLocaleString()}`, detail: isAuthenticated ? "From your earned XP" : "Sign in to sync rank", icon: Trophy, tone: "text-primary" },
     { label: "XP", value: user.xp.toLocaleString(), detail: `Next: ${Math.max(0, 1500 - user.xp).toLocaleString()} XP`, icon: Award, tone: "text-primary" },
     { label: "Coins", value: user.coins.toLocaleString(), detail: "100 coins = Rs 5", icon: CircleDollarSign, tone: "text-primary" },
     { label: "Reputation", value: user.reputation.toLocaleString(), detail: solvedCount > 0 ? "From accepted submissions" : "Solve to earn reputation", icon: Star, tone: "text-primary" },
@@ -81,10 +80,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       <div className="app-shell flex min-h-screen flex-col items-center justify-center px-4">
         <h1 className="text-xl font-black text-white">Profile not available</h1>
         <p className="mt-2 max-w-md text-center text-sm leading-6 text-secondary-text">
-          This build only has the current local user profile. Public user records are not connected yet.
+          This profile is not available. Open your own account page instead.
         </p>
-        <Link href="/profile/guest" className="btn-primary mt-5 h-10 px-4 text-xs">
-          Open your profile
+        <Link href="/profile/me" className="btn-primary mt-5 h-10 px-4 text-xs">
+          Open my profile
         </Link>
       </div>
     );
@@ -144,7 +143,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-secondary-text">{user.college}</span>
                     <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-secondary-text">
-                      {isAuthenticated ? "Signed in account" : "Guest profile"}
+                      {isAuthenticated ? "Signed in account" : "Sign in to view synced profile"}
                     </span>
                   </div>
                 </div>

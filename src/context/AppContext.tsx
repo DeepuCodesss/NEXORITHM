@@ -135,35 +135,8 @@ interface AppContextType {
   solveProblem: (problemId: string) => SolveRewardResult;
   saveLiveReward: (config: LiveRewardConfig) => void;
   saveProblemBoardConfig: (config: ProblemBoardConfig) => void;
-  signInWithProvider: (provider: Exclude<AuthProvider, "guest" | "email">) => void;
-  signInWithEmail: (input: SignInWithEmailInput) => { ok: true } | { ok: false; error: string };
   signOut: () => void;
 }
-
-const providerProfiles: Record<
-  Exclude<AuthProvider, "guest" | "email">,
-  Pick<UserState, "fullName" | "username" | "email" | "avatarUrl">
-> = {
-  google: {
-    fullName: "Alex Rivera",
-    username: "alexrivera",
-    email: "alex.rivera@gmail.com",
-    avatarUrl: "https://api.dicebear.com/9.x/avataaars/svg?seed=AlexRivera",
-  },
-  github: {
-    fullName: "Sam Dev",
-    username: "samdev",
-    email: "sam.dev@users.noreply.github.com",
-    avatarUrl: "https://api.dicebear.com/9.x/avataaars/svg?seed=SamDev",
-  },
-};
-
-const usernameFromEmail = (email: string) =>
-  email
-    .split("@")[0]
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "")
-    .slice(0, 20) || "coder";
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -307,28 +280,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const isProblemSolved = (problemId: string) => user.solvedProblemIds.includes(problemId);
 
-  const signInWithProvider = (provider: Exclude<AuthProvider, "guest" | "email">) => {
-    setUser((current) => ({
-      ...current,
-      ...providerProfiles[provider],
-      authProvider: provider,
-    }));
-  };
-
-  const signInWithEmail = ({ fullName, email, password }: SignInWithEmailInput) => {
-    if (!email.trim()) return { ok: false as const, error: "Enter an email address." };
-    if (!password.trim()) return { ok: false as const, error: "Enter a password." };
-    setUser((current) => ({
-      ...current,
-      fullName: fullName?.trim() || current.fullName || "Nexorithm Coder",
-      username: usernameFromEmail(email),
-      email,
-      authProvider: "email",
-      avatarUrl: `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
-    }));
-    return { ok: true as const };
-  };
-
   const signOut = () => {
     setUser(INITIAL_USER);
   };
@@ -420,8 +371,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         solveProblem,
         saveLiveReward,
         saveProblemBoardConfig,
-        signInWithProvider,
-        signInWithEmail,
         signOut,
       }}
     >

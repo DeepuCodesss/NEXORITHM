@@ -1,15 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { SignInButton, useClerk, useUser } from "@clerk/nextjs";
 import { useApp } from "@/context/AppContext";
 import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Trophy, Gift, CalendarDays, UserRound } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
   const pathname = usePathname();
-  const { user, isAuthenticated, signInWithProvider } = useApp();
+  const { user: clerkUser, isSignedIn } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
+  const { user, isAuthenticated, signOut } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const displayUsername =
+    clerkUser?.username ||
+    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ").trim() ||
+    clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+    user.username;
+  const displayAvatar = clerkUser?.imageUrl || user.avatarUrl;
+  const profileHref = isSignedIn && displayUsername ? `/profile/${displayUsername}` : `/profile/${user.username}`;
 
 
   const navItems = [
@@ -17,7 +28,7 @@ export default function Header() {
     { name: "Contests", href: "/contests", icon: CalendarDays },
     { name: "Rankings", href: "/rankings", icon: Trophy },
     { name: "Rewards", href: "/rewards", icon: Gift },
-    { name: "Profile", href: `/profile/${user.username}`, icon: UserRound },
+    { name: "Profile", href: profileHref, icon: UserRound },
   ];
 
   const isActive = (path: string) => pathname === path;
@@ -92,35 +103,43 @@ export default function Header() {
 
           {/* User Profile Access */}
           {!isAuthenticated ? (
-            <button
-              onClick={() => signInWithProvider("github")}
-              className="btn-primary text-xs px-3 py-1.5 rounded-md font-bold cursor-pointer transition-all hover:scale-105 active:scale-95"
-            >
-              Sign In
-            </button>
+            <SignInButton mode="modal">
+              <button className="btn-primary text-xs px-3 py-1.5 rounded-md font-bold cursor-pointer transition-all hover:scale-105 active:scale-95">
+                Sign In
+              </button>
+            </SignInButton>
           ) : (
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 pl-1 group"
-            >
-              <svg
-                className="h-5 w-5 text-secondary-text group-hover:text-white transition-colors"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  signOut();
+                  await clerkSignOut({ redirectUrl: "/" });
+                }}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-bold text-secondary-text transition-colors hover:bg-hover hover:text-white"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v1m0 14v1m8-8h1M3 12h1m15.364 6.364l.707.707M5.636 5.636l.707.707m12.728 0l.707-.707M5.636 18.364l.707-.707"
-                />
-              </svg>
-              <span className="hidden lg:block text-xs font-medium text-secondary-text group-hover:text-white transition-colors">
-                Settings
-              </span>
-            </Link>
+                Logout
+              </button>
+              <Link
+                href="/settings"
+                className="flex items-center gap-2 pl-1 group"
+                aria-label="Open user settings"
+              >
+                <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-hover shadow-sm transition-colors group-hover:border-primary/40">
+                  <Image
+                    src={displayAvatar}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="h-full w-full object-cover"
+                    unoptimized
+                  />
+                </span>
+                <span className="hidden lg:block text-xs font-medium text-secondary-text group-hover:text-white transition-colors">
+                  {displayUsername}
+                </span>
+              </Link>
+            </div>
           )}
 
           {/* Mobile Navigation Trigger */}

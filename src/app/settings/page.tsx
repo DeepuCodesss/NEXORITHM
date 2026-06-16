@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { useApp } from "@/context/AppContext";
 import { useRouter } from "next/navigation";
 import { User, Mail, ShieldAlert, LogOut, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
   const { signOut } = useApp();
   const router = useRouter();
 
@@ -225,7 +226,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => {
                   signOut();
-                  router.push("/");
+                  void clerkSignOut({ redirectUrl: "/" });
                 }}
                 className="btn-secondary border-primary0/30 text-primary hover:bg-primary0/10 h-10 px-4 text-xs font-bold flex items-center gap-2"
               >
