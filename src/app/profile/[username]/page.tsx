@@ -40,7 +40,7 @@ const difficultyStyles = {
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { user: clerkUser, isSignedIn, isLoaded } = useUser();
-  const { user, missions, problems, solvedCount, isAuthenticated } = useApp();
+  const { user, missions, problems, solvedCount, isAuthenticated, isUserSynced } = useApp();
   const displayUsername =
     clerkUser?.username ||
     clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
@@ -48,7 +48,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const displayFullName =
     [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ").trim() ||
     clerkUser?.fullName ||
-    user.fullName;
+    user.fullName ||
+    displayUsername;
   const displayAvatar = clerkUser?.imageUrl || user.avatarUrl;
   const isOwnProfile = username === displayUsername || username === "me";
   const navItems = [
@@ -86,10 +87,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     { label: "Fast Solver", detail: "Solve 3 problems", active: solvedCount >= 3, icon: Zap },
   ];
 
-  if (!isLoaded) {
+  if (!isLoaded || (isSignedIn && !isUserSynced)) {
     return (
       <div className="app-shell flex min-h-screen items-center justify-center px-4">
-        <p className="text-sm text-secondary-text">Loading profile...</p>
+        <p className="text-sm text-secondary-text">Loading real account data...</p>
       </div>
     );
   }
@@ -160,7 +161,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     Solving DSA daily. Building consistency one verified problem at a time.
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-secondary-text">{user.college}</span>
+                    {user.college ? <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-secondary-text">{user.college}</span> : null}
                     <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-secondary-text">
                       {isAuthenticated ? "Signed in account" : "Sign in to view synced profile"}
                     </span>

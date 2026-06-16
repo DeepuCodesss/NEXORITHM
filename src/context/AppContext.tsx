@@ -5,7 +5,6 @@ import { useUser } from "@clerk/nextjs";
 import {
   UserState,
   INITIAL_USER,
-  AuthProvider,
   Problem,
   MOCK_PROBLEMS,
   Mission,
@@ -15,7 +14,6 @@ import {
   SolveRewardResult,
 } from "@/lib/mockData";
 
-const USER_STORAGE_KEY = "nexorithm-user-state";
 const LIVE_REWARD_STORAGE_KEY = "nexorithm-live-reward";
 
 export interface LiveRewardConfig {
@@ -55,25 +53,6 @@ const createDefaultProblemBoardConfig = (): ProblemBoardConfig => ({
   ],
 });
 
-const loadStoredUser = (userId?: string): UserState => {
-  if (typeof window === "undefined") return INITIAL_USER;
-
-  const storageKey = userId ? `${USER_STORAGE_KEY}-${userId}` : USER_STORAGE_KEY;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return INITIAL_USER;
-
-    const parsed = JSON.parse(raw) as Partial<UserState>;
-    return {
-      ...INITIAL_USER,
-      ...parsed,
-      solvedProblemIds: Array.isArray(parsed.solvedProblemIds) ? parsed.solvedProblemIds : [],
-    };
-  } catch {
-    return INITIAL_USER;
-  }
-};
-
 const loadStoredLiveReward = (): LiveRewardConfig => {
   if (typeof window === "undefined") return createDefaultLiveReward();
 
@@ -112,13 +91,6 @@ const loadStoredProblemBoardConfig = (): ProblemBoardConfig => {
   }
 };
 
-interface SignInWithEmailInput {
-  fullName?: string;
-  email: string;
-  password: string;
-  isSignUp?: boolean;
-}
-
 interface AppContextType {
   user: UserState;
   problems: Problem[];
@@ -128,6 +100,7 @@ interface AppContextType {
   problemBoardConfig: ProblemBoardConfig;
   isPro: boolean;
   isAuthenticated: boolean;
+  isUserSynced: boolean;
   solvedCount: number;
   isProblemSolved: (problemId: string) => boolean;
   buyStreakShield: () => boolean;
@@ -196,6 +169,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [hydrated, setHydrated] = useState(false);
+  const [isUserSynced, setIsUserSynced] = useState(false);
   const [liveReward, setLiveReward] = useState<LiveRewardConfig>(() => createDefaultLiveReward());
   const [problemBoardConfig, setProblemBoardConfig] = useState<ProblemBoardConfig>(() => createDefaultProblemBoardConfig());
 
@@ -205,7 +179,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     queueMicrotask(() => {
-      setUser(loadStoredUser());
       setLiveReward(loadStoredLiveReward());
       setProblemBoardConfig(loadStoredProblemBoardConfig());
       setHydrated(true);
@@ -231,11 +204,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const syncUser = async () => {
       if (!isSignedIn) {
         setUser(INITIAL_USER);
+        setIsUserSynced(true);
         return;
       }
 
       const response = await fetch("/api/me", { cache: "no-store" });
-      if (!response.ok) return;
+      if (!response.ok) {
+        setIsUserSynced(true);
+        return;
+      }
 
       const data = (await response.json()) as { user?: DbUserSnapshot | null };
       if (data.user) {
@@ -252,15 +229,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           authProvider: "email",
         }));
       }
+      setIsUserSynced(true);
     };
 
     void syncUser();
   }, [clerkUser, isLoaded, isSignedIn]);
-
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") return;
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-  }, [user, hydrated]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return;
@@ -364,6 +337,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         problemBoardConfig,
         isPro: user.isPro,
         isAuthenticated: isSignedIn || user.authProvider !== "guest",
+        isUserSynced,
         solvedCount: user.solvedProblemIds.length,
         isProblemSolved,
         buyStreakShield,

@@ -646,21 +646,21 @@ export const DAILY_PRIZE_PROBLEMS = MOCK_PROBLEMS.slice(0, 3).map((problem, inde
 }));
 
 export const INITIAL_USER: UserState = {
-  fullName: "Alex Rivera",
+  fullName: "",
   username: "guest",
-  email: "alex.rivera@gmail.com",
-  avatarUrl: "https://api.dicebear.com/9.x/avataaars/svg?seed=AlexRivera",
+  email: "",
+  avatarUrl: "https://api.dicebear.com/9.x/avataaars/svg?seed=guest",
   authProvider: "guest",
-  xp: 120,
-  coins: 85,
+  xp: 0,
+  coins: 0,
   moneyEarnedInr: 0,
   reputation: 0,
-  devRank: 1245,
-  currentStreak: 5,
-  longestStreak: 5,
+  devRank: 0,
+  currentStreak: 0,
+  longestStreak: 0,
   streakShields: 0,
   isPro: false,
-  college: "Connect authentication to set college",
+  college: "",
   solvedProblemIds: [],
 };
 
