@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { SignInButton, useUser } from "@clerk/nextjs";
-import { Code2, Gift, Moon, UserRound } from "lucide-react";
+import { Code2, Gift, LogOut, Moon, UserRound } from "lucide-react";
 
 function UserAvatar({ src, name }: { src?: string; name: string }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -101,13 +101,21 @@ export default function LandingHeader() {
             </SignInButton>
           )}
 
-          <SignInButton mode="modal">
-            <button type="button" className="btn-gradient h-9 gap-2 px-4 text-xs">
-            <Gift className="h-3.5 w-3.5 sm:hidden" />
-            <span className="hidden sm:inline">Sign up</span>
-            <span className="sm:hidden">Start</span>
-            </button>
-          </SignInButton>
+          {isSignedIn && clerkUser ? (
+            <Link href={`/profile/${clerkUser.username || displayUsername}`} className="btn-gradient h-9 gap-2 px-3 text-xs">
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Open Profile</span>
+              <span className="sm:hidden">Profile</span>
+            </Link>
+          ) : (
+            <SignInButton mode="modal">
+              <button type="button" className="btn-gradient h-9 gap-2 px-4 text-xs">
+                <Gift className="h-3.5 w-3.5 sm:hidden" />
+                <span className="hidden sm:inline">Sign up</span>
+                <span className="sm:hidden">Start</span>
+              </button>
+            </SignInButton>
+          )}
         </div>
       </div>
     </header>
