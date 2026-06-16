@@ -27,16 +27,20 @@ export default function AdminPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setProblemId(liveReward.problemId);
-    setRewardMoneyInr(String(liveReward.rewardMoneyInr));
-    setStartsAt(toDatetimeLocal(liveReward.startsAt));
-    setEndsAt(toDatetimeLocal(liveReward.endsAt));
-    setIsActive(liveReward.isActive);
+    queueMicrotask(() => {
+      setProblemId(liveReward.problemId);
+      setRewardMoneyInr(String(liveReward.rewardMoneyInr));
+      setStartsAt(toDatetimeLocal(liveReward.startsAt));
+      setEndsAt(toDatetimeLocal(liveReward.endsAt));
+      setIsActive(liveReward.isActive);
+    });
   }, [liveReward]);
 
   useEffect(() => {
-    setShowUpcomingRewards(problemBoardConfig.showUpcomingRewards);
-    setUpcomingRewardItems(problemBoardConfig.upcomingRewardItems);
+    queueMicrotask(() => {
+      setShowUpcomingRewards(problemBoardConfig.showUpcomingRewards);
+      setUpcomingRewardItems(problemBoardConfig.upcomingRewardItems);
+    });
   }, [problemBoardConfig]);
 
   const selectedProblem = problems.find((problem) => problem.id === problemId) ?? problems[0];

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import {
   UserState,
   INITIAL_USER,
@@ -166,6 +167,49 @@ const usernameFromEmail = (email: string) =>
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+type DbUserSnapshot = {
+  id: string;
+  clerkId: string;
+  username: string;
+  fullName: string;
+  email: string;
+  avatarUrl: string;
+  college: string;
+  authProvider: string;
+  xp: number;
+  coins: number;
+  moneyEarnedInr: number;
+  reputation: number;
+  devRank: number;
+  currentStreak: number;
+  longestStreak: number;
+  streakShields: number;
+  isPro: boolean;
+  solvedProblemIds: unknown;
+};
+
+const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
+  ...INITIAL_USER,
+  fullName: dbUser.fullName || INITIAL_USER.fullName,
+  username: dbUser.username || INITIAL_USER.username,
+  email: dbUser.email || INITIAL_USER.email,
+  avatarUrl: dbUser.avatarUrl || INITIAL_USER.avatarUrl,
+  authProvider: (dbUser.authProvider as UserState["authProvider"]) || "email",
+  college: dbUser.college || INITIAL_USER.college,
+  xp: dbUser.xp ?? INITIAL_USER.xp,
+  coins: dbUser.coins ?? INITIAL_USER.coins,
+  moneyEarnedInr: dbUser.moneyEarnedInr ?? INITIAL_USER.moneyEarnedInr,
+  reputation: dbUser.reputation ?? INITIAL_USER.reputation,
+  devRank: dbUser.devRank ?? INITIAL_USER.devRank,
+  currentStreak: dbUser.currentStreak ?? INITIAL_USER.currentStreak,
+  longestStreak: dbUser.longestStreak ?? INITIAL_USER.longestStreak,
+  streakShields: dbUser.streakShields ?? INITIAL_USER.streakShields,
+  isPro: dbUser.isPro ?? INITIAL_USER.isPro,
+  solvedProblemIds: Array.isArray(dbUser.solvedProblemIds)
+    ? dbUser.solvedProblemIds.filter((value): value is string => typeof value === "string")
+    : [],
+});
+
 const emptyReward = (): SolveRewardResult => ({
   awarded: false,
   alreadySolved: false,
@@ -176,6 +220,7 @@ const emptyReward = (): SolveRewardResult => ({
 });
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [hydrated, setHydrated] = useState(false);
   const [liveReward, setLiveReward] = useState<LiveRewardConfig>(() => createDefaultLiveReward());
@@ -183,7 +228,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [problems] = useState<Problem[]>(MOCK_PROBLEMS);
   const [missions, setMissions] = useState<Mission[]>(MOCK_MISSIONS);
-  const [leaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -193,6 +238,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setHydrated(true);
     });
   }, []);
+
+  useEffect(() => {
+    const syncLeaderboard = async () => {
+      const response = await fetch("/api/leaderboard", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as { leaderboard?: LeaderboardEntry[] };
+      if (Array.isArray(data.leaderboard)) {
+        setLeaderboard(data.leaderboard);
+      }
+    };
+
+    void syncLeaderboard();
+  }, [user.xp, user.currentStreak, user.solvedProblemIds.length]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const syncUser = async () => {
+      if (!isSignedIn) {
+        setUser(INITIAL_USER);
+        return;
+      }
+
+      const response = await fetch("/api/me", { cache: "no-store" });
+      if (!response.ok) return;
+
+      const data = (await response.json()) as { user?: DbUserSnapshot | null };
+      if (data.user) {
+        setUser(dbUserToState(data.user));
+      } else if (clerkUser) {
+        setUser((current) => ({
+          ...current,
+          username: clerkUser.username || current.username,
+          fullName:
+            [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() ||
+            current.fullName,
+          email: clerkUser.primaryEmailAddress?.emailAddress || current.email,
+          avatarUrl: clerkUser.imageUrl || current.avatarUrl,
+          authProvider: "email",
+        }));
+      }
+    };
+
+    void syncUser();
+  }, [clerkUser, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return;
@@ -322,7 +412,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         liveReward,
         problemBoardConfig,
         isPro: user.isPro,
-        isAuthenticated: user.authProvider !== "guest",
+        isAuthenticated: isSignedIn || user.authProvider !== "guest",
         solvedCount: user.solvedProblemIds.length,
         isProblemSolved,
         buyStreakShield,

@@ -32,9 +32,35 @@ model Problem {
   updatedAt      DateTime     @updatedAt
 }
 
+model User {
+  id               String        @id
+  clerkId          String        @unique
+  username         String        @unique
+  fullName         String
+  email            String        @unique
+  avatarUrl        String
+  college          String        @default("Connect authentication to set college")
+  authProvider     String
+  xp               Int           @default(0)
+  coins            Int           @default(0)
+  moneyEarnedInr   Int           @default(0)
+  reputation       Int           @default(0)
+  devRank          Int           @default(0)
+  currentStreak    Int           @default(0)
+  longestStreak    Int           @default(0)
+  streakShields    Int           @default(0)
+  isPro            Boolean       @default(false)
+  solvedProblemIds  Json
+  lastSolvedAt      DateTime?
+  submissions      Submission[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
 model Submission {
   id             String   @id @default(cuid())
   problemId      String
+  userId         String?
   language       String
   code           String
   status         String
@@ -44,7 +70,9 @@ model Submission {
   output         Json
   createdAt      DateTime @default(now())
   problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([problemId])
+  @@index([userId])
   @@index([createdAt])
 }

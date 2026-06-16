@@ -1,0 +1,51 @@
+import "server-only";
+
+import { currentUser } from "@clerk/nextjs/server";
+import { getPrisma } from "@/lib/db";
+
+type ClerkUser = NonNullable<Awaited<ReturnType<typeof currentUser>>>;
+
+const usernameFromEmail = (email: string) =>
+  email
+    .split("@")[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 20) || "coder";
+
+export const buildUserProfile = (clerkUser: ClerkUser) => {
+  const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses[0]?.emailAddress || "";
+  const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() || clerkUser.username || "Nexorithm Coder";
+  const username = clerkUser.username || usernameFromEmail(email) || clerkUser.id.slice(0, 12);
+  const avatarUrl = clerkUser.imageUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(username)}`;
+
+  return {
+    id: clerkUser.id,
+    clerkId: clerkUser.id,
+    username,
+    fullName,
+    email,
+    avatarUrl,
+    authProvider: clerkUser.externalAccounts[0]?.provider || "email",
+    college: "Connect authentication to set college",
+  };
+};
+
+export const upsertClerkUser = async (clerkUser: ClerkUser) => {
+  const prisma = getPrisma();
+  const profile = buildUserProfile(clerkUser);
+
+  return prisma.user.upsert({
+    where: { clerkId: profile.clerkId },
+    update: {
+      username: profile.username,
+      fullName: profile.fullName,
+      email: profile.email,
+      avatarUrl: profile.avatarUrl,
+      authProvider: profile.authProvider,
+    },
+    create: {
+      ...profile,
+      solvedProblemIds: [],
+    },
+  });
+};

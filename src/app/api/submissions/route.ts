@@ -2,6 +2,8 @@ import { getPrisma } from "@/lib/db";
 import { judgeSubmission } from "@/lib/judge";
 import { isJudgeLanguage } from "@/lib/languages";
 import { MOCK_PROBLEMS } from "@/lib/mockData";
+import { currentUser } from "@clerk/nextjs/server";
+import { upsertClerkUser } from "@/lib/userSync";
 
 export const runtime = "nodejs";
 
@@ -28,9 +30,11 @@ export async function POST(request: Request) {
   let submissionId: string | null = null;
   let saved = false;
   let databaseError: string | null = null;
+  const clerkUser = await currentUser();
 
   try {
     const prisma = getPrisma();
+    const user = clerkUser ? await upsertClerkUser(clerkUser) : null;
 
     await prisma.problem.upsert({
       where: { id: problem.id },
@@ -69,6 +73,7 @@ export async function POST(request: Request) {
     const submission = await prisma.submission.create({
       data: {
         problemId: problem.id,
+        userId: user?.id,
         language,
         code,
         status: result.status,
@@ -80,6 +85,26 @@ export async function POST(request: Request) {
     });
     submissionId = submission.id;
     saved = true;
+
+    if (user && result.status === "Accepted") {
+      const solvedProblemIds = Array.isArray(user.solvedProblemIds) ? user.solvedProblemIds : [];
+      if (!solvedProblemIds.includes(problem.id)) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            xp: user.xp + problem.xpReward,
+            coins: user.coins + problem.coinReward,
+            moneyEarnedInr: user.moneyEarnedInr + (problem.prizeMoneyInr ?? 0),
+            reputation: user.reputation + Math.max(5, Math.floor(problem.xpReward / 10)),
+            devRank: Math.floor((user.xp + problem.xpReward) / 200),
+            currentStreak: user.currentStreak === 0 ? 1 : user.currentStreak,
+            longestStreak: Math.max(user.longestStreak, user.currentStreak === 0 ? 1 : user.currentStreak),
+            solvedProblemIds: [...solvedProblemIds, problem.id],
+            lastSolvedAt: new Date(),
+          },
+        });
+      }
+    }
   } catch (error) {
     databaseError = error instanceof Error ? error.message : String(error);
   }

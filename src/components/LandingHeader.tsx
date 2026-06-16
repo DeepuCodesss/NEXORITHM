@@ -1,9 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { Code2, Gift, Moon } from "lucide-react";
+import { useState } from "react";
+import { Code2, Gift, Moon, UserRound } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+
+function UserAvatar({ src, name }: { src?: string; name: string }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const initials = name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (!src || imageFailed) {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-full border border-primary0/30 bg-primary0/10 text-[9px] font-black text-primary">
+        {initials || <UserRound className="h-3 w-3" />}
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={name}
+      width={20}
+      height={20}
+      onError={() => setImageFailed(true)}
+      className="h-5 w-5 rounded-full border border-border object-cover"
+    />
+  );
+}
 
 export default function LandingHeader() {
   const { user, isAuthenticated } = useApp();
@@ -20,15 +50,21 @@ export default function LandingHeader() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-6 md:flex">
           <Link href="/problems" className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
             Problems
+          </Link>
+          <Link href="/contests" className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
+            Contests
           </Link>
           <Link href="/#rewards" className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
             Rewards
           </Link>
           <Link href="/rankings" className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
             Rankings
+          </Link>
+          <Link href={`/profile/${user.username}`} className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
+            Profile
           </Link>
         </nav>
 
@@ -46,13 +82,7 @@ export default function LandingHeader() {
               href={`/profile/${user.username}`}
               className="btn-secondary h-9 gap-2 px-3 text-xs"
             >
-              <Image
-                src={user.avatarUrl}
-                alt={user.fullName}
-                width={20}
-                height={20}
-                className="h-5 w-5 rounded-full object-cover border border-border"
-              />
+              <UserAvatar src={user.avatarUrl} name={user.fullName} />
               <span className="hidden sm:inline">{user.fullName.split(" ")[0]}</span>
             </Link>
           ) : (

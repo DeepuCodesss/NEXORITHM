@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
-import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Trophy, UserRound, Gift, CalendarDays, ShieldCheck } from "lucide-react";
+import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Trophy, Gift, CalendarDays, UserRound } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
@@ -17,8 +17,7 @@ export default function Header() {
     { name: "Contests", href: "/contests", icon: CalendarDays },
     { name: "Rankings", href: "/rankings", icon: Trophy },
     { name: "Rewards", href: "/rewards", icon: Gift },
-    { name: "Admin", href: "/admin", icon: ShieldCheck },
-    { name: "Profile", href: "/profile/guest", icon: UserRound },
+    { name: "Profile", href: `/profile/${user.username}`, icon: UserRound },
   ];
 
   const isActive = (path: string) => pathname === path;

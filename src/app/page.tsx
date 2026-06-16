@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -24,6 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import LandingHeader from "@/components/LandingHeader";
+import { useApp } from "@/context/AppContext";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 15 },
@@ -84,6 +86,31 @@ const codeLines = [
 ];
 
 function DashboardPreview() {
+  const { problems, liveReward, solveProblem } = useApp();
+  const [consoleMessage, setConsoleMessage] = useState("Ready to test sample cases.");
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [runCount, setRunCount] = useState(0);
+
+  const heroProblemId = liveReward.problemId || problems[0]?.id;
+
+  const handleRunCode = () => {
+    const result = heroProblemId ? solveProblem(heroProblemId) : null;
+    setRunCount((current) => current + 1);
+    setSubmitMessage("");
+    setConsoleMessage(
+      result?.awarded
+        ? `Accepted on samples. +${result.xpGained} XP, +${result.coinsGained} coins added.`
+        : "Accepted on samples. XP already claimed for this demo problem.",
+    );
+  };
+
+  const handleSubmit = () => {
+    const result = heroProblemId ? solveProblem(heroProblemId) : null;
+    const reward = result?.moneyGainedInr || liveReward.rewardMoneyInr || 5;
+    setConsoleMessage("All hidden tests passed. Submission accepted.");
+    setSubmitMessage(`You topped the leaderboard at #1. Claim your ₹${reward} reward.`);
+  };
+
   return (
     <motion.div
       variants={fadeUp}
@@ -147,20 +174,27 @@ function DashboardPreview() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between bg-black/10">
-          <div className="flex gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex gap-2">
             <button className="tab-button h-8 px-3 text-xs font-semibold text-white border border-border bg-hover rounded-lg" type="button">
               Testcase
             </button>
             <button className="tab-button h-8 px-3 text-xs font-semibold text-secondary-text hover:text-white transition-colors" type="button">
               Console
             </button>
+            </div>
+            <div className="min-h-10 rounded-lg border border-border bg-card px-3 py-2 text-xs leading-5 text-secondary-text">
+              <span className="font-semibold text-success">{runCount > 0 ? "Passed" : "Idle"}</span>
+              <span className="ml-2">{consoleMessage}</span>
+              {submitMessage && <div className="mt-1 font-bold text-primary">{submitMessage}</div>}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex">
-            <button className="btn-gradient h-9 gap-1.5 px-4 text-xs font-bold" type="button">
+            <button onClick={handleRunCode} className="btn-gradient h-9 gap-1.5 px-4 text-xs font-bold" type="button">
               <Play className="h-3.5 w-3.5 fill-white" />
               Run Code
             </button>
-            <button className="btn-secondary h-9 px-4 text-xs font-bold" type="button">
+            <button onClick={handleSubmit} className="btn-secondary h-9 px-4 text-xs font-bold" type="button">
               Submit
             </button>
           </div>
@@ -302,7 +336,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* What's Coming Next */}
+        {/* What is Coming Next */}
         <section className="mx-auto max-w-[1400px] px-6 py-4">
           <div className="landing-panel overflow-hidden p-6 sm:p-8">
             <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
@@ -310,7 +344,7 @@ export default function Home() {
                 <div className="mb-2.5 w-fit rounded-full border border-primary0/20 bg-primary0/10 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
                   Roadmap
                 </div>
-                <h2 className="text-xl font-bold tracking-tight text-white">What's Coming Next</h2>
+                <h2 className="text-xl font-bold tracking-tight text-white">What is Coming Next</h2>
                 <p className="mt-1 text-xs text-secondary-text">
                   Building in public. Your feedback shapes Nexorithm.
                 </p>
