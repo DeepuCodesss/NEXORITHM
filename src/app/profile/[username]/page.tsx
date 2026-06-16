@@ -3,6 +3,7 @@
 import { use } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import {
   ArrowRight,
   Award,
@@ -38,10 +39,20 @@ const difficultyStyles = {
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
+  const { user: clerkUser, isSignedIn, isLoaded } = useUser();
   const { user, missions, problems, solvedCount, isAuthenticated } = useApp();
-  const isOwnProfile = username === user.username || username === "me";
+  const displayUsername =
+    clerkUser?.username ||
+    clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+    user.username;
+  const displayFullName =
+    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ").trim() ||
+    clerkUser?.fullName ||
+    user.fullName;
+  const displayAvatar = clerkUser?.imageUrl || user.avatarUrl;
+  const isOwnProfile = username === displayUsername || username === "me";
   const navItems = [
-    { label: "Overview", href: isAuthenticated ? `/profile/${user.username}` : "/settings", icon: Home },
+    { label: "Overview", href: isSignedIn ? `/profile/${displayUsername}` : "/settings", icon: Home },
     { label: "Problems", href: "/problems", icon: BookOpen },
     { label: "Contests", href: "/contests", icon: Trophy },
     { label: "Rankings", href: "/rankings", icon: Medal },
@@ -75,14 +86,22 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     { label: "Fast Solver", detail: "Solve 3 problems", active: solvedCount >= 3, icon: Zap },
   ];
 
-  if (!isOwnProfile) {
+  if (!isLoaded) {
+    return (
+      <div className="app-shell flex min-h-screen items-center justify-center px-4">
+        <p className="text-sm text-secondary-text">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (!isOwnProfile && username !== user.username) {
     return (
       <div className="app-shell flex min-h-screen flex-col items-center justify-center px-4">
         <h1 className="text-xl font-black text-white">Profile not available</h1>
         <p className="mt-2 max-w-md text-center text-sm leading-6 text-secondary-text">
           This profile is not available. Open your own account page instead.
         </p>
-        <Link href="/profile/me" className="btn-primary mt-5 h-10 px-4 text-xs">
+        <Link href={isSignedIn ? `/profile/${displayUsername}` : "/settings"} className="btn-primary mt-5 h-10 px-4 text-xs">
           Open my profile
         </Link>
       </div>
@@ -128,15 +147,15 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.8fr)]">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-primary bg-hover p-1 shadow-[0_0_34px_rgba(99,102,241,0.35)]">
-                  <Image src={user.avatarUrl} alt="" width={112} height={112} unoptimized className="h-full w-full rounded-full object-cover" />
+                  <Image src={displayAvatar} alt="" width={112} height={112} unoptimized className="h-full w-full rounded-full object-cover" />
                   <span className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-background bg-success" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-3xl font-black text-white">{user.fullName}</h1>
+                    <h1 className="text-3xl font-black text-white">{displayFullName}</h1>
                     {isAuthenticated && <BadgeCheck className="h-5 w-5 fill-primary text-white" />}
                   </div>
-                  <p className="mt-1 font-mono text-sm text-secondary-text">@{user.username}</p>
+                  <p className="mt-1 font-mono text-sm text-secondary-text">@{displayUsername}</p>
                   <p className="mt-4 max-w-xl text-sm leading-6 text-secondary-text">
                     Solving DSA daily. Building consistency one verified problem at a time.
                   </p>
