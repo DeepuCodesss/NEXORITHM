@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SignInButton, useUser } from "@clerk/nextjs";
 import { Code2, Gift, Moon, UserRound } from "lucide-react";
-import { useApp } from "@/context/AppContext";
 
 function UserAvatar({ src, name }: { src?: string; name: string }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -36,7 +36,13 @@ function UserAvatar({ src, name }: { src?: string; name: string }) {
 }
 
 export default function LandingHeader() {
-  const { user, isAuthenticated } = useApp();
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const displayUsername =
+    clerkUser?.username ||
+    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ").trim() ||
+    clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+    "Log in";
+  const profileHref = isSignedIn && clerkUser ? `/profile/${clerkUser.username || displayUsername}` : "/problems";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/75 backdrop-blur-xl">
@@ -63,7 +69,7 @@ export default function LandingHeader() {
           <Link href="/rankings" className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
             Rankings
           </Link>
-          <Link href={`/profile/${user.username}`} className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
+          <Link href={profileHref} className="text-sm font-medium text-secondary-text transition-colors hover:text-white">
             Profile
           </Link>
         </nav>
@@ -77,25 +83,31 @@ export default function LandingHeader() {
             <Moon className="h-4 w-4" />
           </button>
 
-          {isAuthenticated ? (
+          {!isLoaded ? (
+            <span className="btn-secondary hidden h-9 px-4 text-xs sm:inline-flex">Loading...</span>
+          ) : isSignedIn && clerkUser ? (
             <Link
-              href={`/profile/${user.username}`}
+              href={`/profile/${clerkUser.username || displayUsername}`}
               className="btn-secondary h-9 gap-2 px-3 text-xs"
             >
-              <UserAvatar src={user.avatarUrl} name={user.fullName} />
-              <span className="hidden sm:inline">{user.fullName.split(" ")[0]}</span>
+              <UserAvatar src={clerkUser.imageUrl} name={displayUsername} />
+              <span className="hidden sm:inline">{displayUsername}</span>
             </Link>
           ) : (
-            <Link href="/problems" className="btn-secondary hidden h-9 px-4 text-xs sm:inline-flex">
-              Log in
-            </Link>
+            <SignInButton mode="modal">
+              <button type="button" className="btn-secondary hidden h-9 px-4 text-xs sm:inline-flex">
+                Log in
+              </button>
+            </SignInButton>
           )}
 
-          <Link href="/problems" className="btn-gradient h-9 gap-2 px-4 text-xs">
+          <SignInButton mode="modal">
+            <button type="button" className="btn-gradient h-9 gap-2 px-4 text-xs">
             <Gift className="h-3.5 w-3.5 sm:hidden" />
             <span className="hidden sm:inline">Sign up</span>
             <span className="sm:hidden">Start</span>
-          </Link>
+            </button>
+          </SignInButton>
         </div>
       </div>
     </header>
