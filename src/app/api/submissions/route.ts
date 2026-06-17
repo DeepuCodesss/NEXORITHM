@@ -7,6 +7,25 @@ import { upsertClerkUser } from "@/lib/userSync";
 
 export const runtime = "nodejs";
 
+const IST_TIME_ZONE = "Asia/Kolkata";
+
+const getDateKeyInTimeZone = (value: Date, timeZone: string) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+
+const getStreakReward = (streakDay: number) => {
+  if (streakDay <= 0) return { coins: 0, cash: 0 };
+  if (streakDay <= 2) return { coins: 5, cash: 0 };
+  if (streakDay <= 4) return { coins: 10, cash: 0 };
+  if (streakDay === 5) return { coins: 15, cash: 0 };
+  if (streakDay === 6) return { coins: 20, cash: 0 };
+  return { coins: 50, cash: 5 };
+};
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
@@ -32,9 +51,13 @@ export async function POST(request: Request) {
   let databaseError: string | null = null;
   const clerkUser = await currentUser();
 
+  if (!clerkUser) {
+    return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
   try {
     const prisma = getPrisma();
-    const user = clerkUser ? await upsertClerkUser(clerkUser) : null;
+    const user = await upsertClerkUser(clerkUser);
 
     await prisma.problem.upsert({
       where: { id: problem.id },
@@ -70,41 +93,75 @@ export async function POST(request: Request) {
       },
     });
 
-    const submission = await prisma.submission.create({
-      data: {
-        problemId: problem.id,
-        userId: user?.id,
-        language,
-        code,
-        status: result.status,
-        passedCount: result.passedCount,
-        totalCount: result.totalCount,
-        runtimeMs: result.runtimeMs,
-        output: JSON.parse(JSON.stringify({ cases: result.cases })),
-      },
-    });
-    submissionId = submission.id;
-    saved = true;
+    const now = new Date();
+    const submissionResult = await prisma.$transaction(async (tx) => {
+      const createdSubmission = await tx.submission.create({
+        data: {
+          problemId: problem.id,
+          userId: user.id,
+          language,
+          code,
+          status: result.status,
+          passedCount: result.passedCount,
+          totalCount: result.totalCount,
+          runtimeMs: result.runtimeMs,
+          output: JSON.parse(JSON.stringify({ cases: result.cases })),
+        },
+      });
 
-    if (user && result.status === "Accepted") {
-      const solvedProblemIds = Array.isArray(user.solvedProblemIds) ? user.solvedProblemIds : [];
-      if (!solvedProblemIds.includes(problem.id)) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            xp: user.xp + problem.xpReward,
-            coins: user.coins + problem.coinReward,
-            moneyEarnedInr: user.moneyEarnedInr + (problem.prizeMoneyInr ?? 0),
-            reputation: user.reputation + Math.max(5, Math.floor(problem.xpReward / 10)),
-            devRank: Math.floor((user.xp + problem.xpReward) / 200),
-            currentStreak: user.currentStreak === 0 ? 1 : user.currentStreak,
-            longestStreak: Math.max(user.longestStreak, user.currentStreak === 0 ? 1 : user.currentStreak),
-            solvedProblemIds: [...solvedProblemIds, problem.id],
-            lastSolvedAt: new Date(),
-          },
-        });
+      if (result.status !== "Accepted") {
+        return { createdSubmission };
       }
-    }
+
+      const currentSolvedProblemIds = Array.isArray(user.solvedProblemIds)
+        ? user.solvedProblemIds.filter((value): value is string => typeof value === "string")
+        : [];
+      if (currentSolvedProblemIds.includes(problem.id)) {
+        return { createdSubmission };
+      }
+
+      const lastSolvedAt = user.lastSolvedAt ? new Date(user.lastSolvedAt) : null;
+      const currentDayKey = getDateKeyInTimeZone(now, IST_TIME_ZONE);
+      const lastDayKey = lastSolvedAt ? getDateKeyInTimeZone(lastSolvedAt, IST_TIME_ZONE) : null;
+      const previousDay = lastSolvedAt ? new Date(lastSolvedAt) : null;
+      if (previousDay) {
+        previousDay.setDate(previousDay.getDate() + 1);
+      }
+      const previousDayKey = previousDay ? getDateKeyInTimeZone(previousDay, IST_TIME_ZONE) : null;
+
+      const nextStreak =
+        !lastDayKey || lastDayKey === currentDayKey
+          ? Math.max(user.currentStreak, 1)
+          : lastDayKey === previousDayKey
+            ? user.currentStreak + 1
+            : 1;
+      const streakReward = getStreakReward(nextStreak);
+      const xpReward = problem.xpReward;
+      const coinReward = problem.coinReward + streakReward.coins;
+      const cashReward = (problem.prizeMoneyInr ?? 0) + streakReward.cash;
+      const reputationReward = Math.max(5, Math.floor(xpReward / 10));
+      const nextXp = user.xp + xpReward;
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          xp: nextXp,
+          coins: user.coins + coinReward,
+          moneyEarnedInr: user.moneyEarnedInr + cashReward,
+          reputation: user.reputation + reputationReward,
+          devRank: Math.floor(nextXp / 200),
+          currentStreak: nextStreak,
+          longestStreak: Math.max(user.longestStreak, nextStreak),
+          solvedProblemIds: [...currentSolvedProblemIds, problem.id],
+          lastSolvedAt: now,
+        },
+      });
+
+      return { createdSubmission };
+    });
+
+    submissionId = submissionResult.createdSubmission.id;
+    saved = true;
   } catch (error) {
     databaseError = error instanceof Error ? error.message : String(error);
   }
