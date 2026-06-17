@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     startsAt: Date;
     endsAt: Date;
     isActive: number;
-  }>>`SELECT problemId, rewardMoney, startsAt, endsAt, isActive
+  }>>`SELECT "problemId", "rewardMoney", "startsAt", "endsAt", "isActive"
     FROM "LiveReward"
     WHERE "problemId" = ${problemId}
     LIMIT 1`;

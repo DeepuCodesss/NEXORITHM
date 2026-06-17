@@ -11,7 +11,7 @@ export async function GET() {
     startsAt: Date;
     endsAt: Date;
     isActive: number;
-  }>>`SELECT problemId, rewardMoney, startsAt, endsAt, isActive
+  }>>`SELECT "problemId", "rewardMoney", "startsAt", "endsAt", "isActive"
     FROM "LiveReward"
     ORDER BY "createdAt" DESC
     LIMIT 1`;
