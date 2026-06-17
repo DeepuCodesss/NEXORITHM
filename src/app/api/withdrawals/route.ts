@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   const result = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw(
-      Prisma.sql`INSERT INTO Withdrawal (id, userId, coins, cashAmount, upiId, status, createdAt)
+      Prisma.sql`INSERT INTO "Withdrawal" ("id", "userId", "coins", "cashAmount", "upiId", "status", "createdAt")
         VALUES (${randomUUID()}, ${user.id}, ${coins}, ${cashAmount}, ${upiId}, ${"pending"}, ${new Date()})`,
     );
 
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     });
 
     await tx.$executeRaw(
-      Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+      Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
         VALUES (${randomUUID()}, ${user.id}, ${"coins"}, ${"withdrawal"}, ${-coins}, ${JSON.stringify({ cashAmount, upiId })}, ${new Date()})`,
     );
 

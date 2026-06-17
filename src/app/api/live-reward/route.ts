@@ -12,8 +12,8 @@ export async function GET() {
     endsAt: Date;
     isActive: number;
   }>>`SELECT problemId, rewardMoney, startsAt, endsAt, isActive
-    FROM LiveReward
-    ORDER BY createdAt DESC
+    FROM "LiveReward"
+    ORDER BY "createdAt" DESC
     LIMIT 1`;
 
   const liveReward = row[0]

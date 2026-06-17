@@ -30,7 +30,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const prisma = getPrisma();
   const rows = await prisma.$queryRaw<Array<{ userId: string; coins: number; cashAmount: number; status: string }>>`
-    SELECT userId, coins, cashAmount, status FROM Withdrawal WHERE id = ${id} LIMIT 1`;
+    SELECT "userId", "coins", "cashAmount", "status" FROM "Withdrawal" WHERE "id" = ${id} LIMIT 1`;
   const withdrawal = rows[0];
   if (!withdrawal) {
     return apiError("Withdrawal not found.", 404);
@@ -42,17 +42,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw(
-      Prisma.sql`UPDATE Withdrawal SET status = ${status} WHERE id = ${id}`,
+      Prisma.sql`UPDATE "Withdrawal" SET "status" = ${status} WHERE "id" = ${id}`,
     );
 
     if (status === "approved") {
       await tx.$executeRaw(
-        Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+        Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${withdrawal.userId}, ${"cash"}, ${"withdrawal_approved"}, ${-Math.round(Number(withdrawal.cashAmount))}, ${JSON.stringify({ withdrawalId: id })}, ${new Date()})`,
       );
     } else {
       await tx.$executeRaw(
-        Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+        Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${withdrawal.userId}, ${"cash"}, ${"withdrawal_rejected"}, ${0}, ${JSON.stringify({ withdrawalId: id })}, ${new Date()})`,
       );
     }

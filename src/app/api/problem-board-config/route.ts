@@ -15,7 +15,7 @@ export async function GET() {
     id: string;
     showUpcomingRewards: number;
     upcomingRewardItems: unknown;
-  }>>(Prisma.sql`SELECT id, showUpcomingRewards, upcomingRewardItems FROM ProblemBoardConfig WHERE id = ${"singleton"} LIMIT 1`);
+  }>>(Prisma.sql`SELECT "id", "showUpcomingRewards", "upcomingRewardItems" FROM "ProblemBoardConfig" WHERE "id" = ${"singleton"} LIMIT 1`);
   const row = rows[0];
   return apiSuccess({
     problemBoardConfig: row

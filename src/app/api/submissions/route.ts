@@ -118,7 +118,7 @@ export async function POST(request: Request) {
         solvedProblemIds: unknown;
         lastSolvedAt: Date | null;
       }>>`SELECT id, xp, coins, moneyEarnedInr, reputation, currentStreak, longestStreak, solvedProblemIds, lastSolvedAt
-        FROM User WHERE id = ${user.id} LIMIT 1 FOR UPDATE`;
+        FROM "User" WHERE "id" = ${user.id} LIMIT 1 FOR UPDATE`;
       const lockedUser = lockedUsers[0];
       if (!lockedUser) {
         throw new Error("User record not found.");
@@ -168,24 +168,24 @@ export async function POST(request: Request) {
       const xpReward = problem.xpReward;
       const coinReward = problem.coinReward;
       const activeLiveReward = await tx.$queryRaw<Array<{ id: string; rewardMoney: number }>>(
-        Prisma.sql`SELECT id, rewardMoney FROM LiveReward
-          WHERE problemId = ${problem.id}
-            AND isActive = 1
-            AND startsAt <= ${now}
-            AND endsAt > ${now}
-            AND winnerUserId IS NULL
-          ORDER BY createdAt DESC
+        Prisma.sql`SELECT "id", "rewardMoney" FROM "LiveReward"
+          WHERE "problemId" = ${problem.id}
+            AND "isActive" = 1
+            AND "startsAt" <= ${now}
+            AND "endsAt" > ${now}
+            AND "winnerUserId" IS NULL
+          ORDER BY "createdAt" DESC
           LIMIT 1`,
       );
       const liveReward = activeLiveReward[0] ?? null;
       if (liveReward) {
         const claimResult = await tx.$executeRaw(
-          Prisma.sql`UPDATE LiveReward
-          SET winnerUserId = ${user.id},
-              winnerSubmissionId = ${createdSubmission.id},
-              paidAt = ${now},
-              isActive = 0
-          WHERE id = ${liveReward.id} AND winnerUserId IS NULL`,
+          Prisma.sql`UPDATE "LiveReward"
+          SET "winnerUserId" = ${user.id},
+              "winnerSubmissionId" = ${createdSubmission.id},
+              "paidAt" = ${now},
+              "isActive" = 0
+          WHERE "id" = ${liveReward.id} AND "winnerUserId" IS NULL`,
         );
         if (claimResult === 0) {
           return { createdSubmission };
@@ -213,35 +213,35 @@ export async function POST(request: Request) {
       });
 
       await tx.$executeRaw(
-        Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+        Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
         VALUES (${randomUUID()}, ${user.id}, ${"xp"}, ${"problem_solve"}, ${xpReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
       );
       await tx.$executeRaw(
-        Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+        Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
         VALUES (${randomUUID()}, ${user.id}, ${"coins"}, ${"problem_solve"}, ${coinReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
       );
       if (streakReward.coins > 0) {
         await tx.$executeRaw(
-          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${user.id}, ${"coins"}, ${"streak_reward"}, ${streakReward.coins}, ${JSON.stringify({ streakDay: nextStreak, problemId: problem.id })}, ${now})`,
         );
       }
       if (streakReward.cash > 0) {
         await tx.$executeRaw(
-          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"streak_reward"}, ${streakReward.cash}, ${JSON.stringify({ streakDay: nextStreak, problemId: problem.id })}, ${now})`,
         );
       }
       if (cashReward > 0) {
         await tx.$executeRaw(
-          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"problem_cash_reward"}, ${cashReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
         );
       }
 
       if (liveReward) {
         await tx.$executeRaw(
-          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"live_reward"}, ${Number(liveReward.rewardMoney ?? 0)}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id, liveRewardId: liveReward.id })}, ${now})`,
         );
       }

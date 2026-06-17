@@ -44,13 +44,13 @@ export async function GET(request: Request) {
     createdAt: Date;
   }>>(
     Prisma.sql`SELECT id, type, source, amount, metadata, createdAt
-      FROM RewardTransaction
-      WHERE userId = ${user.id} ${filterSql}
-      ORDER BY createdAt DESC
+      FROM "RewardTransaction"
+      WHERE "userId" = ${user.id} ${filterSql}
+      ORDER BY "createdAt" DESC
       LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
   );
   const countRows = await prisma.$queryRaw<Array<{ count: number }>>(
-    Prisma.sql`SELECT COUNT(*) as count FROM RewardTransaction WHERE userId = ${user.id} ${filterSql}`,
+    Prisma.sql`SELECT COUNT(*) as count FROM "RewardTransaction" WHERE "userId" = ${user.id} ${filterSql}`,
   );
   const total = Number(countRows[0]?.count ?? 0);
 
