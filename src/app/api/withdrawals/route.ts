@@ -3,13 +3,17 @@ import { currentUser } from "@clerk/nextjs/server";
 import { Prisma } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
 import { upsertClerkUser } from "@/lib/userSync";
+import { apiError } from "@/lib/apiResponse";
+import { apiSuccess } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const clerkUser = await currentUser();
   if (!clerkUser) {
-    return Response.json({ error: "Authentication required." }, { status: 401 });
+    logger.warn("auth.failure", { route: "/api/withdrawals", reason: "missing_user" });
+    return apiError("Authentication required.", 401);
   }
 
   const body = await request.json().catch(() => null);
@@ -18,14 +22,14 @@ export async function POST(request: Request) {
   const upiId = typeof body?.upiId === "string" ? body.upiId.trim() : "";
 
   if (!Number.isFinite(coins) || coins <= 0 || !Number.isFinite(cashAmount) || cashAmount <= 0 || !upiId) {
-    return Response.json({ error: "Invalid withdrawal request." }, { status: 400 });
+    return apiError("Invalid withdrawal request.", 400);
   }
 
   const prisma = getPrisma();
   const user = await upsertClerkUser(clerkUser);
 
   if (user.coins < coins) {
-    return Response.json({ error: "Insufficient coins." }, { status: 400 });
+    return apiError("Insufficient coins.", 409);
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -47,5 +51,6 @@ export async function POST(request: Request) {
     return { ok: true };
   });
 
-  return Response.json({ ok: true, result });
+  logger.info("withdrawal.requested", { userId: user.id, coins, cashAmount });
+  return apiSuccess({ ok: true, result });
 }

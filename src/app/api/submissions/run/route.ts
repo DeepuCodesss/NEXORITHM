@@ -3,6 +3,9 @@ import { isJudgeLanguage } from "@/lib/languages";
 import { MOCK_PROBLEMS } from "@/lib/mockData";
 import { currentUser } from "@clerk/nextjs/server";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { apiError } from "@/lib/apiResponse";
+import { apiSuccess } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -14,27 +17,34 @@ export async function POST(request: Request) {
   const problem = MOCK_PROBLEMS.find((item) => item.id === problemId);
 
   if (!problem) {
-    return Response.json({ error: "Problem not found." }, { status: 404 });
+    return apiError("Problem not found.", 404);
   }
 
   if (!code.trim()) {
-    return Response.json({ error: "Code is required." }, { status: 400 });
+    return apiError("Code is required.", 400);
   }
 
   if (!isJudgeLanguage(language)) {
-    return Response.json({ error: "Unsupported language." }, { status: 400 });
+    return apiError("Unsupported language.", 400);
   }
 
   const clerkUser = await currentUser();
   if (!clerkUser) {
-    return Response.json({ error: "Authentication required." }, { status: 401 });
+    logger.warn("auth.failure", { route: "/api/submissions/run", reason: "missing_user" });
+    return apiError("Authentication required.", 401);
   }
 
-  const rateLimit = checkRateLimit(`run:${clerkUser.id}`);
+  const rateLimit = await checkRateLimit(`run:${clerkUser.id}`);
   if (!rateLimit.allowed) {
-    return Response.json({ error: "Rate limit exceeded." }, { status: 429 });
+    return apiError("Rate limit exceeded.", 429);
   }
 
   const result = await judgeSubmission(problem, language, code);
-  return Response.json({ problemId: problem.id, saved: false, ...result });
+  logger.info("submission.run", {
+    userId: clerkUser.id,
+    problemId: problem.id,
+    language,
+    status: result.status,
+  });
+  return apiSuccess({ problemId: problem.id, saved: false, ...result });
 }

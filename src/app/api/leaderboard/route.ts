@@ -1,13 +1,22 @@
 import { getPrisma } from "@/lib/db";
+import { apiSuccess } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const prisma = getPrisma();
-  const users = await prisma.user.findMany({
-  });
-
-  const leaderboard = users
+const buildLeaderboard = (users: Array<{
+  username: string;
+  fullName: string;
+  avatarUrl: string;
+  xp: number;
+  college: string;
+  currentStreak: number;
+  solvedProblemIds: unknown;
+  isPro: boolean;
+  devRank: number;
+  lastSolvedAt: Date | null;
+  updatedAt: Date;
+}>) =>
+  users
     .map((user) => ({
       username: user.username,
       fullName: user.fullName,
@@ -41,5 +50,43 @@ export async function GET() {
       devRank: entry.devRank,
     }));
 
-  return Response.json({ leaderboard });
+export async function GET(request: Request) {
+  const prisma = getPrisma();
+  const { searchParams } = new URL(request.url);
+  const scope = searchParams.get("scope") ?? "global";
+  const college = searchParams.get("college") ?? "";
+  const now = new Date();
+
+  const users = await prisma.user.findMany({
+    select: {
+      username: true,
+      fullName: true,
+      avatarUrl: true,
+      xp: true,
+      college: true,
+      currentStreak: true,
+      solvedProblemIds: true,
+      isPro: true,
+      devRank: true,
+      lastSolvedAt: true,
+      updatedAt: true,
+    },
+  });
+  const filteredUsers = (() => {
+    if (scope === "college" && college) {
+      return users.filter((user) => user.college === college);
+    }
+    if (scope === "monthly") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return users.filter((user) => {
+        const solvedAt = user.lastSolvedAt ?? user.updatedAt;
+        return solvedAt >= start;
+      });
+    }
+    return users;
+  })();
+
+  const leaderboard = buildLeaderboard(filteredUsers);
+
+  return apiSuccess({ leaderboard });
 }

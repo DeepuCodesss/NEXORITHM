@@ -51,25 +51,6 @@ const createDefaultProblemBoardConfig = (): ProblemBoardConfig => ({
   ],
 });
 
-const loadStoredProblemBoardConfig = (): ProblemBoardConfig => {
-  if (typeof window === "undefined") return createDefaultProblemBoardConfig();
-
-  try {
-    const raw = localStorage.getItem("nexorithm-problem-board");
-    if (!raw) return createDefaultProblemBoardConfig();
-
-    const parsed = JSON.parse(raw) as Partial<ProblemBoardConfig>;
-    return {
-      showUpcomingRewards: parsed.showUpcomingRewards !== false,
-      upcomingRewardItems: Array.isArray(parsed.upcomingRewardItems)
-        ? parsed.upcomingRewardItems.slice(0, 3).map((item) => ({ problemId: item?.problemId ?? "" }))
-        : createDefaultProblemBoardConfig().upcomingRewardItems,
-    };
-  } catch {
-    return createDefaultProblemBoardConfig();
-  }
-};
-
 interface AppContextType {
   user: UserState;
   problems: Problem[];
@@ -147,29 +128,21 @@ const emptyReward = (): SolveRewardResult => ({
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const [user, setUser] = useState<UserState>(INITIAL_USER);
-  const [hydrated, setHydrated] = useState(false);
   const [isUserSynced, setIsUserSynced] = useState(false);
   const [liveReward, setLiveReward] = useState<LiveRewardConfig>(() => createDefaultLiveReward());
   const [problemBoardConfig, setProblemBoardConfig] = useState<ProblemBoardConfig>(() => createDefaultProblemBoardConfig());
 
   const [problems] = useState<Problem[]>(MOCK_PROBLEMS);
-  const [missions, setMissions] = useState<Mission[]>(MOCK_MISSIONS);
+  const [missions] = useState<Mission[]>(MOCK_MISSIONS);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setProblemBoardConfig(loadStoredProblemBoardConfig());
-      setHydrated(true);
-    });
-  }, []);
 
   useEffect(() => {
     const syncLiveReward = async () => {
       const response = await fetch("/api/live-reward", { cache: "no-store" });
       if (!response.ok) return;
-      const data = (await response.json()) as { liveReward?: LiveRewardConfig | null };
-      if (data.liveReward) {
-        setLiveReward(data.liveReward);
+      const payload = (await response.json()) as { success?: boolean; data?: { liveReward?: LiveRewardConfig | null } };
+      if (payload.data?.liveReward) {
+        setLiveReward(payload.data.liveReward);
       }
     };
 
@@ -177,12 +150,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const syncProblemBoardConfig = async () => {
+      const response = await fetch("/api/problem-board-config", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { success?: boolean; data?: { problemBoardConfig?: ProblemBoardConfig | null } };
+      if (payload.data?.problemBoardConfig) {
+        setProblemBoardConfig(payload.data.problemBoardConfig);
+      }
+    };
+
+    void syncProblemBoardConfig();
+  }, []);
+
+  useEffect(() => {
     const syncLeaderboard = async () => {
       const response = await fetch("/api/leaderboard", { cache: "no-store" });
       if (!response.ok) return;
-      const data = (await response.json()) as { leaderboard?: LeaderboardEntry[] };
-      if (Array.isArray(data.leaderboard)) {
-        setLeaderboard(data.leaderboard);
+      const payload = (await response.json()) as { success?: boolean; data?: { leaderboard?: LeaderboardEntry[] } };
+      if (Array.isArray(payload.data?.leaderboard)) {
+        setLeaderboard(payload.data.leaderboard);
       }
     };
 
@@ -205,9 +191,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const data = (await response.json()) as { user?: DbUserSnapshot | null };
-      if (data.user) {
-        setUser(dbUserToState(data.user));
+      const payload = (await response.json()) as { success?: boolean; data?: { user?: DbUserSnapshot | null } };
+      if (payload.data?.user) {
+        setUser(dbUserToState(payload.data.user));
       } else if (clerkUser) {
         setUser((current) => ({
           ...current,
@@ -226,11 +212,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     void syncUser();
   }, [clerkUser, isLoaded, isSignedIn]);
 
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") return;
-    localStorage.setItem("nexorithm-problem-board", JSON.stringify(problemBoardConfig));
-  }, [problemBoardConfig, hydrated]);
-
   const buyStreakShield = (): boolean => {
     return false;
   };
@@ -239,59 +220,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const isProblemSolved = (problemId: string) => user.solvedProblemIds.includes(problemId);
 
-  const signOut = () => {
-    setUser(INITIAL_USER);
-  };
+  const signOut = () => undefined;
 
   const solveProblem = (problemId: string): SolveRewardResult => {
     const problem = problems.find((item) => item.id === problemId);
     if (!problem) return emptyReward();
 
-    if (isProblemSolved(problemId)) {
-      return { ...emptyReward(), alreadySolved: true };
-    }
-
-    const reputationGained = Math.max(5, Math.floor(problem.xpReward / 10));
-    const now = Date.now();
-    const isLiveRewardProblem =
-      liveReward.isActive &&
-      liveReward.problemId === problemId &&
-      new Date(liveReward.startsAt).getTime() <= now &&
-      new Date(liveReward.endsAt).getTime() > now;
-    const moneyGainedInr = isLiveRewardProblem ? liveReward.rewardMoneyInr : 0;
-
-    setUser((current) => {
-      const nextXp = current.xp + problem.xpReward;
-      const nextStreak = current.currentStreak === 0 ? 1 : current.currentStreak;
-
-      return {
-        ...current,
-        xp: nextXp,
-        coins: current.coins + problem.coinReward,
-        moneyEarnedInr: (current.moneyEarnedInr ?? 0) + moneyGainedInr,
-        reputation: current.reputation + reputationGained,
-        devRank: Math.floor(nextXp / 200),
-        currentStreak: nextStreak,
-        longestStreak: Math.max(current.longestStreak, nextStreak),
-        solvedProblemIds: [...current.solvedProblemIds, problemId],
-      };
-    });
-
-    setMissions((current) =>
-      current.map((mission) =>
-        mission.id === "m1"
-          ? { ...mission, currentCount: Math.min(mission.targetCount, mission.currentCount + 1) }
-          : mission,
-      ),
-    );
-
     return {
-      awarded: true,
-      alreadySolved: false,
-      xpGained: problem.xpReward,
-      coinsGained: problem.coinReward,
-      moneyGainedInr,
-      reputationGained,
+      awarded: false,
+      alreadySolved: isProblemSolved(problemId),
+      xpGained: 0,
+      coinsGained: 0,
+      moneyGainedInr: 0,
+      reputationGained: 0,
     };
   };
 
@@ -306,20 +247,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }),
       });
       if (!response.ok) return;
-      const data = (await response.json()) as { liveReward?: LiveRewardConfig | null };
-      if (data.liveReward) {
-        setLiveReward(data.liveReward);
+      const payload = (await response.json()) as { success?: boolean; data?: { liveReward?: LiveRewardConfig | null } };
+      if (payload.data?.liveReward) {
+        setLiveReward(payload.data.liveReward);
       }
     })();
   };
 
   const saveProblemBoardConfig = (config: ProblemBoardConfig) => {
-    setProblemBoardConfig({
-      showUpcomingRewards: config.showUpcomingRewards,
-      upcomingRewardItems: config.upcomingRewardItems.slice(0, 3).map((item) => ({
-        problemId: item.problemId,
-      })),
-    });
+    void (async () => {
+      const response = await fetch("/api/admin/problem-board-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          showUpcomingRewards: config.showUpcomingRewards,
+          upcomingRewardItems: config.upcomingRewardItems.slice(0, 3),
+        }),
+      });
+      if (!response.ok) return;
+      setProblemBoardConfig({
+        showUpcomingRewards: config.showUpcomingRewards,
+        upcomingRewardItems: config.upcomingRewardItems.slice(0, 3).map((item) => ({
+          problemId: item.problemId,
+        })),
+      });
+    })();
   };
 
   return (

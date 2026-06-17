@@ -1,15 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useApp } from "@/context/AppContext";
 import { Flame, Filter, Medal, Search, School, Trophy, Zap } from "lucide-react";
+type LeaderboardEntry = {
+  rank: number;
+  username: string;
+  fullName: string;
+  avatarUrl: string;
+  xp: number;
+  college: string;
+  streak: number;
+  solvedCount: number;
+  isPro: boolean;
+  devRank: number;
+};
 
 export default function Rankings() {
-  const { leaderboard, user } = useApp();
   const [filterType, setFilterType] = useState<"global" | "college" | "friends" | "monthly">("global");
   const [searchQuery, setSearchQuery] = useState("");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+
+  useEffect(() => {
+    const sync = async () => {
+      const scope = filterType === "global" ? "global" : filterType;
+      const response = await fetch(`/api/leaderboard?scope=${scope}&college=${encodeURIComponent("IIT")}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { success?: boolean; data?: { leaderboard?: LeaderboardEntry[] } };
+      setLeaderboard(Array.isArray(payload.data?.leaderboard) ? payload.data.leaderboard : []);
+    };
+    void sync();
+  }, [filterType]);
 
   const filteredLeaderboard = leaderboard.filter((entry) => {
     const matchesQuery =
@@ -94,9 +116,8 @@ export default function Rankings() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredLeaderboard.map((entry) => {
-                    const isSelf = entry.username === user.username;
                     return (
-                      <tr key={entry.username} className={`transition-colors hover:bg-hover ${isSelf ? "bg-primary/10" : ""}`}>
+                      <tr key={entry.username} className="transition-colors hover:bg-hover">
                         <td className="px-4 py-3.5 text-center font-mono font-bold text-secondary-text">
                           {entry.rank === 1 && <Trophy className="mx-auto h-4 w-4 text-primary" />}
                           {entry.rank === 2 && <Medal className="mx-auto h-4 w-4 text-secondary-text" />}

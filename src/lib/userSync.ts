@@ -13,9 +13,10 @@ const usernameFromEmail = (email: string) =>
     .slice(0, 20) || "coder";
 
 export const buildUserProfile = (clerkUser: ClerkUser) => {
-  const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses[0]?.emailAddress || "";
+  const fallbackEmail = `${clerkUser.id}@clerk.local`;
+  const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses[0]?.emailAddress || fallbackEmail;
   const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() || clerkUser.username || "Nexorithm Coder";
-  const username = clerkUser.username || usernameFromEmail(email) || clerkUser.id.slice(0, 12);
+  const username = clerkUser.username || `${usernameFromEmail(email)}-${clerkUser.id.slice(0, 6)}`;
   const avatarUrl = clerkUser.imageUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(username)}`;
 
   return {

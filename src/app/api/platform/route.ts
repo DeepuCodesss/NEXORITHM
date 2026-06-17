@@ -1,5 +1,7 @@
+import { apiSuccess } from "@/lib/apiResponse";
+
 export async function GET() {
-  return Response.json({
+  return apiSuccess({
     brand: "NEXORITHM",
     tagline: "Code. Compete. Earn.",
     capabilities: [

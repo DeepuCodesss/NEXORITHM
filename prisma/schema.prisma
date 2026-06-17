@@ -9,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Problem {
@@ -60,6 +60,7 @@ model User {
 
   @@index([xp, currentStreak, lastSolvedAt])
   @@index([updatedAt])
+  @@index([username, updatedAt])
 }
 
 model RewardTransaction {
@@ -74,6 +75,7 @@ model RewardTransaction {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([type, createdAt])
 }
 
 model Withdrawal {
@@ -103,7 +105,15 @@ model LiveReward {
   paidAt      DateTime?
   createdAt   DateTime @default(now())
 
-  @@index([isActive, startsAt, endsAt])
+  @@index([problemId, isActive, startsAt, endsAt])
+}
+
+model ProblemBoardConfig {
+  id                  String   @id @default("singleton")
+  showUpcomingRewards Boolean  @default(true)
+  upcomingRewardItems  Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Submission {
@@ -121,7 +131,7 @@ model Submission {
   problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
   user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([problemId])
-  @@index([userId])
+  @@index([problemId, createdAt])
+  @@index([userId, createdAt])
   @@index([createdAt])
 }

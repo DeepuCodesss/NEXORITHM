@@ -2,6 +2,9 @@ import { randomUUID } from "crypto";
 import { currentUser } from "@clerk/nextjs/server";
 import { Prisma } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
+import { apiError } from "@/lib/apiResponse";
+import { apiSuccess } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -9,15 +12,20 @@ const isAdmin = (user: Awaited<ReturnType<typeof currentUser>>) => user?.publicM
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const clerkUser = await currentUser();
+  if (!clerkUser) {
+    logger.warn("auth.failure", { route: "/api/admin/withdrawals/[id]", reason: "missing_user" });
+    return apiError("Admin access required.", 403);
+  }
   if (!isAdmin(clerkUser)) {
-    return Response.json({ error: "Admin access required." }, { status: 403 });
+    logger.warn("auth.failure", { route: "/api/admin/withdrawals/[id]", reason: "non_admin" });
+    return apiError("Admin access required.", 403);
   }
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const status = typeof body?.status === "string" ? body.status : "";
   if (!["approved", "rejected"].includes(status)) {
-    return Response.json({ error: "Invalid status." }, { status: 400 });
+    return apiError("Invalid status.", 400);
   }
 
   const prisma = getPrisma();
@@ -25,11 +33,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     SELECT userId, coins, cashAmount, status FROM Withdrawal WHERE id = ${id} LIMIT 1`;
   const withdrawal = rows[0];
   if (!withdrawal) {
-    return Response.json({ error: "Withdrawal not found." }, { status: 404 });
+    return apiError("Withdrawal not found.", 404);
   }
 
   if (withdrawal.status !== "pending") {
-    return Response.json({ error: "Withdrawal already processed." }, { status: 409 });
+    return apiError("Withdrawal already processed.", 409);
   }
 
   await prisma.$transaction(async (tx) => {
@@ -50,5 +58,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   });
 
-  return Response.json({ ok: true });
+  logger.info("admin.withdrawal.updated", { adminId: clerkUser.id, withdrawalId: id, status });
+  return apiSuccess({ ok: true });
 }

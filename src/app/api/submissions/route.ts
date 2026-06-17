@@ -7,6 +7,9 @@ import { upsertClerkUser } from "@/lib/userSync";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { Prisma } from "@/generated/prisma/client";
 import { randomUUID } from "crypto";
+import { apiError } from "@/lib/apiResponse";
+import { apiSuccess } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -37,15 +40,15 @@ export async function POST(request: Request) {
   const problem = MOCK_PROBLEMS.find((item) => item.id === problemId);
 
   if (!problem) {
-    return Response.json({ error: "Problem not found." }, { status: 404 });
+    return apiError("Problem not found.", 404);
   }
 
   if (!code.trim()) {
-    return Response.json({ error: "Code is required." }, { status: 400 });
+    return apiError("Code is required.", 400);
   }
 
   if (!isJudgeLanguage(language)) {
-    return Response.json({ error: "Unsupported language." }, { status: 400 });
+    return apiError("Unsupported language.", 400);
   }
 
   const result = await judgeSubmission(problem, language, code);
@@ -55,12 +58,13 @@ export async function POST(request: Request) {
   const clerkUser = await currentUser();
 
   if (!clerkUser) {
-    return Response.json({ error: "Authentication required." }, { status: 401 });
+    logger.warn("auth.failure", { route: "/api/submissions", reason: "missing_user" });
+    return apiError("Authentication required.", 401);
   }
 
-  const rateLimit = checkRateLimit(`submit:${clerkUser.id}`);
+  const rateLimit = await checkRateLimit(`submit:${clerkUser.id}`);
   if (!rateLimit.allowed) {
-    return Response.json({ error: "Rate limit exceeded." }, { status: 429 });
+    return apiError("Rate limit exceeded.", 429);
   }
 
   try {
@@ -103,6 +107,23 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const submissionResult = await prisma.$transaction(async (tx) => {
+      const lockedUsers = await tx.$queryRaw<Array<{
+        id: string;
+        xp: number;
+        coins: number;
+        moneyEarnedInr: number;
+        reputation: number;
+        currentStreak: number;
+        longestStreak: number;
+        solvedProblemIds: unknown;
+        lastSolvedAt: Date | null;
+      }>>`SELECT id, xp, coins, moneyEarnedInr, reputation, currentStreak, longestStreak, solvedProblemIds, lastSolvedAt
+        FROM User WHERE id = ${user.id} LIMIT 1 FOR UPDATE`;
+      const lockedUser = lockedUsers[0];
+      if (!lockedUser) {
+        throw new Error("User record not found.");
+      }
+
       const createdSubmission = await tx.submission.create({
         data: {
           problemId: problem.id,
@@ -121,14 +142,14 @@ export async function POST(request: Request) {
         return { createdSubmission };
       }
 
-      const currentSolvedProblemIds = Array.isArray(user.solvedProblemIds)
-        ? user.solvedProblemIds.filter((value): value is string => typeof value === "string")
+      const currentSolvedProblemIds = Array.isArray(lockedUser.solvedProblemIds)
+        ? lockedUser.solvedProblemIds.filter((value): value is string => typeof value === "string")
         : [];
       if (currentSolvedProblemIds.includes(problem.id)) {
         return { createdSubmission };
       }
 
-      const lastSolvedAt = user.lastSolvedAt ? new Date(user.lastSolvedAt) : null;
+      const lastSolvedAt = lockedUser.lastSolvedAt ? new Date(lockedUser.lastSolvedAt) : null;
       const currentDayKey = getDateKeyInTimeZone(now, IST_TIME_ZONE);
       const lastDayKey = lastSolvedAt ? getDateKeyInTimeZone(lastSolvedAt, IST_TIME_ZONE) : null;
       const previousDay = lastSolvedAt ? new Date(lastSolvedAt) : null;
@@ -139,9 +160,9 @@ export async function POST(request: Request) {
 
       const nextStreak =
         !lastDayKey || lastDayKey === currentDayKey
-          ? Math.max(user.currentStreak, 1)
+          ? Math.max(lockedUser.currentStreak, 1)
           : lastDayKey === previousDayKey
-            ? user.currentStreak + 1
+            ? lockedUser.currentStreak + 1
             : 1;
       const streakReward = getStreakReward(nextStreak);
       const xpReward = problem.xpReward;
@@ -157,11 +178,24 @@ export async function POST(request: Request) {
           LIMIT 1`,
       );
       const liveReward = activeLiveReward[0] ?? null;
+      if (liveReward) {
+        const claimResult = await tx.$executeRaw(
+          Prisma.sql`UPDATE LiveReward
+          SET winnerUserId = ${user.id},
+              winnerSubmissionId = ${createdSubmission.id},
+              paidAt = ${now},
+              isActive = 0
+          WHERE id = ${liveReward.id} AND winnerUserId IS NULL`,
+        );
+        if (claimResult === 0) {
+          return { createdSubmission };
+        }
+      }
       const cashReward = (problem.prizeMoneyInr ?? 0) + streakReward.cash + Number(liveReward?.rewardMoney ?? 0);
       const reputationReward = Math.max(5, Math.floor(xpReward / 10));
-      const nextXp = user.xp + xpReward;
-      const nextCoins = user.coins + coinReward + streakReward.coins;
-      const nextCash = user.moneyEarnedInr + cashReward;
+      const nextXp = lockedUser.xp + xpReward;
+      const nextCoins = lockedUser.coins + coinReward + streakReward.coins;
+      const nextCash = lockedUser.moneyEarnedInr + cashReward;
 
       await tx.user.update({
         where: { id: user.id },
@@ -169,10 +203,10 @@ export async function POST(request: Request) {
           xp: nextXp,
           coins: nextCoins,
           moneyEarnedInr: nextCash,
-          reputation: user.reputation + reputationReward,
+          reputation: lockedUser.reputation + reputationReward,
           devRank: Math.floor(nextXp / 200),
           currentStreak: nextStreak,
-          longestStreak: Math.max(user.longestStreak, nextStreak),
+          longestStreak: Math.max(lockedUser.longestStreak, nextStreak),
           solvedProblemIds: [...currentSolvedProblemIds, problem.id],
           lastSolvedAt: now,
         },
@@ -207,14 +241,6 @@ export async function POST(request: Request) {
 
       if (liveReward) {
         await tx.$executeRaw(
-          Prisma.sql`UPDATE LiveReward
-          SET winnerUserId = ${user.id},
-              winnerSubmissionId = ${createdSubmission.id},
-              paidAt = ${now},
-              isActive = 0
-          WHERE id = ${liveReward.id} AND winnerUserId IS NULL`,
-        );
-        await tx.$executeRaw(
           Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
           VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"live_reward"}, ${Number(liveReward.rewardMoney ?? 0)}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id, liveRewardId: liveReward.id })}, ${now})`,
         );
@@ -225,11 +251,22 @@ export async function POST(request: Request) {
 
     submissionId = submissionResult.createdSubmission.id;
     saved = true;
+    logger.info("submission.saved", {
+      userId: user.id,
+      problemId: problem.id,
+      submissionId,
+      status: result.status,
+    });
   } catch (error) {
     databaseError = error instanceof Error ? error.message : String(error);
+    logger.error("submission.failed", {
+      userId: clerkUser.id,
+      problemId: problem.id,
+      error: databaseError,
+    });
   }
 
-  return Response.json({
+  return apiSuccess({
     problemId: problem.id,
     submissionId,
     saved,

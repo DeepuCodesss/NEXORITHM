@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/db";
+import { apiSuccess } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 
@@ -25,5 +26,5 @@ export async function GET() {
       }
     : null;
 
-  return Response.json({ liveReward });
+  return apiSuccess({ liveReward });
 }
