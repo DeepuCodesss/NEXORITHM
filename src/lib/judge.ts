@@ -136,9 +136,11 @@ const { parentPort, workerData } = require("worker_threads");
 const vm = require("vm");
 
 (async () => {
-  const sandbox = { console: { log() {} } };
+  const sandbox = Object.create(null);
+  sandbox.console = { log() {}, error() {}, warn() {}, info() {} };
   vm.createContext(sandbox);
-  vm.runInContext(workerData.code, sandbox);
+  const script = new vm.Script(workerData.code, { timeout: workerData.scriptTimeoutMs });
+  script.runInContext(sandbox, { timeout: workerData.scriptTimeoutMs });
 
   const fn = sandbox[workerData.functionName];
   if (typeof fn !== "function") {
@@ -174,10 +176,16 @@ const runJavaScriptWorker = (
   new Promise((resolve, reject) => {
     const worker = new Worker(workerSource, {
       eval: true,
+      resourceLimits: {
+        maxOldGenerationSizeMb: 128,
+        maxYoungGenerationSizeMb: 32,
+        stackSizeMb: 8,
+      },
       workerData: {
         code,
         functionName: `solve${problem.level}`,
         testCases: problem.testCases,
+        scriptTimeoutMs: 1000,
       },
     });
 
@@ -222,6 +230,8 @@ const runProcess = (
     const child = spawn(command, args, {
       cwd,
       windowsHide: true,
+      timeout: timeoutMs,
+      killSignal: "SIGKILL",
       env: { ...process.env, NO_COLOR: "1" },
     });
 
@@ -229,6 +239,7 @@ const runProcess = (
     let stderr = "";
     let timedOut = false;
     let spawnError: string | undefined;
+    const outputLimit = 1_048_576;
 
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -237,9 +248,17 @@ const runProcess = (
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
+      if (stdout.length + stderr.length > outputLimit) {
+        timedOut = true;
+        child.kill("SIGKILL");
+      }
     });
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
+      if (stdout.length + stderr.length > outputLimit) {
+        timedOut = true;
+        child.kill("SIGKILL");
+      }
     });
     child.on("error", (error) => {
       spawnError = error.message;

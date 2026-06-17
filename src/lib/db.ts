@@ -1,4 +1,5 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { validateEnv } from "@/lib/env";
 
@@ -15,6 +16,7 @@ export const getPrisma = () => {
     return globalForPrisma.prisma;
   }
 
-  globalForPrisma.prisma ??= new PrismaClient({ datasourceUrl: databaseUrl } as never);
+  const adapter = new PrismaPg({ connectionString: databaseUrl });
+  globalForPrisma.prisma ??= new PrismaClient({ adapter });
   return globalForPrisma.prisma;
 };
