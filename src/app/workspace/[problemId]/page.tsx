@@ -32,6 +32,26 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
 });
 
 type JudgeResponse = {
+  success?: boolean;
+  data?: {
+    status?: string;
+    message?: string;
+    passedCount?: number;
+    totalCount?: number;
+    runtimeMs?: number;
+    saved?: boolean;
+    submissionId?: string | null;
+    databaseError?: string | null;
+    cases?: Array<{
+      id: number;
+      input: string;
+      expected: string;
+      actual: string;
+      passed: boolean;
+      error?: string;
+    }>;
+    error?: string;
+  };
   status?: string;
   message?: string;
   passedCount?: number;
@@ -150,7 +170,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
         code,
       }),
     });
-    const result = (await response.json()) as JudgeResponse;
+    const payload = (await response.json()) as JudgeResponse;
+    const result = payload.data ?? payload;
+
+    if (!response.ok || payload.success === false) {
+      throw new Error(result.error || "Judge request failed.");
+    }
 
     let reward: SolveRewardResult | undefined;
     if (endpoint === "/api/submissions" && result.status === "Accepted") {
