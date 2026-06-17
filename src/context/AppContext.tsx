@@ -226,13 +226,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const problem = problems.find((item) => item.id === problemId);
     if (!problem) return emptyReward();
 
+    const alreadySolved = isProblemSolved(problemId);
+    if (alreadySolved) {
+      return {
+        ...emptyReward(),
+        alreadySolved: true,
+      };
+    }
+
+    const xpGained = problem.xpReward;
+    const coinsGained = problem.coinReward;
+    const moneyGainedInr = problem.prizeMoneyInr ?? 0;
+    const reputationGained = Math.max(5, Math.floor(xpGained / 10));
+    const nextXp = user.xp + xpGained;
+    const nextStreak = Math.max(user.currentStreak, 1);
+    const nextLevel = Math.max(1, Math.floor(nextXp / 200) + 1);
+    const currentLevel = Math.max(1, Math.floor(user.xp / 200) + 1);
+
+    setUser((current) => ({
+      ...current,
+      xp: current.xp + xpGained,
+      coins: current.coins + coinsGained,
+      moneyEarnedInr: current.moneyEarnedInr + moneyGainedInr,
+      reputation: current.reputation + reputationGained,
+      devRank: Math.floor((current.xp + xpGained) / 200),
+      currentStreak: nextStreak,
+      longestStreak: Math.max(current.longestStreak, nextStreak),
+      solvedProblemIds: [...current.solvedProblemIds, problemId],
+    }));
+
     return {
-      awarded: false,
-      alreadySolved: isProblemSolved(problemId),
-      xpGained: 0,
-      coinsGained: 0,
-      moneyGainedInr: 0,
-      reputationGained: 0,
+      awarded: true,
+      alreadySolved: false,
+      xpGained,
+      coinsGained,
+      moneyGainedInr,
+      reputationGained,
+      currentStreak: nextStreak,
+      previousStreak: user.currentStreak,
+      levelBefore: currentLevel,
+      levelAfter: nextLevel,
+      unlockedTitle: problem.title,
     };
   };
 

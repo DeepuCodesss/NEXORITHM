@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useApp } from "@/context/AppContext";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
 import type { SolveRewardResult } from "@/lib/mockData";
+import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
 import {
   Award,
   BookOpenCheck,
@@ -20,6 +21,7 @@ import {
   Send,
   Terminal,
   ThumbsUp,
+  Clock3,
 } from "lucide-react";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), {
@@ -71,9 +73,23 @@ type JudgeResponse = {
   error?: string;
 };
 
+type SubmissionStatus = "Accepted" | "Wrong Answer" | "Runtime Error" | "Compilation Error" | "Time Limit Exceeded" | "Unknown";
+
+type SubmissionSummary = {
+  status: SubmissionStatus;
+  passedCount: number;
+  totalCount: number;
+  runtimeMs: number;
+  submissionId: string | null;
+  saved: boolean;
+  databaseError: string | null;
+  cases: NonNullable<JudgeResponse["cases"]>;
+  submittedAt: string;
+};
+
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
-  const { problems, solveProblem, isProblemSolved } = useApp();
+  const { problems, solveProblem, isProblemSolved, user } = useApp();
 
   const problem = problems.find((p) => p.id === problemId) || problems[0];
 
@@ -95,6 +111,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rewardBanner, setRewardBanner] = useState<SolveRewardResult | null>(null);
+  const [submissionSummary, setSubmissionSummary] = useState<SubmissionSummary | null>(null);
+  const [toast, setToast] = useState<SubmissionToastData | null>(null);
+  const [celebration, setCelebration] = useState<SubmissionCelebrationData | null>(null);
+  const [streakToast, setStreakToast] = useState<string | null>(null);
+  const [levelToast, setLevelToast] = useState<{ from: number; to: number; title: string } | null>(null);
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -108,6 +129,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       document.body.style.overflow = previousBodyOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    if (!streakToast) return;
+    const timer = window.setTimeout(() => setStreakToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [streakToast]);
+
+  useEffect(() => {
+    if (!levelToast) return;
+    const timer = window.setTimeout(() => setLevelToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [levelToast]);
 
   const handleLanguageChange = (nextLanguage: JudgeLanguage) => {
     setLanguage(nextLanguage);
@@ -156,6 +189,35 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     return lines.join("\n");
   };
 
+  const buildToast = (status: SubmissionStatus, result: JudgeResponse["data"], reward?: SolveRewardResult): SubmissionToastData => {
+    if (status === "Accepted") {
+      const rewardBits = [];
+      const streak = reward?.currentStreak ?? 0;
+      if (reward?.xpGained) rewardBits.push(`+${reward.xpGained} XP`);
+      if (reward?.coinsGained) rewardBits.push(`+${reward.coinsGained} Coins`);
+      if (streak > 0) rewardBits.push(`🔥 ${streak} Day Streak`);
+      return {
+        title: "Accepted",
+        message: rewardBits.length ? rewardBits.join(" • ") : "Submission passed all checks.",
+        tone: "success",
+      };
+    }
+
+    if (status === "Wrong Answer") {
+      return {
+        title: "Wrong Answer",
+        message: `Passed ${result?.passedCount ?? 0}/${result?.totalCount ?? 0} test cases.`,
+        tone: "error",
+      };
+    }
+
+    return {
+      title: status,
+      message: result?.message || "Judge finished.",
+      tone: "error",
+    };
+  };
+
   const callJudge = async (endpoint: "/api/submissions/run" | "/api/submissions") => {
     setConsoleOpen(true);
     setBottomTab("console");
@@ -179,14 +241,55 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
     let reward: SolveRewardResult | undefined;
     if (endpoint === "/api/submissions" && result.status === "Accepted") {
+      const beforeStreak = user.currentStreak;
+      const beforeXp = user.xp;
       reward = solveProblem(problem.id);
+      const status = (result.status as SubmissionStatus) ?? "Unknown";
       if (reward.awarded) {
         setRewardBanner(reward);
+        const beforeLevel = reward.levelBefore ?? Math.max(1, Math.floor(beforeXp / 200) + 1);
+        const afterLevel = reward.levelAfter ?? Math.max(1, Math.floor((beforeXp + reward.xpGained) / 200) + 1);
+        if ((reward.currentStreak ?? beforeStreak) > beforeStreak) {
+          setStreakToast(`🔥 ${reward.currentStreak} Day Streak!`);
+        }
+        if (afterLevel > beforeLevel) {
+          setLevelToast({
+            from: beforeLevel,
+            to: afterLevel,
+            title: reward.unlockedTitle || problem.title,
+          });
+        }
+        setCelebration({
+          problemTitle: problem.title,
+          rewardLine: `+${reward.xpGained} XP • +${reward.coinsGained} Coins • 🔥 ${reward.currentStreak ?? beforeStreak} Day Streak`,
+          xpGained: reward.xpGained,
+          coinsGained: reward.coinsGained,
+          moneyGainedInr: reward.moneyGainedInr,
+          streak: reward.currentStreak ?? beforeStreak,
+          levelBefore: beforeLevel,
+          levelAfter: afterLevel,
+          unlockedTitle: reward.unlockedTitle,
+        });
       } else {
         setRewardBanner(null);
+        setCelebration(null);
       }
+      setToast(buildToast(status, result, reward));
+    } else if (endpoint === "/api/submissions") {
+      setToast(buildToast((result.status as SubmissionStatus) ?? "Unknown", result));
     }
 
+    setSubmissionSummary({
+      status: (result.status as SubmissionStatus) ?? "Unknown",
+      passedCount: result.passedCount ?? 0,
+      totalCount: result.totalCount ?? 0,
+      runtimeMs: result.runtimeMs ?? 0,
+      submissionId: result.saved ? result.submissionId ?? null : null,
+      saved: Boolean(result.saved),
+      databaseError: result.databaseError ?? null,
+      cases: result.cases ?? [],
+      submittedAt: new Date().toISOString(),
+    });
     setConsoleLogs(formatJudgeResponse(result, reward));
     return { result, reward };
   };
@@ -277,6 +380,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   return (
     <div className="fixed inset-x-0 bottom-0 top-14 flex flex-col overflow-hidden bg-background">
+      <SubmissionCelebrations
+        toast={toast}
+        onToastDismiss={() => setToast(null)}
+        celebration={celebration}
+        onCelebrationClose={() => setCelebration(null)}
+      />
+      {streakToast && (
+        <div className="pointer-events-none fixed bottom-24 right-6 z-40 rounded-full border border-reward/30 bg-reward/10 px-4 py-2 text-sm font-bold text-reward shadow-[0_15px_30px_rgba(245,158,11,0.14)] xp-pop">
+          {streakToast}
+        </div>
+      )}
+      {levelToast && (
+        <div className="pointer-events-none fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-sm font-bold text-success shadow-[0_15px_30px_rgba(34,197,94,0.14)] rank-up">
+          ⭐ LEVEL UP! Level {levelToast.from} → Level {levelToast.to}
+        </div>
+      )}
       {rewardBanner?.awarded && (
         <div className="flex items-center justify-between gap-4 border-b border-success/20 bg-success/10 px-4 py-3">
           <div className="flex items-center gap-3">
@@ -661,9 +780,89 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                 )}
 
                 {bottomTab === "console" && (
-                  <div className="font-mono text-xs text-secondary-text">
+                  <div className="space-y-4 text-xs text-secondary-text">
+                    {submissionSummary && (
+                      <div className={`rounded-2xl border p-4 ${submissionSummary.status === "Accepted"
+                          ? "border-success/30 bg-success/5"
+                          : "border-destructive/30 bg-destructive/5"
+                        }`}>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className={`text-sm font-bold ${submissionSummary.status === "Accepted" ? "text-success" : "text-destructive"}`}>
+                              {submissionSummary.status === "Accepted" ? "✓ Accepted" : submissionSummary.status}
+                            </div>
+                            <div className="mt-1 text-secondary-text">
+                              {submissionSummary.passedCount}/{submissionSummary.totalCount} Passed
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {submissionSummary.runtimeMs} ms Runtime
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div className="rounded-xl border border-border bg-background/40 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Memory Usage</div>
+                            <div className="mt-1 font-semibold text-white">N/A</div>
+                          </div>
+                          <div className="rounded-xl border border-border bg-background/40 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">XP Earned</div>
+                            <div className="mt-1 font-semibold text-white">{submissionSummary.status === "Accepted" ? `+${problem.xpReward}` : 0}</div>
+                          </div>
+                          <div className="rounded-xl border border-border bg-background/40 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Coins Earned</div>
+                            <div className="mt-1 font-semibold text-white">{submissionSummary.status === "Accepted" ? `+${problem.coinReward}` : 0}</div>
+                          </div>
+                          <div className="rounded-xl border border-border bg-background/40 p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Saved</div>
+                            <div className="mt-1 font-semibold text-white">{submissionSummary.saved ? "Yes" : "No"}</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 rounded-xl border border-border bg-background/40 p-3 font-mono text-[11px] leading-5 text-secondary-text">
+                          <div className="break-all">Submission ID: {submissionSummary.submissionId || "Pending"}</div>
+                          <div className="mt-1">Submitted on: {new Date(submissionSummary.submittedAt).toLocaleString()}</div>
+                          {submissionSummary.databaseError && <div className="mt-1 text-destructive">Database: {submissionSummary.databaseError}</div>}
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-white">Test Cases</div>
+                            <button
+                              type="button"
+                              onClick={() => setBottomTab("testcase")}
+                              className="rounded-lg border border-border bg-hover px-3 py-1.5 text-xs font-semibold text-secondary-text transition-colors hover:text-white"
+                            >
+                              View Submission
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {submissionSummary.cases.length ? submissionSummary.cases.map((testCase) => (
+                              <div key={testCase.id} className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={testCase.passed ? "text-success" : "text-destructive"}>
+                                    {testCase.passed ? "Case " : "Case "}
+                                    {testCase.id}
+                                  </span>
+                                  <span className={testCase.passed ? "text-success" : "text-destructive"}>
+                                    {testCase.passed ? "✓ Passed" : "Failed"}
+                                  </span>
+                                </div>
+                                <div className="text-muted-foreground">{testCase.error ? "Error" : "Runtime n/a"}</div>
+                              </div>
+                            )) : (
+                              <div className="rounded-xl border border-border bg-background/40 px-3 py-2 text-muted-foreground">
+                                Test case results will appear here after a submission.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {consoleLogs ? (
-                      <pre className="whitespace-pre-wrap leading-relaxed">{consoleLogs}</pre>
+                      <pre className="whitespace-pre-wrap font-mono leading-relaxed">{consoleLogs}</pre>
                     ) : (
                       <span className="text-muted-foreground">
                         Console is idle. Click &apos;Run Code&apos; or &apos;Submit Code&apos; to see judge output.

@@ -101,6 +101,11 @@ export interface SolveRewardResult {
   coinsGained: number;
   moneyGainedInr: number;
   reputationGained: number;
+  currentStreak?: number;
+  previousStreak?: number;
+  levelBefore?: number;
+  levelAfter?: number;
+  unlockedTitle?: string;
 }
 
 const starterCode = (functionName: string): Record<JudgeLanguage, string> => ({
