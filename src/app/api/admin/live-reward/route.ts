@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const prisma = getPrisma();
   await prisma.$executeRaw(
     Prisma.sql`INSERT INTO "LiveReward" ("id", "problemId", "rewardMoney", "startsAt", "endsAt", "isActive", "createdAt")
-      VALUES (${randomUUID()}, ${problemId}, ${rewardMoney}, ${startsAt}, ${endsAt}, ${isActive ? 1 : 0}, ${new Date()})
+      VALUES (${randomUUID()}, ${problemId}, ${rewardMoney}, ${startsAt}, ${endsAt}, ${isActive}, ${new Date()})
       ON CONFLICT ("problemId") DO UPDATE SET
         "rewardMoney" = excluded."rewardMoney",
         "startsAt" = excluded."startsAt",
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     rewardMoney: number;
     startsAt: Date;
     endsAt: Date;
-    isActive: number;
+    isActive: boolean;
   }>>`SELECT "problemId", "rewardMoney", "startsAt", "endsAt", "isActive"
     FROM "LiveReward"
     WHERE "problemId" = ${problemId}
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           rewardMoneyInr: Number(row[0].rewardMoney),
           startsAt: new Date(row[0].startsAt).toISOString(),
           endsAt: new Date(row[0].endsAt).toISOString(),
-          isActive: Boolean(row[0].isActive),
+          isActive: row[0].isActive,
         }
       : null,
   });

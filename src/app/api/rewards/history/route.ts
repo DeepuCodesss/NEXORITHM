@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     metadata: unknown;
     createdAt: Date;
   }>>(
-    Prisma.sql`SELECT id, type, source, amount, metadata, createdAt
+    Prisma.sql`SELECT "id", "type", "source", "amount", "metadata", "createdAt"
       FROM "RewardTransaction"
       WHERE "userId" = ${user.id} ${filterSql}
       ORDER BY "createdAt" DESC

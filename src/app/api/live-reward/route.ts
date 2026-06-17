@@ -10,7 +10,7 @@ export async function GET() {
     rewardMoney: number;
     startsAt: Date;
     endsAt: Date;
-    isActive: number;
+    isActive: boolean;
   }>>`SELECT "problemId", "rewardMoney", "startsAt", "endsAt", "isActive"
     FROM "LiveReward"
     ORDER BY "createdAt" DESC
@@ -22,7 +22,7 @@ export async function GET() {
         rewardMoneyInr: Number(row[0].rewardMoney),
         startsAt: new Date(row[0].startsAt).toISOString(),
         endsAt: new Date(row[0].endsAt).toISOString(),
-        isActive: Boolean(row[0].isActive),
+        isActive: row[0].isActive,
       }
     : null;
 

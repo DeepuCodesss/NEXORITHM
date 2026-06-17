@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         longestStreak: number;
         solvedProblemIds: unknown;
         lastSolvedAt: Date | null;
-      }>>`SELECT id, xp, coins, moneyEarnedInr, reputation, currentStreak, longestStreak, solvedProblemIds, lastSolvedAt
+      }>>`SELECT "id", "xp", "coins", "moneyEarnedInr", "reputation", "currentStreak", "longestStreak", "solvedProblemIds", "lastSolvedAt"
         FROM "User" WHERE "id" = ${user.id} LIMIT 1 FOR UPDATE`;
       const lockedUser = lockedUsers[0];
       if (!lockedUser) {
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
       const activeLiveReward = await tx.$queryRaw<Array<{ id: string; rewardMoney: number }>>(
         Prisma.sql`SELECT "id", "rewardMoney" FROM "LiveReward"
           WHERE "problemId" = ${problem.id}
-            AND "isActive" = 1
+            AND "isActive" = true
             AND "startsAt" <= ${now}
             AND "endsAt" > ${now}
             AND "winnerUserId" IS NULL

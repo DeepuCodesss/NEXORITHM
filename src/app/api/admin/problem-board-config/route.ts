@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const prisma = getPrisma();
   await prisma.$executeRaw(
     Prisma.sql`INSERT INTO "ProblemBoardConfig" ("id", "showUpcomingRewards", "upcomingRewardItems", "createdAt", "updatedAt")
-      VALUES (${ "singleton" }, ${showUpcomingRewards ? 1 : 0}, ${JSON.stringify(upcomingRewardItems)}, ${new Date()}, ${new Date()})
+      VALUES (${ "singleton" }, ${showUpcomingRewards}, ${JSON.stringify(upcomingRewardItems)}, ${new Date()}, ${new Date()})
       ON CONFLICT ("id") DO UPDATE SET
         "showUpcomingRewards" = excluded."showUpcomingRewards",
         "upcomingRewardItems" = excluded."upcomingRewardItems",
