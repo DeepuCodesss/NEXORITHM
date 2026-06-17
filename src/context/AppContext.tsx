@@ -14,8 +14,6 @@ import {
   SolveRewardResult,
 } from "@/lib/mockData";
 
-const LIVE_REWARD_STORAGE_KEY = "nexorithm-live-reward";
-
 export interface LiveRewardConfig {
   problemId: string;
   rewardMoneyInr: number;
@@ -52,25 +50,6 @@ const createDefaultProblemBoardConfig = (): ProblemBoardConfig => ({
     { problemId: MOCK_PROBLEMS[3]?.id ?? "" },
   ],
 });
-
-const loadStoredLiveReward = (): LiveRewardConfig => {
-  if (typeof window === "undefined") return createDefaultLiveReward();
-
-  try {
-    const raw = localStorage.getItem(LIVE_REWARD_STORAGE_KEY);
-    if (!raw) return createDefaultLiveReward();
-
-    const parsed = JSON.parse(raw) as Partial<LiveRewardConfig>;
-    return {
-      ...createDefaultLiveReward(),
-      ...parsed,
-      rewardMoneyInr: Number(parsed.rewardMoneyInr) > 0 ? Number(parsed.rewardMoneyInr) : 5,
-      isActive: parsed.isActive !== false,
-    };
-  } catch {
-    return createDefaultLiveReward();
-  }
-};
 
 const loadStoredProblemBoardConfig = (): ProblemBoardConfig => {
   if (typeof window === "undefined") return createDefaultProblemBoardConfig();
@@ -179,10 +158,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     queueMicrotask(() => {
-      setLiveReward(loadStoredLiveReward());
       setProblemBoardConfig(loadStoredProblemBoardConfig());
       setHydrated(true);
     });
+  }, []);
+
+  useEffect(() => {
+    const syncLiveReward = async () => {
+      const response = await fetch("/api/live-reward", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as { liveReward?: LiveRewardConfig | null };
+      if (data.liveReward) {
+        setLiveReward(data.liveReward);
+      }
+    };
+
+    void syncLiveReward();
   }, []);
 
   useEffect(() => {
@@ -234,11 +225,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     void syncUser();
   }, [clerkUser, isLoaded, isSignedIn]);
-
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") return;
-    localStorage.setItem(LIVE_REWARD_STORAGE_KEY, JSON.stringify(liveReward));
-  }, [liveReward, hydrated]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return;
@@ -310,11 +296,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveLiveReward = (config: LiveRewardConfig) => {
-    setLiveReward({
-      ...config,
-      rewardMoneyInr: Math.max(1, Math.round(Number(config.rewardMoneyInr) || 1)),
-      isActive: config.isActive,
-    });
+    void (async () => {
+      const response = await fetch("/api/admin/live-reward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...config,
+          rewardMoney: Math.max(1, Math.round(Number(config.rewardMoneyInr) || 1)),
+        }),
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as { liveReward?: LiveRewardConfig | null };
+      if (data.liveReward) {
+        setLiveReward(data.liveReward);
+      }
+    })();
   };
 
   const saveProblemBoardConfig = (config: ProblemBoardConfig) => {

@@ -4,6 +4,9 @@ import { isJudgeLanguage } from "@/lib/languages";
 import { MOCK_PROBLEMS } from "@/lib/mockData";
 import { currentUser } from "@clerk/nextjs/server";
 import { upsertClerkUser } from "@/lib/userSync";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { Prisma } from "@/generated/prisma/client";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
@@ -53,6 +56,11 @@ export async function POST(request: Request) {
 
   if (!clerkUser) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit(`submit:${clerkUser.id}`);
+  if (!rateLimit.allowed) {
+    return Response.json({ error: "Rate limit exceeded." }, { status: 429 });
   }
 
   try {
@@ -137,17 +145,30 @@ export async function POST(request: Request) {
             : 1;
       const streakReward = getStreakReward(nextStreak);
       const xpReward = problem.xpReward;
-      const coinReward = problem.coinReward + streakReward.coins;
-      const cashReward = (problem.prizeMoneyInr ?? 0) + streakReward.cash;
+      const coinReward = problem.coinReward;
+      const activeLiveReward = await tx.$queryRaw<Array<{ id: string; rewardMoney: number }>>(
+        Prisma.sql`SELECT id, rewardMoney FROM LiveReward
+          WHERE problemId = ${problem.id}
+            AND isActive = 1
+            AND startsAt <= ${now}
+            AND endsAt > ${now}
+            AND winnerUserId IS NULL
+          ORDER BY createdAt DESC
+          LIMIT 1`,
+      );
+      const liveReward = activeLiveReward[0] ?? null;
+      const cashReward = (problem.prizeMoneyInr ?? 0) + streakReward.cash + Number(liveReward?.rewardMoney ?? 0);
       const reputationReward = Math.max(5, Math.floor(xpReward / 10));
       const nextXp = user.xp + xpReward;
+      const nextCoins = user.coins + coinReward + streakReward.coins;
+      const nextCash = user.moneyEarnedInr + cashReward;
 
       await tx.user.update({
         where: { id: user.id },
         data: {
           xp: nextXp,
-          coins: user.coins + coinReward,
-          moneyEarnedInr: user.moneyEarnedInr + cashReward,
+          coins: nextCoins,
+          moneyEarnedInr: nextCash,
           reputation: user.reputation + reputationReward,
           devRank: Math.floor(nextXp / 200),
           currentStreak: nextStreak,
@@ -156,6 +177,48 @@ export async function POST(request: Request) {
           lastSolvedAt: now,
         },
       });
+
+      await tx.$executeRaw(
+        Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+        VALUES (${randomUUID()}, ${user.id}, ${"xp"}, ${"problem_solve"}, ${xpReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
+      );
+      await tx.$executeRaw(
+        Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+        VALUES (${randomUUID()}, ${user.id}, ${"coins"}, ${"problem_solve"}, ${coinReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
+      );
+      if (streakReward.coins > 0) {
+        await tx.$executeRaw(
+          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          VALUES (${randomUUID()}, ${user.id}, ${"coins"}, ${"streak_reward"}, ${streakReward.coins}, ${JSON.stringify({ streakDay: nextStreak, problemId: problem.id })}, ${now})`,
+        );
+      }
+      if (streakReward.cash > 0) {
+        await tx.$executeRaw(
+          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"streak_reward"}, ${streakReward.cash}, ${JSON.stringify({ streakDay: nextStreak, problemId: problem.id })}, ${now})`,
+        );
+      }
+      if (cashReward > 0) {
+        await tx.$executeRaw(
+          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"problem_cash_reward"}, ${cashReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
+        );
+      }
+
+      if (liveReward) {
+        await tx.$executeRaw(
+          Prisma.sql`UPDATE LiveReward
+          SET winnerUserId = ${user.id},
+              winnerSubmissionId = ${createdSubmission.id},
+              paidAt = ${now},
+              isActive = 0
+          WHERE id = ${liveReward.id} AND winnerUserId IS NULL`,
+        );
+        await tx.$executeRaw(
+          Prisma.sql`INSERT INTO RewardTransaction (id, userId, type, source, amount, metadata, createdAt)
+          VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"live_reward"}, ${Number(liveReward.rewardMoney ?? 0)}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id, liveRewardId: liveReward.id })}, ${now})`,
+        );
+      }
 
       return { createdSubmission };
     });

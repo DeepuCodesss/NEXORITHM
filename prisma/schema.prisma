@@ -53,11 +53,57 @@ model User {
   solvedProblemIds  Json
   lastSolvedAt      DateTime?
   submissions      Submission[]
+  rewardTransactions RewardTransaction[]
+  withdrawals      Withdrawal[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   @@index([xp, currentStreak, lastSolvedAt])
   @@index([updatedAt])
+}
+
+model RewardTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  source    String
+  amount    Int
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Withdrawal {
+  id         String   @id @default(cuid())
+  userId     String
+  coins      Int
+  cashAmount Float
+  upiId      String
+  status     String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model LiveReward {
+  id          String   @id @default(cuid())
+  problemId   String   @unique
+  rewardMoney Float
+  startsAt    DateTime
+  endsAt      DateTime
+  isActive    Boolean  @default(true)
+  winnerUserId String?
+  winnerSubmissionId String?
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([isActive, startsAt, endsAt])
 }
 
 model Submission {

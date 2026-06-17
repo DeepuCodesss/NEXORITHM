@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Clock, Coins, Plus, Save, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 
 const toDatetimeLocal = (value: string) => {
@@ -15,6 +17,8 @@ const toDatetimeLocal = (value: string) => {
 const fromDatetimeLocal = (value: string) => new Date(value).toISOString();
 
 export default function AdminPage() {
+  const router = useRouter();
+  const { user: clerkUser, isLoaded } = useUser();
   const { problems, liveReward, problemBoardConfig, saveLiveReward, saveProblemBoardConfig } = useApp();
   const [query, setQuery] = useState("");
   const [problemId, setProblemId] = useState(liveReward.problemId);
@@ -25,6 +29,13 @@ export default function AdminPage() {
   const [showUpcomingRewards, setShowUpcomingRewards] = useState(problemBoardConfig.showUpcomingRewards);
   const [upcomingRewardItems, setUpcomingRewardItems] = useState(problemBoardConfig.upcomingRewardItems);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (clerkUser?.publicMetadata?.role !== "admin") {
+      router.replace("/");
+    }
+  }, [clerkUser?.publicMetadata?.role, isLoaded, router]);
 
   useEffect(() => {
     queueMicrotask(() => {

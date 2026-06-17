@@ -1,6 +1,8 @@
 import { judgeSubmission } from "@/lib/judge";
 import { isJudgeLanguage } from "@/lib/languages";
 import { MOCK_PROBLEMS } from "@/lib/mockData";
+import { currentUser } from "@clerk/nextjs/server";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -21,6 +23,16 @@ export async function POST(request: Request) {
 
   if (!isJudgeLanguage(language)) {
     return Response.json({ error: "Unsupported language." }, { status: 400 });
+  }
+
+  const clerkUser = await currentUser();
+  if (!clerkUser) {
+    return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit(`run:${clerkUser.id}`);
+  if (!rateLimit.allowed) {
+    return Response.json({ error: "Rate limit exceeded." }, { status: 429 });
   }
 
   const result = await judgeSubmission(problem, language, code);

@@ -45,6 +45,14 @@ export const upsertClerkUser = async (clerkUser: ClerkUser) => {
     },
     create: {
       ...profile,
+      xp: 0,
+      coins: 0,
+      moneyEarnedInr: 0,
+      reputation: 0,
+      devRank: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      streakShields: 0,
       solvedProblemIds: [],
     },
   });
