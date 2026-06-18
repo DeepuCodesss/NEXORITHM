@@ -28,6 +28,7 @@ model Problem {
   starterCode    Json
   testCases      Json
   submissions    Submission[]
+  solutionReplays SolutionReplay[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -55,6 +56,7 @@ model User {
   submissions      Submission[]
   rewardTransactions RewardTransaction[]
   withdrawals      Withdrawal[]
+  solutionReplays  SolutionReplay[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -134,4 +136,26 @@ model Submission {
   @@index([problemId, createdAt])
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+model SolutionReplay {
+  id              String   @id @default(cuid())
+  userId          String
+  problemId       String
+  submissionId    String   @unique
+  language        String
+  replayData      Json
+  solveTimeSeconds Int
+  pasteCount      Int      @default(0)
+  pastedCharacters Int     @default(0)
+  runCount        Int      @default(0)
+  tabSwitchCount  Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId])
+  @@index([problemId, createdAt])
+  @@index([solveTimeSeconds, createdAt])
 }

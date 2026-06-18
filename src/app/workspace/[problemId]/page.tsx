@@ -1,12 +1,13 @@
 "use client";
 
-import { use, useEffect, useState, type CSSProperties, type ElementType, type PointerEvent } from "react";
+import { use, useEffect, useRef, useState, type CSSProperties, type ClipboardEvent as ReactClipboardEvent, type ElementType, type PointerEvent } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useApp } from "@/context/AppContext";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
 import type { SolveRewardResult } from "@/lib/mockData";
 import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
+import { createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
 import {
   BookOpenCheck,
   ChevronLeft,
@@ -84,14 +85,25 @@ type SubmissionSummary = {
   submittedAt: string;
 };
 
+type ProblemLeaderboardRow = {
+  rank: number;
+  user: string;
+  username: string;
+  avatarUrl: string;
+  solveTime: number;
+  language: string;
+  replayId: string;
+};
+
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
   const { problems, solveProblem, user, liveReward } = useApp();
 
   const problem = problems.find((p) => p.id === problemId) || problems[0];
+  const starterCode = problem.starterCode.javascript;
 
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
-  const [code, setCode] = useState(problem.starterCode.javascript);
+  const [code, setCode] = useState(starterCode);
 
   type LeftTab = "description" | "editorial" | "solutions" | "discussions" | "testcases";
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
@@ -113,6 +125,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [streakToast, setStreakToast] = useState<string | null>(null);
   const [levelToast, setLevelToast] = useState<{ from: number; to: number; title: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [leaders, setLeaders] = useState<ProblemLeaderboardRow[]>([]);
+  const [leadersLoading, setLeadersLoading] = useState(false);
+  const replayClockRef = useRef(0);
+  const replayEventsRef = useRef<ReplayEvent[]>([{ type: "snapshot", timestamp: 0, code: starterCode }]);
+  const replayStatsRef = useRef({ pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0 });
+  const snapshotTimerRef = useRef<number | null>(null);
+  const lastSnapshotCodeRef = useRef(starterCode);
 
   const currentProblemIndex = Math.max(0, problems.findIndex((item) => item.id === problem.id));
   const nextProblemHref = `/workspace/${problems[(currentProblemIndex + 1) % problems.length]?.id ?? problem.id}`;
@@ -152,8 +171,43 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    const replayTimer = window.setInterval(() => {
+      replayClockRef.current += 1;
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(replayTimer);
+    };
   }, []);
+
+  useEffect(() => {
+    replayClockRef.current = 0;
+    replayEventsRef.current = [{ type: "snapshot", timestamp: 0, code: starterCode }];
+    replayStatsRef.current = { pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0 };
+    lastSnapshotCodeRef.current = starterCode;
+    queueMicrotask(() => {
+      setCode(starterCode);
+      setLanguage("javascript");
+      setLeftTab("description");
+      setBottomTab("testcase");
+    });
+  }, [problem.id, starterCode]);
+
+  useEffect(() => {
+    const sync = async () => {
+      setLeadersLoading(true);
+      const response = await fetch(`/api/problems/${problem.id}/leaderboard?pageSize=10`, { cache: "no-store" });
+      if (!response.ok) {
+        setLeaders([]);
+        setLeadersLoading(false);
+        return;
+      }
+      const payload = (await response.json()) as { data?: { leaders?: ProblemLeaderboardRow[] } };
+      setLeaders(Array.isArray(payload.data?.leaders) ? payload.data!.leaders : []);
+      setLeadersLoading(false);
+    };
+    void sync();
+  }, [problem.id]);
 
   const handleLanguageChange = (nextLanguage: JudgeLanguage) => {
     setLanguage(nextLanguage);
@@ -164,6 +218,53 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     if (confirm("Reset current editor code to default template?")) {
       setCode(problem.starterCode[language]);
     }
+  };
+
+  const replayTimestamp = () => replayClockRef.current;
+
+  const recordReplayEvent = (event: ReplayEvent) => {
+    replayEventsRef.current = [...replayEventsRef.current, event].slice(-60);
+  };
+
+  const recordSnapshot = (nextCode: string) => {
+    if (nextCode === lastSnapshotCodeRef.current) return;
+    lastSnapshotCodeRef.current = nextCode;
+    recordReplayEvent({ type: "snapshot", timestamp: replayTimestamp(), code: nextCode.slice(0, 6000) });
+  };
+
+  const scheduleSnapshot = (nextCode: string) => {
+    if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = window.setTimeout(() => {
+      recordSnapshot(nextCode);
+      snapshotTimerRef.current = null;
+    }, 2500);
+  };
+
+  const onTabSwitch = (tab: string) => {
+    replayStatsRef.current.tabSwitchCount += 1;
+    recordReplayEvent({ type: "tab", timestamp: replayTimestamp(), label: tab });
+  };
+
+  const onRunAttempt = () => {
+    replayStatsRef.current.runCount += 1;
+    recordReplayEvent({ type: "run", timestamp: replayTimestamp() });
+  };
+
+  const onSubmitAttempt = () => {
+    recordReplayEvent({ type: "submit", timestamp: replayTimestamp() });
+  };
+
+  const onPaste = (event: ReactClipboardEvent<HTMLDivElement>) => {
+    const pasted = event.clipboardData.getData("text");
+    if (!pasted) return;
+    replayStatsRef.current.pasteCount += 1;
+    replayStatsRef.current.pastedCharacters += pasted.length;
+    recordReplayEvent({
+      type: "paste",
+      timestamp: replayTimestamp(),
+      meta: { characters: pasted.length },
+    });
+    scheduleSnapshot(code + pasted.slice(0, 2000));
   };
 
   const shouldShowCelebration = (reward?: SolveRewardResult) =>
@@ -251,6 +352,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     setConsoleOpen(true);
     setBottomTab("console");
     setConsoleLogs(endpoint.endsWith("/run") ? "Running code on backend judge..." : "Submitting code to backend judge...");
+    if (endpoint === "/api/submissions") {
+      replayStatsRef.current.solveTimeSeconds = replayTimestamp();
+      recordSnapshot(code);
+      onSubmitAttempt();
+    } else {
+      onRunAttempt();
+    }
+
+    const replay = endpoint === "/api/submissions"
+      ? createReplayPayload(normalizeReplayEvents(replayEventsRef.current), {
+          ...replayStatsRef.current,
+          solveTimeSeconds: Math.max(1, replayStatsRef.current.solveTimeSeconds),
+        })
+      : undefined;
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -259,6 +374,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
         problemId: problem.id,
         language,
         code,
+        replay,
       }),
     });
     const payload = (await response.json()) as JudgeResponse;
@@ -482,7 +598,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setLeftTab(tab.id)}
+                  onClick={() => {
+                    setLeftTab(tab.id);
+                    onTabSwitch(tab.id);
+                  }}
                   className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${leftTab === tab.id
                       ? "border-primary text-white"
                       : "border-transparent text-muted-foreground hover:text-secondary-text"
@@ -523,6 +642,48 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                         <span className="font-semibold text-success">₹{activeLiveCash}</span>
                       </>
                     ) : null}
+                  </div>
+                </div>
+                <div className="mb-5 rounded-2xl border border-border bg-card p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-white">🏆 Fastest Solvers</div>
+                      <div className="mt-1 text-xs text-secondary-text">Top accepted submissions for this problem.</div>
+                    </div>
+                    <Link href={`/problems/${problem.id}/leaderboard`} className="text-xs font-semibold text-primary hover:underline">
+                      View Full Leaderboard →
+                    </Link>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {leadersLoading ? (
+                      Array.from({ length: 3 }, (_, index) => (
+                        <div key={index} className="h-12 animate-pulse rounded-xl border border-border bg-hover/60" />
+                      ))
+                    ) : leaders.length ? (
+                      leaders.slice(0, 3).map((leader) => (
+                        <div key={leader.replayId} className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-xs font-black text-white">
+                              #{leader.rank}
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-white">{leader.user}</div>
+                              <div className="text-[11px] text-secondary-text">{leader.language}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-sm font-bold text-reward">{leader.solveTime}s</div>
+                            <Link href={`/replay/${leader.replayId}`} className="rounded-full border border-border bg-hover px-3 py-1 text-xs font-semibold text-secondary-text hover:text-white">
+                              ▶ Replay
+                            </Link>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-secondary-text">
+                        No accepted replays yet for this problem.
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Embedded HTML Problem Description */}
@@ -673,13 +834,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
           className="relative flex min-h-0 w-full min-w-0 flex-col overflow-hidden bg-[#1e1e1e] md:w-auto md:[flex-basis:var(--right-panel-width)]"
           style={rightPanelStyle}
         >
-          <div className="min-h-[180px] flex-1 overflow-hidden">
+          <div className="min-h-[180px] flex-1 overflow-hidden" onPaste={onPaste}>
             <Editor
               height="100%"
               theme="vs-dark"
               language={languageById(language).monaco}
               value={code}
-              onChange={(val) => setCode(val || "")}
+              onChange={(val) => {
+                const nextCode = val || "";
+                setCode(nextCode);
+                scheduleSnapshot(nextCode);
+              }}
               options={{
                 automaticLayout: true,
                 minimap: { enabled: false },
@@ -721,6 +886,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                 <button
                   onClick={() => {
                     setBottomTab("testcase");
+                    onTabSwitch("testcase");
                     setConsoleOpen(true);
                   }}
                   className={`flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition-colors ${bottomTab === "testcase" && consoleOpen
@@ -734,6 +900,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                 <button
                   onClick={() => {
                     setBottomTab("console");
+                    onTabSwitch("console");
                     setConsoleOpen(true);
                   }}
                   className={`flex h-8 items-center gap-1.5 rounded px-3 text-xs font-bold transition-colors ${bottomTab === "console" && consoleOpen
@@ -761,7 +928,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                       {problem.testCases.map((tc) => (
                         <button
                           key={tc.id}
-                          onClick={() => setSelectedTestCase(tc.id)}
+                          onClick={() => {
+                            setSelectedTestCase(tc.id);
+                            onTabSwitch(`case-${tc.id}`);
+                          }}
                           className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${selectedTestCase === tc.id
                               ? "bg-border text-white"
                               : "bg-hover text-secondary-text hover:bg-hover hover:text-white"

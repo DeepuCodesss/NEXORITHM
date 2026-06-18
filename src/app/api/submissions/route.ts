@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import { apiError } from "@/lib/apiResponse";
 import { apiSuccess } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
+import { normalizeReplayEvents, type ReplayPayload } from "@/lib/replay";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
   const language = body?.language;
   const code = typeof body?.code === "string" ? body.code : "";
+  const replayPayload = body?.replay as ReplayPayload | undefined;
   const problem = MOCK_PROBLEMS.find((item) => item.id === problemId);
 
   if (!problem) {
@@ -244,6 +246,40 @@ export async function POST(request: Request) {
           Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
           VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"live_reward"}, ${Number(liveReward.rewardMoney ?? 0)}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id, liveRewardId: liveReward.id })}, ${now})`,
         );
+      }
+
+      if (replayPayload?.events && Array.isArray(replayPayload.events) && replayPayload.stats) {
+        const compactEvents = normalizeReplayEvents(replayPayload.events).slice(0, 60);
+        const existingReplay = await tx.solutionReplay.findUnique({
+          where: {
+            userId_problemId: {
+              userId: user.id,
+              problemId: problem.id,
+            },
+          },
+          select: { id: true },
+        });
+        if (!existingReplay) {
+          await tx.solutionReplay.create({
+            data: {
+              userId: user.id,
+              problemId: problem.id,
+              submissionId: createdSubmission.id,
+              language,
+              replayData: JSON.parse(
+                JSON.stringify({
+                  events: compactEvents,
+                  stats: replayPayload.stats,
+                }),
+              ),
+              solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
+              pasteCount: replayPayload.stats.pasteCount,
+              pastedCharacters: replayPayload.stats.pastedCharacters,
+              runCount: replayPayload.stats.runCount,
+              tabSwitchCount: replayPayload.stats.tabSwitchCount,
+            },
+          });
+        }
       }
 
       return { createdSubmission };
