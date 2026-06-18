@@ -77,3 +77,15 @@ export const trustLevelForScore = (score: number) => {
   if (score >= 40) return "Suspicious";
   return "High Risk";
 };
+
+export const calculatePasteContribution = (pastedCharacters: number, finalCodeCharacters: number) => {
+  if (finalCodeCharacters <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((pastedCharacters / finalCodeCharacters) * 100)));
+};
+
+export const pasteContributionLabel = (value: number) => {
+  if (value <= 20) return "negligible";
+  if (value <= 50) return "moderate";
+  if (value <= 80) return "suspicious";
+  return "highly suspicious";
+};

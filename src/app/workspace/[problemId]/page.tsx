@@ -95,6 +95,7 @@ type ProblemLeaderboardRow = {
   language: string;
   replayId: string;
   trustScore: number;
+  pasteContribution: number;
 };
 
 type ProblemLeaderboardResponse = {
@@ -668,6 +669,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                         <div className="truncate text-xs text-secondary-text">Accepted solve</div>
                         <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${trustTone(leader.trustScore)}`}>
                           {trustLevelForScore(leader.trustScore)}
+                        </div>
+                        <div className="mt-1 text-[11px] text-secondary-text" title={`Paste contribution: ${leader.pasteContribution}%`}>
+                          Paste contribution: {leader.pasteContribution}%
                         </div>
                       </div>
                   <div className="font-bold text-white">{formatSolveTime(leader.solveTime)}</div>

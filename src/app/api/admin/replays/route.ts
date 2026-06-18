@@ -37,6 +37,7 @@ export async function GET(request: Request) {
         id: true,
         solveTimeSeconds: true,
         trustScore: true,
+        replayData: true,
         language: true,
         pasteCount: true,
         pastedCharacters: true,

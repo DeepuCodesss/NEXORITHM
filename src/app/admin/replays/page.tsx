@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Clock3, Play, Trash2 } from "lucide-react";
+import { calculatePasteContribution, pasteContributionLabel } from "@/lib/replay";
 
 type ReplayRow = {
   id: string;
@@ -13,6 +14,7 @@ type ReplayRow = {
   pastedCharacters: number;
   runCount: number;
   tabSwitchCount: number;
+  replayData?: { events?: Array<{ type: string; code?: string }> };
   createdAt: string;
   user: { username: string; fullName: string };
   problem: { title: string; slug: string };
@@ -30,6 +32,11 @@ const trustLabel = (score: number) => {
   if (score >= 90) return "Trusted";
   if (score >= 40) return "Suspicious";
   return "High Risk";
+};
+
+const getFinalCodeLength = (replay: ReplayRow) => {
+  const lastSnapshot = [...(replay.replayData?.events ?? [])].reverse().find((event) => event.type === "snapshot" && typeof event.code === "string");
+  return lastSnapshot?.code?.length ?? 0;
 };
 
 export default function AdminReplaysPage() {
@@ -106,9 +113,17 @@ export default function AdminReplaysPage() {
                     </span>
                     <span className="rounded-full border border-border bg-background/50 px-2 py-0.5 text-secondary-text">{replay.language}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">Paste: {replay.pasteCount}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Paste: {replay.pasteCount}
+                  </div>
                   <div className="text-xs text-muted-foreground">Chars: {replay.pastedCharacters}</div>
                   <div className="text-xs text-muted-foreground">Tabs: {replay.tabSwitchCount}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Paste contribution: {calculatePasteContribution(replay.pastedCharacters, getFinalCodeLength(replay))}%
+                    <span className="ml-2 text-secondary-text">
+                      Trust impact: {pasteContributionLabel(calculatePasteContribution(replay.pastedCharacters, getFinalCodeLength(replay)))}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Link href={`/replay/${replay.id}`} className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20">
                       <Play className="h-3.5 w-3.5" />

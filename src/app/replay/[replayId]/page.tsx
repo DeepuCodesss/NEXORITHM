@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pause, Play, RotateCcw } from "lucide-react";
-import { trustLevelForScore } from "@/lib/replay";
+import { calculatePasteContribution, pasteContributionLabel, trustLevelForScore } from "@/lib/replay";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -74,6 +74,12 @@ export default function ReplayPage({ params }: { params: Promise<{ replayId: str
   const events = useMemo(() => replay?.replayData.events ?? [], [replay]);
   const trustScore = replay?.replayData.stats.trustScore ?? replay?.trustScore ?? 100;
   const trustLevel = trustLevelForScore(trustScore);
+  const finalCodeCharacters = useMemo(() => {
+    const lastSnapshot = [...events].reverse().find((event) => event.type === "snapshot");
+    return lastSnapshot?.type === "snapshot" ? lastSnapshot.code.length : 0;
+  }, [events]);
+  const pasteContribution = calculatePasteContribution(replay?.pastedCharacters ?? replay?.replayData.stats.pastedCharacters ?? 0, finalCodeCharacters);
+  const pasteContributionTrust = pasteContributionLabel(pasteContribution);
   const eventLabel = (event: ReplayEvent) => {
     switch (event.type) {
       case "snapshot":
@@ -196,6 +202,11 @@ export default function ReplayPage({ params }: { params: Promise<{ replayId: str
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-secondary-text">
                 <div className="rounded-xl border border-border bg-background/40 p-3">Paste: <span className="font-semibold text-white">{replay?.pasteCount ?? 0}</span></div>
                 <div className="rounded-xl border border-border bg-background/40 p-3">Tabs: <span className="font-semibold text-white">{replay?.tabSwitchCount ?? 0}</span></div>
+              </div>
+              <div className="mt-3 rounded-xl border border-border bg-background/40 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Paste Contribution</div>
+                <div className="mt-1 text-lg font-black text-white">{pasteContribution}%</div>
+                <div className="mt-1 text-xs text-secondary-text capitalize">Trust impact: {pasteContributionTrust}</div>
               </div>
             </div>
 
