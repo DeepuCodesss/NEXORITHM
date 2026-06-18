@@ -89,7 +89,7 @@ type SubmissionSummary = {
 
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
-  const { problems, solveProblem, isProblemSolved, user } = useApp();
+  const { problems, solveProblem, isProblemSolved, user, liveReward } = useApp();
 
   const problem = problems.find((p) => p.id === problemId) || problems[0];
 
@@ -116,6 +116,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [celebration, setCelebration] = useState<SubmissionCelebrationData | null>(null);
   const [streakToast, setStreakToast] = useState<string | null>(null);
   const [levelToast, setLevelToast] = useState<{ from: number; to: number; title: string } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  const activeLiveCash =
+    liveReward &&
+    liveReward.isActive &&
+    liveReward.problemId === problem.id &&
+    new Date(liveReward.startsAt).getTime() <= now &&
+    new Date(liveReward.endsAt).getTime() > now
+      ? liveReward.rewardMoneyInr
+      : 0;
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -142,6 +152,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     return () => window.clearTimeout(timer);
   }, [levelToast]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const handleLanguageChange = (nextLanguage: JudgeLanguage) => {
     setLanguage(nextLanguage);
     setCode(problem.starterCode[nextLanguage]);
@@ -163,7 +178,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
     if (reward?.awarded) {
       lines.push("");
-      lines.push(`+${reward.xpGained} XP  +${reward.coinsGained} coins  +${reward.moneyGainedInr} INR  +${reward.reputationGained} reputation`);
+      const rewardPieces = [`+${reward.xpGained} XP`, `+${reward.coinsGained} coins`, `+${reward.reputationGained} reputation`];
+      if (reward.moneyGainedInr > 0) rewardPieces.splice(2, 0, `+₹${reward.moneyGainedInr} cash`);
+      lines.push(rewardPieces.join("  "));
     } else if (reward?.alreadySolved && result.status === "Accepted") {
       lines.push("");
       lines.push("Already solved — no additional XP for this problem.");
@@ -264,7 +281,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
           rewardLine: `+${reward.xpGained} XP • +${reward.coinsGained} Coins • 🔥 ${reward.currentStreak ?? beforeStreak} Day Streak`,
           xpGained: reward.xpGained,
           coinsGained: reward.coinsGained,
-          moneyGainedInr: reward.moneyGainedInr,
+          moneyGainedInr: reward.moneyGainedInr > 0 ? reward.moneyGainedInr : undefined,
           streak: reward.currentStreak ?? beforeStreak,
           levelBefore: beforeLevel,
           levelAfter: afterLevel,
@@ -509,6 +526,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                   </span>
                   <span className="text-muted-foreground">Level: {problem.level}</span>
                   <span className="text-muted-foreground">Topic: {problem.topic}</span>
+                </div>
+                <div className="mb-5 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-3 text-secondary-text">
+                    <span className="font-semibold text-white">XP Reward:</span>
+                    <span className="font-semibold text-primary">+{problem.xpReward} XP</span>
+                    <span className="font-semibold text-white">Coin Reward:</span>
+                    <span className="font-semibold text-reward">+{problem.coinReward} Coins</span>
+                    {activeLiveCash > 0 ? (
+                      <>
+                        <span className="font-semibold text-white">Cash Reward:</span>
+                        <span className="font-semibold text-success">₹{activeLiveCash}</span>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
                 {/* Embedded HTML Problem Description */}
                 <div

@@ -21,11 +21,11 @@ export default function AdminPage() {
   const { user: clerkUser, isLoaded } = useUser();
   const { problems, liveReward, problemBoardConfig, saveLiveReward, saveProblemBoardConfig } = useApp();
   const [query, setQuery] = useState("");
-  const [problemId, setProblemId] = useState(liveReward.problemId);
-  const [rewardMoneyInr, setRewardMoneyInr] = useState(String(liveReward.rewardMoneyInr));
-  const [startsAt, setStartsAt] = useState(toDatetimeLocal(liveReward.startsAt));
-  const [endsAt, setEndsAt] = useState(toDatetimeLocal(liveReward.endsAt));
-  const [isActive, setIsActive] = useState(liveReward.isActive);
+  const [problemId, setProblemId] = useState(liveReward?.problemId ?? "");
+  const [rewardMoneyInr, setRewardMoneyInr] = useState(String(liveReward?.rewardMoneyInr ?? 0));
+  const [startsAt, setStartsAt] = useState(toDatetimeLocal(liveReward?.startsAt ?? new Date().toISOString()));
+  const [endsAt, setEndsAt] = useState(toDatetimeLocal(liveReward?.endsAt ?? new Date().toISOString()));
+  const [isActive, setIsActive] = useState(liveReward?.isActive ?? false);
   const [showUpcomingRewards, setShowUpcomingRewards] = useState(problemBoardConfig.showUpcomingRewards);
   const [upcomingRewardItems, setUpcomingRewardItems] = useState(problemBoardConfig.upcomingRewardItems);
   const [saved, setSaved] = useState(false);
@@ -39,11 +39,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     queueMicrotask(() => {
-      setProblemId(liveReward.problemId);
-      setRewardMoneyInr(String(liveReward.rewardMoneyInr));
-      setStartsAt(toDatetimeLocal(liveReward.startsAt));
-      setEndsAt(toDatetimeLocal(liveReward.endsAt));
-      setIsActive(liveReward.isActive);
+      setProblemId(liveReward?.problemId ?? "");
+      setRewardMoneyInr(String(liveReward?.rewardMoneyInr ?? 0));
+      setStartsAt(toDatetimeLocal(liveReward?.startsAt ?? new Date().toISOString()));
+      setEndsAt(toDatetimeLocal(liveReward?.endsAt ?? new Date().toISOString()));
+      setIsActive(liveReward?.isActive ?? false);
     });
   }, [liveReward]);
 
@@ -307,7 +307,9 @@ export default function AdminPage() {
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reward</div>
               <div className="mt-2 flex items-center gap-2 text-[36px] font-black leading-none text-primary">
                 <Coins className="h-6 w-6 text-primary" />
-                ₹{Math.max(1, Math.round(Number(rewardMoneyInr) || 1))}
+                {Math.max(0, Math.round(Number(rewardMoneyInr) || 0)) > 0
+                  ? `₹${Math.max(0, Math.round(Number(rewardMoneyInr) || 0))}`
+                  : "No cash reward"}
               </div>
             </div>
           </aside>

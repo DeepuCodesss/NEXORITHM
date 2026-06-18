@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, CircleDollarSign, Flame, Gift, Info, LockKeyhole, Sparkles, Target, Trophy, Zap } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import type { Problem } from "@/lib/mockData";
@@ -22,11 +23,22 @@ const cleanDescription = (problem?: Problem) => problem?.description.replace(/<[
 
 export default function RewardsPage() {
   const { user, problems, liveReward } = useApp();
+  const [now, setNow] = useState(() => Date.now());
   const easyProblems = problems.filter((problem) => problem.difficulty === "Easy");
-  const featuredEasyProblem = easyProblems.find((problem) => problem.id === liveReward.problemId) ?? easyProblems[0] ?? null;
+  const featuredEasyProblem = easyProblems.find((problem) => problem.id === liveReward?.problemId) ?? easyProblems[0] ?? null;
   const currentBalance = user.coins;
   const currentStreak = user.currentStreak;
-  const liveIsActive = Boolean(featuredEasyProblem) && liveReward.isActive;
+  const liveIsActive = Boolean(
+    featuredEasyProblem &&
+      liveReward &&
+      liveReward.isActive &&
+      new Date(liveReward.endsAt).getTime() > now,
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <div className="app-shell min-h-screen bg-background pb-10">
@@ -170,7 +182,7 @@ export default function RewardsPage() {
                   <h3 className="mt-3 text-xl font-black text-white">{featuredEasyProblem?.title ?? "No active reward"}</h3>
                   <p className="mt-2 text-sm text-secondary-text">
                     {liveIsActive
-                      ? `Solve this problem to earn Rs ${liveReward.rewardMoneyInr}.`
+                      ? `Solve this problem to earn Rs ${liveReward?.rewardMoneyInr ?? 0}.`
                       : "Publish an easy problem to feature it here."}
                   </p>
 

@@ -31,17 +31,6 @@ export interface ProblemBoardConfig {
   upcomingRewardItems: UpcomingRewardItem[];
 }
 
-const createDefaultLiveReward = (): LiveRewardConfig => {
-  const now = Date.now();
-  return {
-    problemId: MOCK_PROBLEMS[0]?.id ?? "",
-    rewardMoneyInr: 5,
-    startsAt: new Date(now - 18 * 60 * 1000).toISOString(),
-    endsAt: new Date(now + 42 * 60 * 1000 + 15 * 1000).toISOString(),
-    isActive: true,
-  };
-};
-
 const createDefaultProblemBoardConfig = (): ProblemBoardConfig => ({
   showUpcomingRewards: true,
   upcomingRewardItems: [
@@ -56,7 +45,7 @@ interface AppContextType {
   problems: Problem[];
   missions: Mission[];
   leaderboard: LeaderboardEntry[];
-  liveReward: LiveRewardConfig;
+  liveReward: LiveRewardConfig | null;
   problemBoardConfig: ProblemBoardConfig;
   isPro: boolean;
   isAuthenticated: boolean;
@@ -129,7 +118,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [isUserSynced, setIsUserSynced] = useState(false);
-  const [liveReward, setLiveReward] = useState<LiveRewardConfig>(() => createDefaultLiveReward());
+  const [liveReward, setLiveReward] = useState<LiveRewardConfig | null>(null);
   const [problemBoardConfig, setProblemBoardConfig] = useState<ProblemBoardConfig>(() => createDefaultProblemBoardConfig());
 
   const [problems] = useState<Problem[]>(MOCK_PROBLEMS);
@@ -141,9 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch("/api/live-reward", { cache: "no-store" });
       if (!response.ok) return;
       const payload = (await response.json()) as { success?: boolean; data?: { liveReward?: LiveRewardConfig | null } };
-      if (payload.data?.liveReward) {
-        setLiveReward(payload.data.liveReward);
-      }
+      setLiveReward(payload.data?.liveReward ?? null);
     };
 
     void syncLiveReward();
@@ -236,7 +223,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const xpGained = problem.xpReward;
     const coinsGained = problem.coinReward;
-    const moneyGainedInr = problem.prizeMoneyInr ?? 0;
+    const liveRewardActive =
+      liveReward?.isActive &&
+      liveReward.problemId === problemId &&
+      new Date(liveReward.startsAt).getTime() <= Date.now() &&
+      new Date(liveReward.endsAt).getTime() > Date.now();
+    const moneyGainedInr = liveRewardActive ? liveReward.rewardMoneyInr : 0;
     const reputationGained = Math.max(5, Math.floor(xpGained / 10));
     const nextXp = user.xp + xpGained;
     const nextStreak = Math.max(user.currentStreak, 1);
@@ -277,14 +269,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...config,
-          rewardMoney: Math.max(1, Math.round(Number(config.rewardMoneyInr) || 1)),
+          rewardMoney: Math.max(0, Math.round(Number(config.rewardMoneyInr) || 0)),
         }),
       });
       if (!response.ok) return;
       const payload = (await response.json()) as { success?: boolean; data?: { liveReward?: LiveRewardConfig | null } };
-      if (payload.data?.liveReward) {
-        setLiveReward(payload.data.liveReward);
-      }
+      setLiveReward(payload.data?.liveReward ?? null);
     })();
   };
 

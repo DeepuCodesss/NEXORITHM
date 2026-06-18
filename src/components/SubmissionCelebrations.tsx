@@ -17,7 +17,7 @@ export interface SubmissionCelebrationData {
   rewardLine: string;
   xpGained: number;
   coinsGained: number;
-  moneyGainedInr: number;
+  moneyGainedInr?: number;
   streak: number;
   levelBefore?: number;
   levelAfter?: number;
@@ -218,10 +218,12 @@ export default function SubmissionCelebrations({
                       <span>Coins</span>
                       <span className="font-semibold text-white">+{celebration.coinsGained}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>Cash</span>
-                      <span className="font-semibold text-white">₹{celebration.moneyGainedInr}</span>
-                    </div>
+                    {typeof celebration.moneyGainedInr === "number" && celebration.moneyGainedInr > 0 ? (
+                      <div className="flex items-center justify-between">
+                        <span>Cash</span>
+                        <span className="font-semibold text-white">₹{celebration.moneyGainedInr}</span>
+                      </div>
+                    ) : null}
                     <div className="flex items-center justify-between">
                       <span>Streak</span>
                       <span className="font-semibold text-white">{celebration.streak} day{celebration.streak === 1 ? "" : "s"}</span>

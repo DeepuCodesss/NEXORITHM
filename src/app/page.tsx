@@ -91,7 +91,7 @@ function DashboardPreview() {
   const [submitMessage, setSubmitMessage] = useState("");
   const [runCount, setRunCount] = useState(0);
 
-  const heroProblemId = liveReward.problemId || problems[0]?.id;
+  const heroProblemId = liveReward?.problemId || problems[0]?.id;
 
   const handleRunCode = () => {
     const result = heroProblemId ? solveProblem(heroProblemId) : null;
@@ -106,9 +106,13 @@ function DashboardPreview() {
 
   const handleSubmit = () => {
     const result = heroProblemId ? solveProblem(heroProblemId) : null;
-    const reward = result?.moneyGainedInr || liveReward.rewardMoneyInr || 5;
     setConsoleMessage("All hidden tests passed. Submission accepted.");
-    setSubmitMessage(`You topped the leaderboard at #1. Claim your ₹${reward} reward.`);
+    const cashReward = result?.moneyGainedInr ?? 0;
+    setSubmitMessage(
+      cashReward > 0
+        ? `You topped the leaderboard at #1. Claim your ₹${cashReward} reward.`
+        : "You topped the leaderboard at #1. No cash reward is active right now.",
+    );
   };
 
   return (
@@ -147,7 +151,7 @@ function DashboardPreview() {
               Live Reward Problem
             </div>
             <div className="mt-1 flex items-baseline justify-between gap-4">
-              <div className="text-lg font-black text-primary">₹5 Prize Pool</div>
+              <div className="text-lg font-black text-primary">{liveReward?.isActive ? `₹${liveReward.rewardMoneyInr} Prize Pool` : "No Live Reward"}</div>
               <div className="text-[10px] font-medium text-secondary-text">42 min remaining</div>
             </div>
           </div>

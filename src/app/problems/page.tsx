@@ -32,9 +32,9 @@ export default function ProblemsPage() {
   }, []);
 
   const topicOptions = ["All Topics", "Arrays", "Dynamic Programming", "Graphs", "Strings", "Binary Search"];
-  const liveRewardProblem = problems.find((problem) => problem.id === liveReward.problemId) ?? problems[0];
-  const liveTimeLeft = formatTimeLeft(liveReward.endsAt);
-  const liveRewardActive = liveReward.isActive && !liveTimeLeft.expired;
+  const liveRewardProblem = problems.find((problem) => problem.id === liveReward?.problemId) ?? problems[0];
+  const liveTimeLeft = liveReward ? formatTimeLeft(liveReward.endsAt) : { minutes: 0, seconds: "00", expired: true };
+  const liveRewardActive = !!liveReward && liveReward.isActive && !liveTimeLeft.expired;
   const upcomingProblems = problemBoardConfig.showUpcomingRewards
     ? problemBoardConfig.upcomingRewardItems
       .map((item) => problems.find((problem) => problem.id === item.problemId))
@@ -100,7 +100,7 @@ export default function ProblemsPage() {
   };
 
   const problemStatus = (problem: Problem) => {
-    if (problem.id === liveReward.problemId && liveRewardActive) return "Live Reward";
+    if (problem.id === liveReward?.problemId && liveRewardActive) return "Live Reward";
     if (upcomingProblems.some((item) => item.id === problem.id)) return "Upcoming";
     if (isProblemSolved(problem.id)) return "Solved";
     return "No Active Reward";
@@ -195,8 +195,8 @@ export default function ProblemsPage() {
                     <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
                       <div>
                         <div className="text-xs font-semibold uppercase text-muted-foreground">Reward</div>
-                        <div className="mt-2 flex items-center gap-2 text-2xl font-black text-primary">
-                          <Coins className="h-5 w-5 text-reward" />₹{liveReward.rewardMoneyInr}
+                    <div className="mt-2 flex items-center gap-2 text-2xl font-black text-primary">
+                          <Coins className="h-5 w-5 text-reward" />₹{liveReward?.rewardMoneyInr ?? 0}
                         </div>
                       </div>
                       <div className="text-right">
@@ -318,9 +318,13 @@ export default function ProblemsPage() {
                           </td>
                           <td className="px-4 py-4">
                             {live || upcoming ? (
-                              <span className="inline-flex items-center gap-1 text-sm font-bold text-primary">
-                                <Coins className="h-4 w-4 text-reward" />₹{live ? liveReward.rewardMoneyInr : problem.prizeMoneyInr ?? liveReward.rewardMoneyInr}
-                              </span>
+                              live && liveReward ? (
+                                <span className="inline-flex items-center gap-1 text-sm font-bold text-primary">
+                                  <Coins className="h-4 w-4 text-reward" />₹{liveReward.rewardMoneyInr}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">TBA</span>
+                              )
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
@@ -376,7 +380,7 @@ export default function ProblemsPage() {
                           <div className="mt-1 text-sm font-bold text-foreground">{problem.title}</div>
                         </div>
                         <span className="inline-flex items-center gap-1 rounded-md bg-reward/10 px-2 py-1 text-xs font-bold text-reward">
-                          <Coins className="h-3.5 w-3.5" />₹{problem.prizeMoneyInr ?? liveReward.rewardMoneyInr}
+                          <Coins className="h-3.5 w-3.5" />TBA
                         </span>
                       </div>
                     ))
