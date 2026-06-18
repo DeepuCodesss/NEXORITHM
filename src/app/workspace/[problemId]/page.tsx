@@ -10,7 +10,6 @@ import SubmissionCelebrations, { type SubmissionCelebrationData, type Submission
 import { createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
 import {
   BookOpenCheck,
-  ArrowRight,
   ChevronLeft,
   FileCode2,
   FileText,
@@ -479,59 +478,181 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     "--right-panel-width": `calc(${100 - leftPanelWidth}% - 4px)`,
   } as CSSProperties;
 
-  const renderLeaderboard = (compact = false) => (
-    <div className={compact ? "space-y-3" : "space-y-4"}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-bold text-white">🏆 Fastest Solvers</div>
-          {!compact && <div className="mt-1 text-xs text-secondary-text">Ranked accepted submissions with replay access.</div>}
-        </div>
-        {!compact && (
-          <Link href={`/problems/${problem.id}/leaderboard`} className="text-xs font-semibold text-primary hover:underline">
-            View Full Leaderboard →
-          </Link>
-        )}
-      </div>
+  const renderLeaderboard = () => {
+    const topLeader = leaders[0] ?? null;
+    const totalAccepted = leadersTotal || leaders.length || 0;
+    const languageCounts = new Map<string, number>();
+    for (const leader of leaders) {
+      languageCounts.set(leader.language, (languageCounts.get(leader.language) ?? 0) + 1);
+    }
+    const mostUsedLanguage = Array.from(languageCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? topLeader?.language ?? "JavaScript";
+    const myLeader = leaders.find((leader) => leader.username === user.username || leader.user === user.fullName) ?? null;
 
-      <div className="space-y-2">
-        {leadersLoading ? (
-          Array.from({ length: compact ? 2 : 3 }, (_, index) => (
-            <div key={index} className="h-12 animate-pulse rounded-xl border border-border bg-hover/60" />
-          ))
-        ) : leaders.length ? (
-          leaders.slice(0, compact ? 1 : 3).map((leader) => (
-            <div key={leader.replayId} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-3 py-2">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-black text-white">
-                  #{leader.rank}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-white">{leader.user}</div>
-                  {!compact && <div className="text-[11px] text-secondary-text">{leader.language}</div>}
-                </div>
+    const rankAccent = (rank: number) => {
+      if (rank === 1) return "border-amber-400/40 bg-amber-400/10 text-amber-100";
+      if (rank === 2) return "border-slate-300/40 bg-slate-300/10 text-slate-100";
+      if (rank === 3) return "border-orange-400/40 bg-orange-400/10 text-orange-100";
+      return "border-border bg-background/40 text-secondary-text";
+    };
+
+    const languageTone = (language: string) => {
+      const normalized = language.toLowerCase();
+      if (normalized.includes("javascript")) return "border-amber-400/30 bg-amber-400/10 text-amber-100";
+      if (normalized.includes("python")) return "border-sky-400/30 bg-sky-400/10 text-sky-100";
+      if (normalized.includes("java")) return "border-orange-400/30 bg-orange-400/10 text-orange-100";
+      if (normalized.includes("c++") || normalized.includes("cpp")) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
+      return "border-border bg-hover text-secondary-text";
+    };
+
+    const normalizedLanguage = (language: string) => {
+      const lower = language.toLowerCase();
+      if (lower.includes("javascript")) return "JavaScript";
+      if (lower.includes("python")) return "Python";
+      if (lower.includes("java")) return "Java";
+      if (lower.includes("c++") || lower.includes("cpp")) return "C++";
+      return language;
+    };
+
+    return (
+      <div className="space-y-5">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-background/60 p-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">🏆 Total Accepted Solvers</div>
+            <div className="mt-2 text-2xl font-black text-white">{totalAccepted}</div>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/60 p-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">⚡ Fastest Solve</div>
+            <div className="mt-2 text-2xl font-black text-white">{topLeader ? formatSolveTime(topLeader.solveTime) : "—"}</div>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/60 p-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">💻 Most Used Language</div>
+            <div className="mt-2 text-2xl font-black text-white">{normalizedLanguage(mostUsedLanguage)}</div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-background/60 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-bold text-white">My Rank</div>
+              <div className="mt-1 text-xs text-secondary-text">Your personal placement for this problem.</div>
+            </div>
+          </div>
+          {myLeader ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-border bg-card p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Rank</div>
+                <div className="mt-1 text-lg font-black text-white">#{myLeader.rank}</div>
               </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="text-sm font-bold text-reward">{leader.solveTime}s</div>
-                <Link href={`/replay/${leader.replayId}`} className="rounded-full border border-border bg-hover px-3 py-1 text-xs font-semibold text-secondary-text hover:text-white">
-                  ▶ Replay
-                </Link>
+              <div className="rounded-xl border border-border bg-card p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Solve Time</div>
+                <div className="mt-1 text-lg font-black text-white">{formatSolveTime(myLeader.solveTime)}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Language</div>
+                <div className={`mt-1 inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${languageTone(myLeader.language)}`}>
+                  {normalizedLanguage(myLeader.language)}
+                </div>
               </div>
             </div>
-          ))
-        ) : (
-          <div className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-secondary-text">
-            <div className="text-base font-bold text-white">🏆 No leaderboard entries yet</div>
-            <div className="mt-2">Be the first solver and claim Rank #1.</div>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-border px-4 py-5 text-sm text-secondary-text">
+              <div className="font-bold text-white">Not ranked yet.</div>
+              <div className="mt-1">Solve the problem to enter the leaderboard.</div>
+            </div>
+          )}
+        </div>
 
-      <Link href={`/problems/${problem.id}/leaderboard`} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-        View Full Leaderboard
-        <ArrowRight className="h-3.5 w-3.5" />
-      </Link>
-    </div>
-  );
+        <div className="space-y-3 sm:hidden">
+          {leadersLoading ? (
+            Array.from({ length: 3 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-2xl border border-border bg-background/40" />)
+          ) : leaders.length ? (
+            leaders.map((leader) => (
+              <div key={leader.replayId} className={`rounded-2xl border p-4 ${leader.rank <= 3 ? "bg-background/55" : "bg-background/35"} ${rankAccent(leader.rank)}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="inline-flex h-9 w-14 items-center justify-center rounded-full border text-xs font-black bg-background/40 text-white">
+                      {leader.rank === 1 ? "🏆 #1" : `#${leader.rank}`}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-white">{leader.user}</div>
+                      <div className="mt-1 text-xs text-secondary-text">{formatSolveTime(leader.solveTime)}</div>
+                      <div className={`mt-2 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${languageTone(leader.language)}`}>
+                        {normalizedLanguage(leader.language)}
+                      </div>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/replay/${leader.replayId}`}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-bold text-primary transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/20"
+                  >
+                    ▶ Replay
+                  </Link>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-secondary-text">
+              <div className="text-base font-bold text-white">Be the first solver to claim Rank #1.</div>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-2xl border border-border bg-card sm:block">
+          <div className="border-b border-border px-4 py-3">
+            <div className="grid grid-cols-[72px_minmax(0,1.4fr)_88px_110px_110px] gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground sm:grid-cols-[72px_minmax(0,1.6fr)_96px_132px_144px]">
+              <div>Rank</div>
+              <div>User</div>
+              <div>Solve Time</div>
+              <div>Language</div>
+              <div>Replay</div>
+            </div>
+          </div>
+
+          <div className="divide-y divide-border">
+            {leadersLoading ? (
+              Array.from({ length: 5 }, (_, index) => <div key={index} className="h-16 animate-pulse bg-background/40" />)
+            ) : leaders.length ? (
+              leaders.map((leader) => (
+                <div
+                  key={leader.replayId}
+                  className={`grid grid-cols-[72px_minmax(0,1.4fr)_88px_110px_110px] gap-3 px-4 py-4 text-sm sm:grid-cols-[72px_minmax(0,1.6fr)_96px_132px_144px] ${leader.rank <= 3 ? "bg-background/55" : "bg-background/35"} ${leader.rank === 1 ? "shadow-[inset_0_0_0_1px_rgba(245,158,11,0.14)]" : ""}`}
+                >
+                  <div
+                    className={`inline-flex h-9 w-14 items-center justify-center rounded-full border text-xs font-black ${rankAccent(leader.rank)}`}
+                  >
+                    {leader.rank === 1 ? "🏆 #1" : `#${leader.rank}`}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold text-white">{leader.user}</div>
+                    <div className="truncate text-xs text-secondary-text">Accepted solve</div>
+                  </div>
+                  <div className="font-bold text-white">{formatSolveTime(leader.solveTime)}</div>
+                  <div className="flex items-start">
+                    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${languageTone(leader.language)}`}>
+                      {normalizedLanguage(leader.language)}
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <Link
+                      href={`/replay/${leader.replayId}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-bold text-primary transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/20 hover:shadow-[0_10px_20px_rgba(139,92,246,0.18)]"
+                    >
+                      ▶ Replay
+                    </Link>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-10 text-center text-sm text-secondary-text">
+                <div className="text-base font-bold text-white">🏆 No leaderboard entries yet</div>
+                <div className="mt-2">Be the first solver to claim Rank #1.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const handleRunCode = async () => {
     setIsRunning(true);
@@ -799,7 +920,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                   </Link>
                 </div>
                 <div className="rounded-2xl border border-border bg-card p-4">
-                  {renderLeaderboard(false)}
+                  {renderLeaderboard()}
                 </div>
               </div>
             )}
