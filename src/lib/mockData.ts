@@ -617,7 +617,6 @@ const generateProblem = (level: number): Problem => {
   const title = `${pattern}: ${taskCopy[kind].title}`;
   const slug = slugify(`${track.topic}-${pattern}-${level}`);
   const functionName = `solve${level}`;
-  const rewards = rewardForDifficulty(difficulty);
   const testCases = buildTestCases(kind, level);
 
   return {
@@ -628,8 +627,8 @@ const generateProblem = (level: number): Problem => {
     level,
     topic: track.topic,
     pattern,
-    ...rewards,
-    prizeMoneyInr: level <= 3 ? [5, 10, 25][level - 1] : undefined,
+    ...rewardForDifficulty(difficulty),
+    prizeMoneyInr: undefined,
     description: buildDescription(kind, difficulty, track.topic, pattern, testCases),
     discussions: buildDiscussions(level, kind, track.topic, pattern),
     editorial: buildEditorial(kind, difficulty, track.topic, pattern),
@@ -647,7 +646,7 @@ export const DAILY_PRIZE_PROBLEMS = MOCK_PROBLEMS.slice(0, 3).map((problem, inde
   ...problem,
   title: ["Easy Challenge", "Medium Challenge", "Hard Challenge"][index],
   difficulty: (["Easy", "Medium", "Hard"] as const)[index],
-  prizeMoneyInr: [5, 10, 25][index],
+  prizeMoneyInr: undefined,
 }));
 
 export const INITIAL_USER: UserState = {

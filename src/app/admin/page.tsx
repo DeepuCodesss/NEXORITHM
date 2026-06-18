@@ -125,6 +125,10 @@ export default function AdminPage() {
             View Problems
             <ArrowRight className="h-4 w-4" />
           </Link>
+          <Link href="/admin/withdrawals" className="btn-primary h-10 gap-2 px-4 text-sm">
+            Withdrawals
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">

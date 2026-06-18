@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         judgeKind: problem.judge.kind,
         xpReward: problem.xpReward,
         coinReward: problem.coinReward,
-        prizeMoneyInr: problem.prizeMoneyInr,
+        prizeMoneyInr: null,
         description: problem.description,
         starterCode: problem.starterCode,
         testCases: problem.testCases,
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
         judgeKind: problem.judge.kind,
         xpReward: problem.xpReward,
         coinReward: problem.coinReward,
-        prizeMoneyInr: problem.prizeMoneyInr,
+        prizeMoneyInr: null,
         description: problem.description,
         starterCode: problem.starterCode,
         testCases: problem.testCases,
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
           return { createdSubmission };
         }
       }
-      const cashReward = (problem.prizeMoneyInr ?? 0) + streakReward.cash + Number(liveReward?.rewardMoney ?? 0);
+      const cashReward = streakReward.cash + Number(liveReward?.rewardMoney ?? 0);
       const reputationReward = Math.max(5, Math.floor(xpReward / 10));
       const nextXp = lockedUser.xp + xpReward;
       const nextCoins = lockedUser.coins + coinReward + streakReward.coins;

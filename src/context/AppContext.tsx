@@ -93,7 +93,7 @@ const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
   college: dbUser.college || INITIAL_USER.college,
   xp: dbUser.xp ?? INITIAL_USER.xp,
   coins: dbUser.coins ?? INITIAL_USER.coins,
-  moneyEarnedInr: dbUser.moneyEarnedInr ?? INITIAL_USER.moneyEarnedInr,
+  moneyEarnedInr: Math.max(0, dbUser.moneyEarnedInr ?? INITIAL_USER.moneyEarnedInr),
   reputation: dbUser.reputation ?? INITIAL_USER.reputation,
   devRank: dbUser.devRank ?? INITIAL_USER.devRank,
   currentStreak: dbUser.currentStreak ?? INITIAL_USER.currentStreak,

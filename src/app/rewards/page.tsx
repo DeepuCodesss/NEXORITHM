@@ -1,11 +1,22 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, CircleDollarSign, Flame, Gift, Info, LockKeyhole, Sparkles, Target, Trophy, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  CircleDollarSign,
+  Clock,
+  Flame,
+  Gift,
+  Info,
+  IndianRupee,
+  LockKeyhole,
+  Sparkles,
+  Trophy,
+  WalletCards,
+  Zap,
+} from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import type { Problem } from "@/lib/mockData";
 
 const streakRewards = [
   { day: 1, coins: 5 },
@@ -19,14 +30,11 @@ const streakRewards = [
   { day: 30, coins: 200 },
 ];
 
-const cleanDescription = (problem?: Problem) => problem?.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() ?? "";
-
 export default function RewardsPage() {
   const { user, problems, liveReward } = useApp();
   const [now, setNow] = useState(() => Date.now());
   const easyProblems = problems.filter((problem) => problem.difficulty === "Easy");
   const featuredEasyProblem = easyProblems.find((problem) => problem.id === liveReward?.problemId) ?? easyProblems[0] ?? null;
-  const currentBalance = user.coins;
   const currentStreak = user.currentStreak;
   const liveIsActive = Boolean(
     featuredEasyProblem &&
@@ -51,25 +59,30 @@ export default function RewardsPage() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Rewards</h1>
-                <p className="mt-1 max-w-2xl text-sm text-secondary-text">A clean reward hub for real coins, streaks, and withdrawals.</p>
+                <p className="mt-1 max-w-2xl text-sm text-secondary-text">A clean reward hub for real coins, streaks, live challenges, and progress.</p>
                 <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-secondary-text">
                   <Info className="h-3.5 w-3.5" />
-                  Easy rewards appear only when a real easy problem exists.
+                  Earn on live problems, streaks, and milestone progress.
                 </div>
               </div>
             </div>
 
             <div className="relative flex justify-end self-start">
-              <div className="relative flex h-[104px] items-center justify-end overflow-hidden sm:h-[116px] md:h-[124px] lg:h-[132px] xl:mr-1">
-                <Image
-                  src="/reward-chests.png"
-                  alt="Reward gift with coins"
-                  width={1200}
-                  height={900}
-                  priority
-                  className="h-full w-auto object-contain"
-                />
-              </div>
+              <Link
+                href="/rewards/withdraw"
+                className="group flex h-[104px] w-full max-w-[260px] items-center justify-between rounded-[24px] border border-border bg-card px-5 shadow-[0_0_40px_rgba(99,102,241,0.08)] transition hover:border-primary/30 hover:bg-hover sm:h-[116px] md:h-[124px] lg:h-[132px]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-reward/30 bg-reward/10 text-reward">
+                    <WalletCards className="h-7 w-7" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-black text-white">Withdraw</div>
+                    <div className="mt-1 text-xs text-secondary-text">Open cash-out page</div>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-secondary-text transition group-hover:translate-x-0.5 group-hover:text-white" />
+              </Link>
             </div>
           </div>
 
@@ -78,45 +91,12 @@ export default function RewardsPage() {
               <div className="flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-lg font-black text-white">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Today&apos;s Visible Reward Pool
+                  Reward Milestones
                 </h2>
                 <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-xs text-secondary-text">
                   <Info className="h-3.5 w-3.5" />
-                  Live problem only
+                  Progress only
                 </span>
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-3">
-                {featuredEasyProblem ? (
-                <RewardCard
-                    title="Easy Challenge"
-                    value={liveIsActive && liveReward ? "Live" : "No cash"}
-                    description={`Solve ${featuredEasyProblem.title.toLowerCase()} and earn a real reward.`}
-                    icon={Zap}
-                    tone="border-success/50 text-success"
-                    href={`/workspace/${featuredEasyProblem.id}`}
-                    ctaLabel="Solve Now"
-                    supportingText={cleanDescription(featuredEasyProblem).slice(0, 105)}
-                  />
-                ) : (
-                  <EmptyRewardCard title="Easy Challenge" value="Locked" icon={Zap} tone="border-success/50 text-success" />
-                )}
-
-                <ComingSoonCard
-                  title="Medium Challenge"
-                  value="Coming soon"
-                  icon={Target}
-                  tone="border-amber-400/40 text-amber-400"
-                  description="Future reward tier for medium problems."
-                />
-
-                <ComingSoonCard
-                  title="Hard Challenge"
-                  value="Coming soon"
-                  icon={Trophy}
-                  tone="border-violet-400/40 text-violet-400"
-                  description="Future reward tier for hard problems."
-                />
               </div>
 
               <section className="surface-card rounded-[24px] border border-border p-5">
@@ -124,7 +104,7 @@ export default function RewardsPage() {
                   <div>
                     <h2 className="flex items-center gap-2 text-lg font-black text-white">
                       <Flame className="h-5 w-5 text-reward" />
-                      Daily Streak Rewards
+                      Streak Rewards
                     </h2>
                     <p className="mt-1 text-sm text-secondary-text">Keep solving daily to keep your streak alive and unlock bonuses.</p>
                   </div>
@@ -157,20 +137,41 @@ export default function RewardsPage() {
                   })}
                 </div>
               </section>
-            </div>
 
-            <aside className="space-y-4">
+              <div className="grid gap-4 xl:grid-cols-3">
+                <RewardCard
+                  title="XP Rewards"
+                  value={`${user.xp.toLocaleString()} XP`}
+                  description="Solve problems to earn XP and level up your account."
+                  icon={Trophy}
+                  tone="border-primary/40 text-primary"
+                  supportingText="XP keeps your profile and rank climbing."
+                />
+                <RewardCard
+                  title="Coin Rewards"
+                  value={`${user.coins.toLocaleString()} Coins`}
+                  description="Earn platform coins from solving and streak consistency."
+                  icon={CircleDollarSign}
+                  tone="border-reward/40 text-reward"
+                  supportingText="Coins are your core in-app reward."
+                />
+                <RewardCard
+                  title="Reward Progress"
+                  value="Track your path"
+                  description="Monitor streaks, solved count, and reward milestones across the platform."
+                  icon={Zap}
+                  tone="border-success/40 text-success"
+                  supportingText="Progress updates as you solve more problems."
+                />
+              </div>
+
               <section className="surface-card rounded-[24px] border border-border p-5">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-white">Live Reward</h2>
-                    <p className="mt-1 text-sm text-secondary-text">Currently active reward configuration.</p>
-                  </div>
-                  <span
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold ${
-                      liveIsActive ? "border-success/30 bg-success/10 text-success" : "border-muted-foreground/20 bg-card text-muted-foreground"
-                    }`}
-                  >
+                  <h2 className="flex items-center gap-2 text-lg font-black text-white">
+                    <Trophy className="h-5 w-5 text-primary" />
+                    Live Reward Challenges
+                  </h2>
+                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold ${liveIsActive ? "border-success/30 bg-success/10 text-success" : "border-muted-foreground/20 bg-card text-muted-foreground"}`}>
                     <span className={`h-2 w-2 rounded-full ${liveIsActive ? "bg-success" : "bg-muted-foreground"}`} />
                     {liveIsActive ? "Live" : "Paused"}
                   </span>
@@ -181,10 +182,9 @@ export default function RewardsPage() {
                   <h3 className="mt-3 text-xl font-black text-white">{featuredEasyProblem?.title ?? "No active reward"}</h3>
                   <p className="mt-2 text-sm text-secondary-text">
                     {liveIsActive
-                      ? `Solve this problem to earn a backend-confirmed cash reward.`
+                      ? "Solve this problem to earn a backend-confirmed cash reward."
                       : "Publish an easy problem to feature it here."}
                   </p>
-
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
                     {featuredEasyProblem ? (
                       <>
@@ -201,28 +201,30 @@ export default function RewardsPage() {
                   </Link>
                 </div>
               </section>
+            </div>
 
-              <section className="surface-card rounded-[24px] border border-violet-500/30 p-5">
+            <aside className="space-y-4">
+              <section className="surface-card rounded-[24px] border border-border p-5">
                 <div className="flex items-center gap-2">
                   <CircleDollarSign className="h-5 w-5 text-violet-400" />
-                  <h2 className="text-lg font-black text-white">Your Balance</h2>
+                  <h2 className="text-lg font-black text-white">Upcoming Rewards</h2>
                 </div>
-                <div className="mt-5 flex items-end gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-reward/15 text-reward">
-                    <CircleDollarSign className="h-8 w-8" />
-                  </div>
-                  <div>
-                    <div className="flex items-end gap-2">
-                      <span className="text-4xl font-black text-white">{currentBalance}</span>
-                      <span className="pb-1 text-lg font-bold text-white">Coins</span>
-                    </div>
-                    <p className="mt-1 text-sm text-secondary-text">Withdraw badges from your coins.</p>
-                  </div>
+                <div className="mt-4 rounded-2xl border border-dashed border-border bg-black/20 p-4 text-sm text-secondary-text">
+                  No upcoming rewards are configured.
                 </div>
-                <Link href="/rewards/withdraw" className="btn-primary mt-5 h-12 w-full gap-2 text-sm">
-                  Withdraw Badges
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+              </section>
+
+              <section className="surface-card rounded-[24px] border border-border p-5">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-black text-white">How Rewards Work</h2>
+                </div>
+                <div className="mt-3 space-y-2.5 text-sm text-secondary-text">
+                  <p className="flex gap-3"><Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />One featured problem is active at a time, and only the live one pays out the cash reward.</p>
+                  <p className="flex gap-3"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />Solve before the timer ends to earn the live reward.</p>
+                  <p className="flex gap-3"><Trophy className="mt-0.5 h-4 w-4 shrink-0 text-primary" />Milestones pay out separately when you hit their target.</p>
+                  <p className="flex gap-3"><IndianRupee className="mt-0.5 h-4 w-4 shrink-0 text-primary" />Rewards are tracked per user, so progress and cash stay tied to your account.</p>
+                </div>
               </section>
             </aside>
           </div>
@@ -238,8 +240,6 @@ function RewardCard({
   description,
   icon: Icon,
   tone,
-  href,
-  ctaLabel,
   supportingText,
 }: {
   title: string;
@@ -247,90 +247,12 @@ function RewardCard({
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   tone: string;
-  href: string;
-  ctaLabel: string;
   supportingText: string;
-}) {
-  return (
-    <div className={`surface-card flex min-h-[230px] flex-col justify-between rounded-[24px] border p-5 ${tone} shadow-[0_0_30px_rgba(34,197,94,0.08)]`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-[22px] border border-current/30 bg-black/20">
-          <Icon className="h-9 w-9" />
-        </div>
-        <div className="text-right">
-          <p className="text-lg font-bold text-white">{title}</p>
-          <p className="mt-1 text-3xl font-black text-current">{value}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        <p className="max-w-sm text-sm leading-6 text-secondary-text">{description}</p>
-        <p className="text-xs font-semibold text-secondary-text">{supportingText}</p>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <p className="text-xs text-secondary-text">Real reward card</p>
-        <Link href={href} className="btn-primary h-12 gap-2 px-5 text-sm">
-          {ctaLabel}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function EmptyRewardCard({
-  title,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  title: string;
-  value: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: string;
-}) {
-  return (
-    <div className={`surface-card flex min-h-[260px] flex-col justify-between rounded-[24px] border p-5 ${tone} opacity-85`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-[22px] border border-current/30 bg-black/20">
-          <Icon className="h-9 w-9" />
-        </div>
-        <div className="text-right">
-          <p className="text-lg font-bold text-white">{title}</p>
-          <p className="mt-1 text-3xl font-black text-current">{value}</p>
-        </div>
-      </div>
-      <div className="rounded-2xl border border-dashed border-border bg-black/20 px-4 py-8 text-center text-sm text-secondary-text">
-        Publish an easy problem and it will appear here automatically.
-      </div>
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <p className="text-xs text-secondary-text">Waiting for live content</p>
-        <button className="btn-secondary h-12 px-5 text-sm text-secondary-text" disabled>
-          Coming Soon
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ComingSoonCard({
-  title,
-  value,
-  icon: Icon,
-  tone,
-  description,
-}: {
-  title: string;
-  value: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: string;
-  description: string;
 }) {
   return (
     <div className={`surface-card flex min-h-[230px] flex-col justify-between rounded-[24px] border p-5 ${tone}`}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-[22px] border border-current/20 bg-black/20 text-muted-foreground">
+        <div className="flex h-20 w-20 items-center justify-center rounded-[22px] border border-current/30 bg-black/20">
           <Icon className="h-9 w-9" />
         </div>
         <div className="text-right">
@@ -338,13 +260,10 @@ function ComingSoonCard({
           <p className="mt-1 text-3xl font-black text-current">{value}</p>
         </div>
       </div>
-      <div className="rounded-2xl border border-dashed border-border bg-black/20 px-4 py-5 text-sm text-secondary-text">
-        <p className="font-semibold text-white">Coming soon</p>
-        <p className="mt-2 leading-6">{description}</p>
+      <div className="mt-4 space-y-2">
+        <p className="max-w-sm text-sm leading-6 text-secondary-text">{description}</p>
+        <p className="text-xs font-semibold text-secondary-text">{supportingText}</p>
       </div>
-      <button className="btn-secondary mt-5 h-12 w-full cursor-not-allowed bg-card text-secondary-text opacity-70" disabled>
-        Coming Soon
-      </button>
     </div>
   );
 }

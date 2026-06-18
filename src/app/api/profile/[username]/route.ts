@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { apiError } from "@/lib/apiResponse";
 import { apiSuccess } from "@/lib/apiResponse";
+import { getUserCashBalanceInr } from "@/lib/rewards";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
 
   const rank = ranked.findIndex((entry) => entry.id === user.id) + 1;
   const solvedProblemIds = Array.isArray(user.solvedProblemIds) ? user.solvedProblemIds : [];
+  const moneyEarnedInr = await getUserCashBalanceInr(user.id);
   const recentActivity = await prisma.submission.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
@@ -49,6 +51,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
       avatarUrl: user.avatarUrl,
       xp: user.xp,
       coins: user.coins,
+      moneyEarnedInr,
       currentStreak: user.currentStreak,
       solvedCount: solvedProblemIds.length,
       globalRank: rank,

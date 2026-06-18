@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { SignInButton, useClerk, useUser } from "@clerk/nextjs";
 import { useApp } from "@/context/AppContext";
-import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Trophy, Gift, CalendarDays, UserRound } from "lucide-react";
+import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Trophy, Gift, CalendarDays, UserRound, IndianRupee } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
@@ -86,6 +86,11 @@ export default function Header() {
               <span className="font-bold">{user.coins}</span>
             </div>
 
+            <div className="flex items-center gap-1 rounded-md border border-success/20 bg-success/10 px-2 py-1 text-success">
+              <IndianRupee className="h-3.5 w-3.5" />
+              <span className="font-bold">{Math.max(0, user.moneyEarnedInr).toLocaleString()}</span>
+            </div>
+
             {/* XP */}
             <div className="flex items-center gap-1 rounded-md border border-border bg-hover px-2 py-1 text-secondary-text">
               <Award className="w-3.5 h-3.5 text-primary" />
@@ -164,6 +169,10 @@ export default function Header() {
             <div className="flex flex-col items-center justify-center rounded-md border border-reward/20 bg-reward/10 p-2 text-reward">
               <Coins className="w-4 h-4 mb-1" />
               <span className="font-bold">{user.coins} Coins</span>
+            </div>
+            <div className="flex flex-col items-center justify-center rounded-md border border-success/20 bg-success/10 p-2 text-success">
+              <IndianRupee className="mb-1 h-4 w-4" />
+              <span className="font-bold">{Math.max(0, user.moneyEarnedInr).toLocaleString()}</span>
             </div>
             <div className="flex flex-col items-center justify-center rounded-md border border-border bg-hover p-2 text-secondary-text">
               <Award className="w-4 h-4 mb-1 text-primary" />
