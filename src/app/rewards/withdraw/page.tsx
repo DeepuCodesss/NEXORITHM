@@ -5,10 +5,10 @@ import { ArrowLeft, BadgeIndianRupee, CircleDollarSign, ShieldCheck, Sparkles, W
 import { useApp } from "@/context/AppContext";
 
 const badgeTiers = [
-  { title: "Starter Badge", coins: 100, badgeValue: "Rs 5", perk: "Unlocks your first withdrawal tier" },
-  { title: "Builder Badge", coins: 250, badgeValue: "Rs 15", perk: "Best for steady daily solving" },
-  { title: "Elite Badge", coins: 500, badgeValue: "Rs 35", perk: "Reserved for strong streaks" },
-  { title: "Champion Badge", coins: 1000, badgeValue: "Rs 80", perk: "Highest visible badge tier" },
+  { title: "Starter Badge", coins: 100, badgeValue: "Value varies", perk: "Unlocks your first withdrawal tier" },
+  { title: "Builder Badge", coins: 250, badgeValue: "Value varies", perk: "Best for steady daily solving" },
+  { title: "Elite Badge", coins: 500, badgeValue: "Value varies", perk: "Reserved for strong streaks" },
+  { title: "Champion Badge", coins: 1000, badgeValue: "Value varies", perk: "Highest visible badge tier" },
 ];
 
 export default function WithdrawBadgesPage() {

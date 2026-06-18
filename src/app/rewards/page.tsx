@@ -14,9 +14,9 @@ const streakRewards = [
   { day: 4, coins: 10 },
   { day: 5, coins: 10 },
   { day: 6, coins: 15 },
-  { day: 7, coins: 20, cash: 5 },
-  { day: 14, coins: 50, cash: 15 },
-  { day: 30, coins: 200, cash: 50 },
+  { day: 7, coins: 20 },
+  { day: 14, coins: 50 },
+  { day: 30, coins: 200 },
 ];
 
 const cleanDescription = (problem?: Problem) => problem?.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() ?? "";
@@ -88,9 +88,9 @@ export default function RewardsPage() {
 
               <div className="grid gap-4 xl:grid-cols-3">
                 {featuredEasyProblem ? (
-                  <RewardCard
+                <RewardCard
                     title="Easy Challenge"
-                    value="Rs 5"
+                    value={liveIsActive && liveReward ? "Live" : "No cash"}
                     description={`Solve ${featuredEasyProblem.title.toLowerCase()} and earn a real reward.`}
                     icon={Zap}
                     tone="border-success/50 text-success"
@@ -104,7 +104,7 @@ export default function RewardsPage() {
 
                 <ComingSoonCard
                   title="Medium Challenge"
-                  value="Rs 100"
+                  value="Coming soon"
                   icon={Target}
                   tone="border-amber-400/40 text-amber-400"
                   description="Future reward tier for medium problems."
@@ -112,7 +112,7 @@ export default function RewardsPage() {
 
                 <ComingSoonCard
                   title="Hard Challenge"
-                  value="Rs 1000"
+                  value="Coming soon"
                   icon={Trophy}
                   tone="border-violet-400/40 text-violet-400"
                   description="Future reward tier for hard problems."
@@ -152,7 +152,6 @@ export default function RewardsPage() {
                         </div>
                         <p className="mt-3 text-sm font-bold text-white">Day {reward.day}</p>
                         <p className="mt-1 text-xs text-reward">+{reward.coins} Coins</p>
-                        {reward.cash ? <p className="mt-1 text-xs text-success">+Rs {reward.cash}</p> : null}
                       </div>
                     );
                   })}
@@ -182,7 +181,7 @@ export default function RewardsPage() {
                   <h3 className="mt-3 text-xl font-black text-white">{featuredEasyProblem?.title ?? "No active reward"}</h3>
                   <p className="mt-2 text-sm text-secondary-text">
                     {liveIsActive
-                      ? `Solve this problem to earn Rs ${liveReward?.rewardMoneyInr ?? 0}.`
+                      ? `Solve this problem to earn a backend-confirmed cash reward.`
                       : "Publish an easy problem to feature it here."}
                   </p>
 

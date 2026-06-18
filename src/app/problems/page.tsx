@@ -81,9 +81,9 @@ export default function ProblemsPage() {
   const easySolvedCount = solveProblems.filter((problem) => problem.difficulty === "Easy").length;
 
   const milestoneItems = [
-    { title: "7 Day Streak", description: "Keep your streak alive for 7 days to unlock ₹5.", current: user.currentStreak, target: 7, reward: 5 },
-    { title: "40 Easy Solves", description: "Clear 40 Easy problems to unlock ₹5.", current: easySolvedCount, target: 40, reward: 5 },
-    { title: "100 Problems Solved", description: "Solve 100 problems in total to unlock ₹25.", current: solveProblems.length, target: 100, reward: 25 },
+    { title: "7 Day Streak", description: "Keep your streak alive for 7 days to unlock a bonus.", current: user.currentStreak, target: 7 },
+    { title: "40 Easy Solves", description: "Clear 40 Easy problems to unlock a bonus.", current: easySolvedCount, target: 40 },
+    { title: "100 Problems Solved", description: "Solve 100 problems in total to unlock a bonus.", current: solveProblems.length, target: 100 },
   ];
 
   const stats = [
@@ -195,8 +195,14 @@ export default function ProblemsPage() {
                     <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
                       <div>
                         <div className="text-xs font-semibold uppercase text-muted-foreground">Reward</div>
-                    <div className="mt-2 flex items-center gap-2 text-2xl font-black text-primary">
-                          <Coins className="h-5 w-5 text-reward" />₹{liveReward?.rewardMoneyInr ?? 0}
+                        <div className="mt-2 flex items-center gap-2 text-2xl font-black text-primary">
+                          {liveReward && liveRewardActive ? (
+                            <>
+                              <Coins className="h-5 w-5 text-reward" />₹{liveReward.rewardMoneyInr}
+                            </>
+                          ) : (
+                            <span className="text-secondary-text">No cash reward</span>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -419,7 +425,7 @@ export default function ProblemsPage() {
                           <div className="text-sm font-bold text-white">{item.title}</div>
                           <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
                         </div>
-                        <span className="rounded-md bg-reward/10 px-2 py-1 text-xs font-bold text-reward">₹{item.reward}</span>
+                        <span className="rounded-md bg-reward/10 px-2 py-1 text-xs font-bold text-reward">Bonus</span>
                       </div>
                       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
                         <div className="h-full rounded-full bg-reward" style={{ width: `${progress}%` }} />
