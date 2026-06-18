@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Flame, Medal, Sparkles, Trophy, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, Flame, Medal, Sparkles, Trophy, X } from "lucide-react";
 
 export type SubmissionToastTone = "success" | "error";
 
@@ -22,6 +23,8 @@ export interface SubmissionCelebrationData {
   levelBefore?: number;
   levelAfter?: number;
   unlockedTitle?: string;
+  nextProblemHref?: string;
+  showCash?: boolean;
 }
 
 interface SubmissionCelebrationsProps {
@@ -208,42 +211,58 @@ export default function SubmissionCelebrations({
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-border bg-white/[0.02] p-4">
-                  <div className="text-sm font-semibold text-white">What you earned</div>
-                  <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-secondary-text">
-                    <div className="flex items-center justify-between">
-                      <span>XP</span>
-                      <span className="font-semibold text-white">+{celebration.xpGained}</span>
+                  <div className="text-sm font-semibold text-white">Rewards earned</div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">XP</div>
+                      <div className="mt-1 text-lg font-black text-primary">+{celebration.xpGained}</div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>Coins</span>
-                      <span className="font-semibold text-white">+{celebration.coinsGained}</span>
+                    <div className="rounded-xl border border-reward/15 bg-reward/5 px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Coins</div>
+                      <div className="mt-1 text-lg font-black text-reward">+{celebration.coinsGained}</div>
                     </div>
-                    {typeof celebration.moneyGainedInr === "number" && celebration.moneyGainedInr > 0 ? (
-                      <div className="flex items-center justify-between">
-                        <span>Cash</span>
-                        <span className="font-semibold text-white">₹{celebration.moneyGainedInr}</span>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between">
-                      <span>Streak</span>
-                      <span className="font-semibold text-white">{celebration.streak} day{celebration.streak === 1 ? "" : "s"}</span>
+                    <div className="rounded-xl border border-success/15 bg-success/5 px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Streak</div>
+                      <div className="mt-1 text-lg font-black text-success">{celebration.streak} day{celebration.streak === 1 ? "" : "s"}</div>
                     </div>
                   </div>
+                  {celebration.showCash && typeof celebration.moneyGainedInr === "number" && celebration.moneyGainedInr > 0 ? (
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-success/20 bg-success/10 px-3 py-2 text-sm text-success">
+                      <span>Live cash reward</span>
+                      <span className="font-semibold text-white">₹{celebration.moneyGainedInr}</span>
+                    </div>
+                  ) : null}
                   {celebration.levelBefore && celebration.levelAfter && celebration.levelAfter > celebration.levelBefore && (
-                    <div className="mt-4 rounded-xl border border-success/20 bg-success/10 px-3 py-2 text-sm text-success">
+                    <div className="mt-3 rounded-xl border border-success/20 bg-success/10 px-3 py-2 text-sm text-success">
                       ⭐ Level {celebration.levelBefore} → Level {celebration.levelAfter}
                       {celebration.unlockedTitle ? <span className="block text-secondary-text">Unlocked: {celebration.unlockedTitle}</span> : null}
                     </div>
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={onCelebrationClose}
-                  className="btn-primary mt-5 h-11 w-full rounded-xl"
-                >
-                  Continue Coding
-                </button>
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={onCelebrationClose}
+                    className="btn-primary h-11 rounded-xl"
+                  >
+                    Continue Coding
+                  </button>
+                  {celebration.nextProblemHref ? (
+                    <Link
+                      href={celebration.nextProblemHref}
+                      onClick={onCelebrationClose}
+                      className="btn-secondary flex h-11 items-center justify-center gap-2 rounded-xl"
+                    >
+                      Next Problem
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  ) : (
+                    <button type="button" disabled className="btn-secondary h-11 rounded-xl opacity-60">
+                      Next Problem
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>

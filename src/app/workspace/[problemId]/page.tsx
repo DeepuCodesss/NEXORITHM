@@ -8,11 +8,8 @@ import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/lan
 import type { SolveRewardResult } from "@/lib/mockData";
 import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
 import {
-  Award,
   BookOpenCheck,
-  CheckCircle2,
   ChevronLeft,
-  Coins,
   FileCode2,
   FileText,
   MessageSquare,
@@ -89,7 +86,7 @@ type SubmissionSummary = {
 
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
-  const { problems, solveProblem, isProblemSolved, user, liveReward } = useApp();
+  const { problems, solveProblem, user, liveReward } = useApp();
 
   const problem = problems.find((p) => p.id === problemId) || problems[0];
 
@@ -110,7 +107,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [selectedTestCase, setSelectedTestCase] = useState(1);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rewardBanner, setRewardBanner] = useState<SolveRewardResult | null>(null);
   const [submissionSummary, setSubmissionSummary] = useState<SubmissionSummary | null>(null);
   const [toast, setToast] = useState<SubmissionToastData | null>(null);
   const [celebration, setCelebration] = useState<SubmissionCelebrationData | null>(null);
@@ -118,6 +114,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [levelToast, setLevelToast] = useState<{ from: number; to: number; title: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
+  const currentProblemIndex = Math.max(0, problems.findIndex((item) => item.id === problem.id));
+  const nextProblemHref = `/workspace/${problems[(currentProblemIndex + 1) % problems.length]?.id ?? problem.id}`;
   const activeLiveCash =
     liveReward &&
     liveReward.isActive &&
@@ -168,6 +166,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     }
   };
 
+  const shouldShowCelebration = (reward?: SolveRewardResult) =>
+    Boolean(reward?.awarded) &&
+    Boolean(
+      (reward?.levelBefore && reward?.levelAfter && reward.levelAfter > reward.levelBefore) ||
+        (reward?.currentStreak && reward.currentStreak >= 7) ||
+        (typeof reward?.moneyGainedInr === "number" && reward.moneyGainedInr > 0) ||
+        Boolean(reward?.unlockedTitle) ||
+        !reward?.alreadySolved,
+    );
+
   const formatJudgeResponse = (result: JudgeResponse, reward?: SolveRewardResult) => {
     if (result.error) return result.error;
 
@@ -214,8 +222,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       if (reward?.coinsGained) rewardBits.push(`+${reward.coinsGained} Coins`);
       if (streak > 0) rewardBits.push(`🔥 ${streak} Day Streak`);
       return {
-        title: "Accepted",
-        message: rewardBits.length ? rewardBits.join(" • ") : "Submission passed all checks.",
+        title: reward?.alreadySolved ? "Practice submission" : "Accepted",
+        message: reward?.alreadySolved
+          ? "No additional rewards earned."
+          : rewardBits.length
+            ? rewardBits.join(" • ")
+            : "Submission passed all checks.",
         tone: "success",
       };
     }
@@ -263,7 +275,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       reward = solveProblem(problem.id);
       const status = (result.status as SubmissionStatus) ?? "Unknown";
       if (reward.awarded) {
-        setRewardBanner(reward);
         const beforeLevel = reward.levelBefore ?? Math.max(1, Math.floor(beforeXp / 200) + 1);
         const afterLevel = reward.levelAfter ?? Math.max(1, Math.floor((beforeXp + reward.xpGained) / 200) + 1);
         if ((reward.currentStreak ?? beforeStreak) > beforeStreak) {
@@ -276,19 +287,24 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
             title: reward.unlockedTitle || problem.title,
           });
         }
-        setCelebration({
-          problemTitle: problem.title,
-          rewardLine: `+${reward.xpGained} XP • +${reward.coinsGained} Coins • 🔥 ${reward.currentStreak ?? beforeStreak} Day Streak`,
-          xpGained: reward.xpGained,
-          coinsGained: reward.coinsGained,
-          moneyGainedInr: reward.moneyGainedInr > 0 ? reward.moneyGainedInr : undefined,
-          streak: reward.currentStreak ?? beforeStreak,
-          levelBefore: beforeLevel,
-          levelAfter: afterLevel,
-          unlockedTitle: reward.unlockedTitle,
-        });
+        setCelebration(
+          shouldShowCelebration(reward)
+            ? {
+                problemTitle: problem.title,
+                rewardLine: `+${reward.xpGained} XP • +${reward.coinsGained} Coins • 🔥 ${reward.currentStreak ?? beforeStreak} Day Streak`,
+                xpGained: reward.xpGained,
+                coinsGained: reward.coinsGained,
+                moneyGainedInr: reward.moneyGainedInr > 0 ? reward.moneyGainedInr : undefined,
+                showCash: reward.moneyGainedInr > 0,
+                streak: reward.currentStreak ?? beforeStreak,
+                levelBefore: beforeLevel,
+                levelAfter: afterLevel,
+                unlockedTitle: reward.unlockedTitle,
+                nextProblemHref,
+              }
+            : null,
+        );
       } else {
-        setRewardBanner(null);
         setCelebration(null);
       }
       setToast(buildToast(status, result, reward));
@@ -411,38 +427,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       {levelToast && (
         <div className="pointer-events-none fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-sm font-bold text-success shadow-[0_15px_30px_rgba(34,197,94,0.14)] rank-up">
           ⭐ LEVEL UP! Level {levelToast.from} → Level {levelToast.to}
-        </div>
-      )}
-      {rewardBanner?.awarded && (
-        <div className="flex items-center justify-between gap-4 border-b border-success/20 bg-success/10 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-sm font-bold text-success">Accepted — problem solved!</p>
-              <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs font-mono text-success/90">
-                <span className="inline-flex items-center gap-1">
-                  <Award className="h-3.5 w-3.5" />+{rewardBanner.xpGained} XP
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Coins className="h-3.5 w-3.5" />+{rewardBanner.coinsGained} coins
-                </span>
-                {rewardBanner.moneyGainedInr > 0 && <span>+₹{rewardBanner.moneyGainedInr} cash</span>}
-                <span>+{rewardBanner.reputationGained} reputation</span>
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setRewardBanner(null)}
-            className="text-xs font-mono uppercase text-success/70 hover:text-success"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {isProblemSolved(problem.id) && !rewardBanner?.awarded && (
-        <div className="border-b border-border bg-card px-4 py-2 text-xs text-secondary-text">
-          You have already solved this problem. Submit again to practice — no extra XP.
         </div>
       )}
       {/* Workbench Header */}
