@@ -1,0 +1,2 @@
+ALTER TABLE "SolutionReplay"
+ADD COLUMN "trustScore" INTEGER NOT NULL DEFAULT 100;

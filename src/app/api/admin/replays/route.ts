@@ -15,16 +15,28 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const pageSize = Math.min(50, Math.max(10, Number(searchParams.get("pageSize") ?? 20)));
   const skip = (page - 1) * pageSize;
+  const sort = searchParams.get("sort") ?? "newest";
+  const orderBy =
+    sort === "lowest_trust"
+      ? [{ trustScore: "asc" as const }, { createdAt: "desc" as const }]
+      : sort === "highest_paste"
+        ? [{ pastedCharacters: "desc" as const }, { createdAt: "desc" as const }]
+        : sort === "most_tab_switches"
+          ? [{ tabSwitchCount: "desc" as const }, { createdAt: "desc" as const }]
+          : sort === "fastest_solve"
+            ? [{ solveTimeSeconds: "asc" as const }, { createdAt: "asc" as const }]
+            : [{ createdAt: "desc" as const }];
   const prisma = getPrisma();
   const [total, replays] = await Promise.all([
     prisma.solutionReplay.count(),
     prisma.solutionReplay.findMany({
-      orderBy: [{ createdAt: "desc" }],
+      orderBy,
       skip,
       take: pageSize,
       select: {
         id: true,
         solveTimeSeconds: true,
+        trustScore: true,
         language: true,
         pasteCount: true,
         pastedCharacters: true,

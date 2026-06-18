@@ -146,6 +146,7 @@ model SolutionReplay {
   language        String
   replayData      Json
   solveTimeSeconds Int
+  trustScore      Int      @default(100)
   pasteCount      Int      @default(0)
   pastedCharacters Int     @default(0)
   runCount        Int      @default(0)

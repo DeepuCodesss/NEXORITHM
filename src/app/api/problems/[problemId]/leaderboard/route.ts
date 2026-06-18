@@ -22,6 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prob
         id: true,
         user: { select: { username: true, fullName: true, avatarUrl: true } },
         solveTimeSeconds: true,
+        trustScore: true,
         language: true,
         createdAt: true,
       },
@@ -34,6 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prob
     username: replay.user.username,
     avatarUrl: replay.user.avatarUrl,
     solveTime: replay.solveTimeSeconds,
+    trustScore: replay.trustScore,
     language: replay.language,
     replayId: replay.id,
   }));

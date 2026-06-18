@@ -10,7 +10,7 @@ import { randomUUID } from "crypto";
 import { apiError } from "@/lib/apiResponse";
 import { apiSuccess } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
-import { normalizeReplayEvents, type ReplayPayload } from "@/lib/replay";
+import { calculateTrustScore, normalizeReplayEvents, type ReplayPayload } from "@/lib/replay";
 
 export const runtime = "nodejs";
 
@@ -248,28 +248,40 @@ export async function POST(request: Request) {
         );
       }
 
-      if (replayPayload?.events && Array.isArray(replayPayload.events) && replayPayload.stats) {
-        const compactEvents = normalizeReplayEvents(replayPayload.events).slice(0, 60);
-        const existingReplay = await tx.solutionReplay.findUnique({
-          where: {
-            userId_problemId: {
-              userId: user.id,
-              problemId: problem.id,
+      return { createdSubmission };
+    });
+
+    submissionId = submissionResult.createdSubmission.id;
+    saved = true;
+    if (result.status === "Accepted" && replayPayload?.events && Array.isArray(replayPayload.events) && replayPayload.stats) {
+      void (async () => {
+        try {
+          const prisma = getPrisma();
+          const compactEvents = normalizeReplayEvents(replayPayload.events).slice(0, 60);
+          const trustScore = calculateTrustScore(
+            {
+              pasteCount: replayPayload.stats.pasteCount,
+              pastedCharacters: replayPayload.stats.pastedCharacters,
+              runCount: replayPayload.stats.runCount,
+              tabSwitchCount: replayPayload.stats.tabSwitchCount,
+              solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
             },
-          },
-          select: { id: true },
-        });
-        if (!existingReplay) {
-          await tx.solutionReplay.create({
+            compactEvents,
+          );
+          await prisma.solutionReplay.create({
             data: {
               userId: user.id,
               problemId: problem.id,
-              submissionId: createdSubmission.id,
+              submissionId,
               language,
               replayData: JSON.parse(
                 JSON.stringify({
                   events: compactEvents,
-                  stats: replayPayload.stats,
+                  stats: {
+                    ...replayPayload.stats,
+                    solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
+                    trustScore,
+                  },
                 }),
               ),
               solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
@@ -279,14 +291,16 @@ export async function POST(request: Request) {
               tabSwitchCount: replayPayload.stats.tabSwitchCount,
             },
           });
+        } catch (error) {
+          logger.warn("replay.save_failed", {
+            userId: user.id,
+            problemId: problem.id,
+            submissionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
-      }
-
-      return { createdSubmission };
-    });
-
-    submissionId = submissionResult.createdSubmission.id;
-    saved = true;
+      })();
+    }
     logger.info("submission.saved", {
       userId: user.id,
       problemId: problem.id,

@@ -7,7 +7,7 @@ import { useApp } from "@/context/AppContext";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
 import type { SolveRewardResult } from "@/lib/mockData";
 import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
-import { createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
+import { calculateTrustScore, createReplayPayload, normalizeReplayEvents, trustLevelForScore, type ReplayEvent } from "@/lib/replay";
 import {
   BookOpenCheck,
   ChevronLeft,
@@ -94,6 +94,7 @@ type ProblemLeaderboardRow = {
   solveTime: number;
   language: string;
   replayId: string;
+  trustScore: number;
 };
 
 type ProblemLeaderboardResponse = {
@@ -147,7 +148,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [leadersLoading, setLeadersLoading] = useState(false);
   const replayClockRef = useRef(0);
   const replayEventsRef = useRef<ReplayEvent[]>([{ type: "snapshot", timestamp: 0, code: starterCode }]);
-  const replayStatsRef = useRef({ pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0 });
+  const replayStatsRef = useRef({ pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 });
   const snapshotTimerRef = useRef<number | null>(null);
   const lastSnapshotCodeRef = useRef(starterCode);
 
@@ -201,7 +202,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   useEffect(() => {
     replayClockRef.current = 0;
     replayEventsRef.current = [{ type: "snapshot", timestamp: 0, code: starterCode }];
-    replayStatsRef.current = { pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0 };
+    replayStatsRef.current = { pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 };
     lastSnapshotCodeRef.current = starterCode;
     queueMicrotask(() => {
       setCode(starterCode);
@@ -262,7 +263,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   const onTabSwitch = (tab: string) => {
     replayStatsRef.current.tabSwitchCount += 1;
-    recordReplayEvent({ type: "tab", timestamp: replayTimestamp(), label: tab });
+    recordReplayEvent({ type: "tab_switch", timestamp: replayTimestamp(), label: tab });
   };
 
   const onRunAttempt = () => {
@@ -274,6 +275,30 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     recordReplayEvent({ type: "submit", timestamp: replayTimestamp() });
   };
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      recordReplayEvent({
+        type: document.hidden ? "tab_hidden" : "tab_visible",
+        timestamp: replayTimestamp(),
+      });
+    };
+    const handleWindowBlur = () => {
+      recordReplayEvent({ type: "window_blur", timestamp: replayTimestamp() });
+    };
+    const handleWindowFocus = () => {
+      recordReplayEvent({ type: "window_focus", timestamp: replayTimestamp() });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, []);
+
   const onPaste = (event: ReactClipboardEvent<HTMLDivElement>) => {
     const pasted = event.clipboardData.getData("text");
     if (!pasted) return;
@@ -282,7 +307,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     recordReplayEvent({
       type: "paste",
       timestamp: replayTimestamp(),
-      meta: { characters: pasted.length },
+      charsPasted: pasted.length,
+      linesPasted: pasted.split(/\r?\n/).length,
     });
     scheduleSnapshot(code + pasted.slice(0, 2000));
   };
@@ -384,6 +410,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       ? createReplayPayload(normalizeReplayEvents(replayEventsRef.current), {
           ...replayStatsRef.current,
           solveTimeSeconds: Math.max(1, replayStatsRef.current.solveTimeSeconds),
+          trustScore: calculateTrustScore(
+            {
+              pasteCount: replayStatsRef.current.pasteCount,
+              pastedCharacters: replayStatsRef.current.pastedCharacters,
+              runCount: replayStatsRef.current.runCount,
+              tabSwitchCount: replayStatsRef.current.tabSwitchCount,
+              solveTimeSeconds: Math.max(1, replayStatsRef.current.solveTimeSeconds),
+            },
+            normalizeReplayEvents(replayEventsRef.current),
+          ),
         })
       : undefined;
 
@@ -512,6 +548,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       if (lower.includes("c++") || lower.includes("cpp")) return "C++";
       return language;
     };
+    const trustTone = (score: number) => {
+      if (score >= 90) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
+      if (score >= 40) return "border-amber-400/30 bg-amber-400/10 text-amber-100";
+      return "border-rose-400/30 bg-rose-400/10 text-rose-100";
+    };
 
     return (
       <div className="space-y-5">
@@ -622,10 +663,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                   >
                     {leader.rank === 1 ? "🏆 #1" : `#${leader.rank}`}
                   </div>
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold text-white">{leader.user}</div>
-                    <div className="truncate text-xs text-secondary-text">Accepted solve</div>
-                  </div>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-white">{leader.user}</div>
+                        <div className="truncate text-xs text-secondary-text">Accepted solve</div>
+                        <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${trustTone(leader.trustScore)}`}>
+                          {trustLevelForScore(leader.trustScore)}
+                        </div>
+                      </div>
                   <div className="font-bold text-white">{formatSolveTime(leader.solveTime)}</div>
                   <div className="flex items-start">
                     <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${languageTone(leader.language)}`}>

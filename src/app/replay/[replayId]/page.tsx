@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pause, Play, RotateCcw } from "lucide-react";
+import { trustLevelForScore } from "@/lib/replay";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -12,14 +13,15 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
 
 type ReplayEvent =
   | { type: "snapshot"; timestamp: number; code: string }
-  | { type: "run" | "submit" | "paste" | "tab"; timestamp: number; label?: string; meta?: Record<string, unknown> };
+  | { type: "run" | "submit" | "paste" | "tab_switch" | "tab_hidden" | "tab_visible" | "window_blur" | "window_focus"; timestamp: number; charsPasted?: number; linesPasted?: number; label?: string; meta?: Record<string, unknown> };
 
 type ReplayData = {
   id: string;
   problemId: string;
   language: string;
-  replayData: { events: ReplayEvent[]; stats: { pasteCount: number; pastedCharacters: number; runCount: number; tabSwitchCount: number; solveTimeSeconds: number } };
+  replayData: { events: ReplayEvent[]; stats: { pasteCount: number; pastedCharacters: number; runCount: number; tabSwitchCount: number; solveTimeSeconds: number; trustScore: number } };
   solveTimeSeconds: number;
+  trustScore: number;
   pasteCount: number;
   pastedCharacters: number;
   runCount: number;
@@ -70,6 +72,31 @@ export default function ReplayPage({ params }: { params: Promise<{ replayId: str
   }, [replayId]);
 
   const events = useMemo(() => replay?.replayData.events ?? [], [replay]);
+  const trustScore = replay?.replayData.stats.trustScore ?? replay?.trustScore ?? 100;
+  const trustLevel = trustLevelForScore(trustScore);
+  const eventLabel = (event: ReplayEvent) => {
+    switch (event.type) {
+      case "snapshot":
+        return "Snapshot";
+      case "paste":
+        return "Pasted";
+      case "run":
+        return "Run";
+      case "submit":
+        return "Submit";
+      case "tab_hidden":
+        return "Tab hidden";
+      case "tab_visible":
+        return "Tab visible";
+      case "tab_switch":
+        return "Tab switch";
+      case "window_blur":
+        return "Window blur";
+      case "window_focus":
+        return "Window focus";
+    }
+    return "Event";
+  };
 
   useEffect(() => {
     if (!playing || !events.length) return;
@@ -152,12 +179,23 @@ export default function ReplayPage({ params }: { params: Promise<{ replayId: str
                 {events.map((event, index) => (
                   <div key={`${event.type}-${event.timestamp}-${index}`} className={`rounded-xl border px-3 py-2 text-sm ${index === cursor ? "border-primary bg-primary/10 text-white" : "border-border bg-background/50 text-secondary-text"}`}>
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold capitalize">{event.type}</span>
+                      <span className="font-semibold">{eventLabel(event)}</span>
                       <span>{String(Math.floor(event.timestamp / 60)).padStart(2, "0")}:{String(event.timestamp % 60).padStart(2, "0")}</span>
                     </div>
                     {event.type === "snapshot" ? <div className="mt-1 truncate text-xs">{event.code.slice(0, 80) || "Empty snapshot"}</div> : null}
+                    {event.type === "paste" ? <div className="mt-1 text-xs">Pasted {event.charsPasted ?? 0} chars</div> : null}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-sm font-semibold text-white">Trust Score</div>
+              <div className="mt-2 text-3xl font-black text-white">{trustScore}/100</div>
+              <div className="mt-1 text-xs text-secondary-text">{trustLevel}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-secondary-text">
+                <div className="rounded-xl border border-border bg-background/40 p-3">Paste: <span className="font-semibold text-white">{replay?.pasteCount ?? 0}</span></div>
+                <div className="rounded-xl border border-border bg-background/40 p-3">Tabs: <span className="font-semibold text-white">{replay?.tabSwitchCount ?? 0}</span></div>
               </div>
             </div>
 
