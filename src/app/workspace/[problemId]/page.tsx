@@ -147,6 +147,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [leaders, setLeaders] = useState<ProblemLeaderboardRow[]>([]);
   const [leadersTotal, setLeadersTotal] = useState(0);
   const [leadersLoading, setLeadersLoading] = useState(false);
+  const [backHref] = useState(() => {
+    try {
+      const referrer = new URL(document.referrer);
+      if (referrer.pathname.startsWith("/contests")) {
+        return `${referrer.pathname}${referrer.search}${referrer.hash}`;
+      }
+    } catch {
+      // Fallback below.
+    }
+    return "/problems";
+  });
   const replayClockRef = useRef(0);
   const replayEventsRef = useRef<ReplayEvent[]>([{ type: "snapshot", timestamp: 0, code: starterCode }]);
   const replayStatsRef = useRef({ pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 });
@@ -794,7 +805,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       <div className="flex h-11 items-center justify-between border-b border-border bg-hover px-4 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href={backHref}
             className="flex items-center gap-1 text-xs text-secondary-text hover:text-white transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
