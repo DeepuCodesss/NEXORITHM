@@ -106,6 +106,13 @@ type ProblemLeaderboardResponse = {
   };
 };
 
+const formatSolveTime = (seconds: number) => {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}m ${String(remaining).padStart(2, "0")}s`;
+};
+
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
   const { problems, solveProblem, user, liveReward } = useApp();
@@ -477,7 +484,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-bold text-white">🏆 Fastest Solvers</div>
-          {!compact && <div className="mt-1 text-xs text-secondary-text">Top accepted submissions for this problem.</div>}
+          {!compact && <div className="mt-1 text-xs text-secondary-text">Ranked accepted submissions with replay access.</div>}
         </div>
         {!compact && (
           <Link href={`/problems/${problem.id}/leaderboard`} className="text-xs font-semibold text-primary hover:underline">
@@ -513,7 +520,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
           ))
         ) : (
           <div className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-secondary-text">
-            No accepted replays yet for this problem.
+            <div className="text-base font-bold text-white">🏆 No leaderboard entries yet</div>
+            <div className="mt-2">Be the first solver and claim Rank #1.</div>
           </div>
         )}
       </div>
@@ -715,16 +723,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                 <button
                   type="button"
                   onClick={() => setLeftTab("leaderboard")}
-                  className="mb-5 w-full rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-hover/70"
+                  className="group mb-5 w-full rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-hover/70"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-white">
-                        🏆 Fastest Solver: {leaders[0]?.username || leaders[0]?.user || "Loading..."}
+                        🏆 Fastest Solver: {leaders[0]?.username || leaders[0]?.user || "Loading..."} ({leaders[0] ? formatSolveTime(leaders[0].solveTime) : "--"})
                       </div>
-                      <div className="mt-1 text-xs text-secondary-text">Top {leadersTotal} accepted solvers</div>
+                      <div className="mt-1 text-xs text-secondary-text">{leadersTotal || leaders.length || 0} accepted solvers</div>
                     </div>
-                    <span className="text-xs font-semibold text-primary">View Full Leaderboard →</span>
+                    <span className="text-xs font-semibold text-primary transition-transform duration-200 group-hover:translate-x-0.5">View Leaderboard →</span>
                   </div>
                 </button>
                 <div className="hidden mb-5 rounded-2xl border border-border bg-card p-4" aria-hidden="true">
