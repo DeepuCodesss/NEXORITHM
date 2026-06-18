@@ -10,6 +10,7 @@ import SubmissionCelebrations, { type SubmissionCelebrationData, type Submission
 import { createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
 import {
   BookOpenCheck,
+  ArrowRight,
   ChevronLeft,
   FileCode2,
   FileText,
@@ -20,6 +21,7 @@ import {
   Terminal,
   ThumbsUp,
   Clock3,
+  Trophy,
 } from "lucide-react";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), {
@@ -95,6 +97,15 @@ type ProblemLeaderboardRow = {
   replayId: string;
 };
 
+type ProblemLeaderboardResponse = {
+  data?: {
+    leaders?: ProblemLeaderboardRow[];
+    pagination?: {
+      total?: number;
+    };
+  };
+};
+
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
   const { problems, solveProblem, user, liveReward } = useApp();
@@ -105,7 +116,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
   const [code, setCode] = useState(starterCode);
 
-  type LeftTab = "description" | "editorial" | "solutions" | "discussions" | "testcases";
+  type LeftTab = "description" | "leaderboard" | "editorial" | "solutions" | "discussions" | "testcases";
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
 
   type BottomTab = "testcase" | "console";
@@ -126,6 +137,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [levelToast, setLevelToast] = useState<{ from: number; to: number; title: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [leaders, setLeaders] = useState<ProblemLeaderboardRow[]>([]);
+  const [leadersTotal, setLeadersTotal] = useState(0);
   const [leadersLoading, setLeadersLoading] = useState(false);
   const replayClockRef = useRef(0);
   const replayEventsRef = useRef<ReplayEvent[]>([{ type: "snapshot", timestamp: 0, code: starterCode }]);
@@ -199,11 +211,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       const response = await fetch(`/api/problems/${problem.id}/leaderboard?pageSize=10`, { cache: "no-store" });
       if (!response.ok) {
         setLeaders([]);
+        setLeadersTotal(0);
         setLeadersLoading(false);
         return;
       }
-      const payload = (await response.json()) as { data?: { leaders?: ProblemLeaderboardRow[] } };
+      const payload = (await response.json()) as ProblemLeaderboardResponse;
       setLeaders(Array.isArray(payload.data?.leaders) ? payload.data!.leaders : []);
+      setLeadersTotal(payload.data?.pagination?.total ?? 0);
       setLeadersLoading(false);
     };
     void sync();
@@ -445,6 +459,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   const leftTabs: Array<{ id: LeftTab; label: string; icon: ElementType }> = [
     { id: "description", label: "Description", icon: FileText },
+    { id: "leaderboard", label: "Leaderboard", icon: Trophy },
     { id: "editorial", label: "Editorial", icon: BookOpenCheck },
     { id: "solutions", label: "Solutions", icon: FileCode2 },
     { id: "discussions", label: "Discuss", icon: MessageSquare },
@@ -456,6 +471,59 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const rightPanelStyle = {
     "--right-panel-width": `calc(${100 - leftPanelWidth}% - 4px)`,
   } as CSSProperties;
+
+  const renderLeaderboard = (compact = false) => (
+    <div className={compact ? "space-y-3" : "space-y-4"}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-bold text-white">🏆 Fastest Solvers</div>
+          {!compact && <div className="mt-1 text-xs text-secondary-text">Top accepted submissions for this problem.</div>}
+        </div>
+        {!compact && (
+          <Link href={`/problems/${problem.id}/leaderboard`} className="text-xs font-semibold text-primary hover:underline">
+            View Full Leaderboard →
+          </Link>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {leadersLoading ? (
+          Array.from({ length: compact ? 2 : 3 }, (_, index) => (
+            <div key={index} className="h-12 animate-pulse rounded-xl border border-border bg-hover/60" />
+          ))
+        ) : leaders.length ? (
+          leaders.slice(0, compact ? 1 : 3).map((leader) => (
+            <div key={leader.replayId} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-black text-white">
+                  #{leader.rank}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-white">{leader.user}</div>
+                  {!compact && <div className="text-[11px] text-secondary-text">{leader.language}</div>}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="text-sm font-bold text-reward">{leader.solveTime}s</div>
+                <Link href={`/replay/${leader.replayId}`} className="rounded-full border border-border bg-hover px-3 py-1 text-xs font-semibold text-secondary-text hover:text-white">
+                  ▶ Replay
+                </Link>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-secondary-text">
+            No accepted replays yet for this problem.
+          </div>
+        )}
+      </div>
+
+      <Link href={`/problems/${problem.id}/leaderboard`} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+        View Full Leaderboard
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  );
 
   const handleRunCode = async () => {
     setIsRunning(true);
@@ -644,7 +712,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                     ) : null}
                   </div>
                 </div>
-                <div className="mb-5 rounded-2xl border border-border bg-card p-4">
+                <button
+                  type="button"
+                  onClick={() => setLeftTab("leaderboard")}
+                  className="mb-5 w-full rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-hover/70"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-white">
+                        🏆 Fastest Solver: {leaders[0]?.username || leaders[0]?.user || "Loading..."}
+                      </div>
+                      <div className="mt-1 text-xs text-secondary-text">Top {leadersTotal} accepted solvers</div>
+                    </div>
+                    <span className="text-xs font-semibold text-primary">View Full Leaderboard →</span>
+                  </div>
+                </button>
+                <div className="hidden mb-5 rounded-2xl border border-border bg-card p-4" aria-hidden="true">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-white">🏆 Fastest Solvers</div>
@@ -691,6 +774,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                   className="space-y-4"
                   dangerouslySetInnerHTML={{ __html: problem.description }}
                 />
+              </div>
+            )}
+
+            {leftTab === "leaderboard" && (
+              <div className="space-y-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h1 className="text-lg font-bold text-white">🏆 Fastest Solvers</h1>
+                    <p className="mt-2 text-sm leading-6 text-secondary-text">
+                      Accepted submissions ranked by solve time, with replay access for each entry.
+                    </p>
+                  </div>
+                  <Link href={`/problems/${problem.id}/leaderboard`} className="mt-1 text-xs font-semibold text-primary hover:underline">
+                    View Full Leaderboard →
+                  </Link>
+                </div>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  {renderLeaderboard(false)}
+                </div>
               </div>
             )}
 
