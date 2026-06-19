@@ -26,14 +26,25 @@ type RuntimeCheck = {
 export default function JudgeHealthPage() {
   const [data, setData] = useState<RuntimeCheck | null>(null);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = async () => {
-      const response = await fetch("/api/admin/runtime-check", { cache: "no-store" });
-      if (!response.ok) return;
-      const payload = (await response.json()) as { data?: RuntimeCheck };
+      const response = await fetch("/api/admin/runtime-check", { cache: "no-store", credentials: "include" });
+      const text = await response.text();
+      if (!response.ok) {
+        console.warn("judge-health runtime-check failed", {
+          status: response.status,
+          statusText: response.statusText,
+          body: text,
+        });
+        setError(`Runtime check failed (${response.status}): ${response.statusText}`);
+        return;
+      }
+      const payload = JSON.parse(text) as { data?: RuntimeCheck };
       setData(payload.data ?? null);
       setLastChecked(new Date().toISOString());
+      setError(null);
     };
     void sync();
   }, []);
@@ -57,6 +68,7 @@ export default function JudgeHealthPage() {
           </div>
 
           <div className="mt-4 text-xs text-muted-foreground">Last Checked: {lastChecked ?? "Pending"}</div>
+          {error ? <div className="mt-2 text-sm text-rose-200">{error}</div> : null}
 
           <div className="mt-5 overflow-hidden rounded-2xl border border-border">
             <div className="divide-y divide-white/[0.04]">
