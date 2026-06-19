@@ -8,8 +8,14 @@ const requiredVars = [
 
 let validated = false;
 
+const isEnvValidationSkipped = () => {
+  const flag = process.env.SKIP_ENV_VALIDATION?.trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+};
+
 export const validateEnv = () => {
   if (validated) return;
+  if (isEnvValidationSkipped()) return;
 
   const missing = requiredVars.filter((name) => !process.env[name]?.trim());
   if (missing.length > 0) {

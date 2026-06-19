@@ -1,31 +1,18 @@
-# FROM node:22-bookworm-slim AS base
+FROM node:22-bookworm-slim AS build
 
-# ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV SKIP_ENV_VALIDATION=true
 
-# RUN apt-get update \
-#   && apt-get install -y --no-install-recommends \
-#     ca-certificates \
-#     curl \
-#     python3 \
-#     g++ \
-#     gcc \
-#     default-jdk \
-#     #openjdk-21-jdk-headless \
-#   && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
-# WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install
 
-# COPY package.json package-lock.json* ./
-# RUN npm install
+COPY . .
 
-# COPY . .
+RUN npm run build
 
-# RUN npm run build
-
-# EXPOSE 3000
-
-# CMD ["npm", "run", "start"]
-FROM node:22-bookworm-slim AS base
+FROM node:22-bookworm-slim AS runtime
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -41,12 +28,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY . .
-
-RUN npm install
-
-RUN npm run build
+COPY --from=build /app /app
 
 EXPOSE 3000
 
-CMD ["npm","run","start"]
+CMD ["npm", "run", "start"]
