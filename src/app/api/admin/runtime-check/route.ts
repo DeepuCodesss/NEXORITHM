@@ -41,6 +41,26 @@ export async function GET() {
     runJudgeSelfTest(),
   ]);
 
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event: "admin.runtime_check.probe",
+      timestamp: new Date().toISOString(),
+      node,
+      python,
+      java,
+      javac,
+      gcc,
+      gpp,
+      selfTests: selfTests.map((entry) => ({
+        language: entry.language,
+        passed: entry.passed,
+        status: entry.status,
+        executionMode: entry.executionMode,
+      })),
+    }),
+  );
+
   logger.info("admin.runtime_check", {
     node: node.version,
     python: python.version,
