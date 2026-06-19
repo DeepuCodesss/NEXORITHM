@@ -9,7 +9,8 @@ RUN apt-get update \
     python3 \
     g++ \
     gcc \
-    openjdk-21-jdk-headless \
+    default-jdk \
+    #openjdk-21-jdk-headless \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
