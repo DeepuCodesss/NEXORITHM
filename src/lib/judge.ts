@@ -3,7 +3,6 @@ import { randomUUID } from "crypto";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
-import { Worker } from "worker_threads";
 import type { JudgeLanguage } from "@/lib/languages";
 import type { Problem } from "@/lib/mockData";
 import { logger } from "@/lib/logger";
@@ -33,6 +32,8 @@ type LanguageConfig = {
   compile?: string[];
   run: string[];
   needsPythonRunner?: boolean;
+  sourceFilename?: string;
+  runnerFilename?: string;
 };
 
 type JudgeMode = "native" | "docker" | "unavailable";
@@ -64,19 +65,23 @@ const isWin = process.platform === "win32";
 const nativeBinary = isWin ? "main.exe" : "./main";
 
 const nativeConfigs: Partial<Record<JudgeLanguage, LanguageConfig>> = {
+  javascript: {
+    filename: "main.js",
+    run: ["node", "main.js"],
+  },
   python: {
-    filename: "solution.py",
-    run: isWin ? ["py", "-3", "runner.py"] : ["python3", "runner.py"],
+    filename: "main.py",
+    run: isWin ? ["py", "-3", "main.py"] : ["python3", "main.py"],
     needsPythonRunner: true,
   },
   cpp: {
-    filename: "Main.cpp",
-    compile: ["g++", "-std=c++20", "-O2", "Main.cpp", "-o", isWin ? "main.exe" : "main"],
+    filename: "main.cpp",
+    compile: ["g++", "main.cpp", "-std=c++17", "-O2", "-o", isWin ? "main.exe" : "main"],
     run: isWin ? ["main.exe"] : [nativeBinary],
   },
   c: {
-    filename: "Main.c",
-    compile: ["gcc", "-std=c17", "-O2", "Main.c", "-o", isWin ? "main.exe" : "main"],
+    filename: "main.c",
+    compile: ["gcc", "main.c", "-o", isWin ? "main.exe" : "main"],
     run: isWin ? ["main.exe"] : [nativeBinary],
   },
   java: {
@@ -104,23 +109,29 @@ const nativeConfigs: Partial<Record<JudgeLanguage, LanguageConfig>> = {
 };
 
 const dockerConfigs: Partial<Record<JudgeLanguage, LanguageConfig & { image: string; shellCommand: string }>> = {
+  javascript: {
+    image: "node:22-bookworm-slim",
+    filename: "main.js",
+    shellCommand: "node main.js",
+    run: [],
+  },
   python: {
     image: "python:3.12-alpine",
-    filename: "solution.py",
-    shellCommand: "python3 runner.py",
+    filename: "main.py",
+    shellCommand: "python3 main.py",
     run: [],
     needsPythonRunner: true,
   },
   cpp: {
     image: "gcc:14",
-    filename: "Main.cpp",
-    shellCommand: "g++ -std=c++20 -O2 Main.cpp -o main && ./main",
+    filename: "main.cpp",
+    shellCommand: "g++ main.cpp -std=c++17 -O2 -o main && ./main",
     run: [],
   },
   c: {
     image: "gcc:14",
-    filename: "Main.c",
-    shellCommand: "gcc -std=c17 -O2 Main.c -o main && ./main",
+    filename: "main.c",
+    shellCommand: "gcc main.c -o main && ./main",
     run: [],
   },
   java: {
@@ -161,85 +172,25 @@ const parseBinaryOutput = (value: string) => normalizeOutput(value.split(/\r?\n/
 
 type ProbeCommand = readonly [string, string[]];
 
-const workerSource = `
-const { parentPort, workerData } = require("worker_threads");
-const vm = require("vm");
-
-(async () => {
-  const sandbox = Object.create(null);
-  sandbox.console = { log() {}, error() {}, warn() {}, info() {} };
-  vm.createContext(sandbox);
-  const script = new vm.Script(workerData.code, { timeout: workerData.scriptTimeoutMs });
-  script.runInContext(sandbox, { timeout: workerData.scriptTimeoutMs });
-
-  const fn = sandbox[workerData.functionName];
-  if (typeof fn !== "function") {
-    throw new Error("Expected a function named " + workerData.functionName + ".");
-  }
-
-  const results = [];
-  for (const testCase of workerData.testCases) {
-    try {
-      const actual = await fn(String(testCase.input));
-      results.push({ id: testCase.id, actual: String(actual ?? "") });
-    } catch (error) {
-      results.push({
-        id: testCase.id,
-        actual: "",
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-  parentPort.postMessage({ results });
-})().catch((error) => {
-  parentPort.postMessage({
-    error: error instanceof Error ? error.message : String(error),
-  });
-});
+const jsRunner = (functionName: string) => `
+const fs = require("fs");
+${functionName}
+const input = fs.readFileSync(0, "utf8");
+const result = ${functionName}(input);
+if (result !== undefined && result !== null) {
+  process.stdout.write(String(result));
+}
 `;
 
-const runJavaScriptWorker = (
-  problem: Problem,
-  code: string,
-  timeoutMs: number,
-): Promise<Array<{ id: number; actual: string; error?: string }>> =>
-  new Promise((resolve, reject) => {
-    const worker = new Worker(workerSource, {
-      eval: true,
-      resourceLimits: {
-        maxOldGenerationSizeMb: 128,
-        maxYoungGenerationSizeMb: 32,
-        stackSizeMb: 8,
-      },
-      workerData: {
-        code,
-        functionName: `solve${problem.level}`,
-        testCases: problem.testCases,
-        scriptTimeoutMs: 1000,
-      },
-    });
+const pythonRunner = (functionName: string) => `
+import sys
 
-    const timeout = setTimeout(() => {
-      worker.terminate();
-      reject(new Error(`Execution timed out after ${timeoutMs}ms.`));
-    }, timeoutMs);
-
-    worker.once("message", (message: { results?: Array<{ id: number; actual: string; error?: string }>; error?: string }) => {
-      clearTimeout(timeout);
-      worker.terminate();
-      if (message.error) {
-        reject(new Error(message.error));
-        return;
-      }
-      resolve(message.results ?? []);
-    });
-
-    worker.once("error", (error) => {
-      clearTimeout(timeout);
-      worker.terminate();
-      reject(error);
-    });
-  });
+${functionName}
+if __name__ == "__main__":
+    result = ${functionName}(sys.stdin.read())
+    if result is not None:
+        print(result, end="")
+`;
 
 type ProcessResult = {
   stdout: string;
@@ -247,6 +198,19 @@ type ProcessResult = {
   timedOut: boolean;
   exitCode: number | null;
   spawnError?: string;
+};
+
+const logProcess = (phase: "compile" | "runtime", language: JudgeLanguage, execution: ProcessResult, command: string[]) => {
+  logger.info("judge.process", {
+    language,
+    phase,
+    command: command.join(" "),
+    stdout: normalizeOutput(execution.stdout),
+    stderr: normalizeOutput(execution.stderr),
+    timedOut: execution.timedOut,
+    exitCode: execution.exitCode,
+    spawnError: execution.spawnError ?? null,
+  });
 };
 
 const runProcess = (
@@ -315,6 +279,8 @@ const detectBinary = async (command: string, args: string[], cwd = process.cwd()
 
 const versionProbeFor = (language: JudgeLanguage): { runtime: ProbeCommand | null; compiler: ProbeCommand | null } => {
   switch (language) {
+    case "javascript":
+      return { runtime: ["node", ["--version"]] as const, compiler: null };
     case "python":
       return { runtime: [isWin ? "py" : "python3", isWin ? ["-3", "--version"] : ["--version"]] as const, compiler: null };
     case "java":
@@ -348,21 +314,6 @@ const formatProcessError = (execution: ProcessResult) => {
   return normalizeOutput(execution.stderr || `Process exited with code ${execution.exitCode}.`);
 };
 
-const pythonRunner = (functionName: string) => `
-import importlib.util
-import sys
-
-spec = importlib.util.spec_from_file_location("solution", "solution.py")
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-fn = getattr(module, "${functionName}", None)
-if not callable(fn):
-    raise RuntimeError("Expected a function named ${functionName}.")
-result = fn(sys.stdin.read())
-if result is not None:
-    print(result, end="")
-`;
-
 const writeLanguageFiles = async (
   workdir: string,
   language: JudgeLanguage,
@@ -370,11 +321,17 @@ const writeLanguageFiles = async (
   code: string,
   config: LanguageConfig,
 ) => {
-  await writeFile(path.join(workdir, config.filename), code, "utf8");
-
-  if (config.needsPythonRunner) {
-    await writeFile(path.join(workdir, "runner.py"), pythonRunner(`solve${problem.level}`), "utf8");
+  if (language === "javascript") {
+    await writeFile(path.join(workdir, config.filename), `${code}\n${jsRunner(`solve${problem.level}`)}`, "utf8");
+    return;
   }
+
+  if (language === "python") {
+    await writeFile(path.join(workdir, config.filename), `${code}\n${pythonRunner(`solve${problem.level}`)}`, "utf8");
+    return;
+  }
+
+  await writeFile(path.join(workdir, config.filename), code, "utf8");
 };
 
 let dockerReady: boolean | null = null;
@@ -431,6 +388,7 @@ export const detectToolchain = async (language: JudgeLanguage): Promise<JudgeToo
 
 const runNativeCase = async (
   workdir: string,
+  language: JudgeLanguage,
   config: LanguageConfig,
   input: string,
   timeoutMs: number,
@@ -438,6 +396,7 @@ const runNativeCase = async (
 ) => {
   if (config.compile && !compiled) {
     const compileResult = await runProcess(config.compile[0], config.compile.slice(1), workdir, "", 15000);
+    logProcess("compile", language, compileResult, config.compile);
     const compileError = formatProcessError(compileResult);
     if (compileError) {
       return { execution: compileResult, compileError };
@@ -445,6 +404,7 @@ const runNativeCase = async (
   }
 
   const execution = await runProcess(config.run[0], config.run.slice(1), workdir, input, timeoutMs);
+  logProcess("runtime", language, execution, config.run);
   return { execution, compileError: undefined as string | undefined };
 };
 
@@ -462,7 +422,7 @@ const runNativeJudge = async (problem: Problem, language: JudgeLanguage, code: s
     let compiled = !config.compile;
 
     for (const testCase of problem.testCases) {
-      const { execution, compileError } = await runNativeCase(workdir, config, testCase.input, 8000, compiled);
+      const { execution, compileError } = await runNativeCase(workdir, language, config, testCase.input, 8000, compiled);
       if (config.compile && !compiled && !compileError) {
         compiled = true;
       }
@@ -518,6 +478,7 @@ const runDockerJudge = async (problem: Problem, language: JudgeLanguage, code: s
     const results = [];
     for (const testCase of problem.testCases) {
       const execution = await runDockerCase(workdir, config.image, config.shellCommand, testCase.input, 12000);
+      logProcess("runtime", language, execution, ["docker", ...dockerArgs(workdir, config.image, config.shellCommand)]);
       results.push({
         id: testCase.id,
         actual: execution.stdout,
@@ -639,7 +600,7 @@ export async function judgeSubmission(
       executionMode: shouldUseDocker() ? "docker-preferred" : "native-preferred",
     });
 
-    const toolchain = language === "javascript" ? null : await detectToolchain(language);
+    const toolchain = await detectToolchain(language);
     if (toolchain) {
       logger.info("judge.toolchain", {
         language: toolchain.language,
@@ -654,15 +615,13 @@ export async function judgeSubmission(
     }
 
     const results =
-      language === "javascript"
-        ? await runJavaScriptWorker(problem, code, 1600)
-        : toolchain?.executionMode === "docker"
-          ? await runDockerJudge(problem, language, code)
-          : toolchain?.executionMode === "native"
-            ? await runNativeJudge(problem, language, code)
-            : (() => {
-                throw new Error(toolchain?.reason ?? "Runtime not found: install the language toolchain locally, or set JUDGE_USE_DOCKER=true with Docker Desktop running.");
-              })();
+      toolchain.executionMode === "docker"
+        ? await runDockerJudge(problem, language, code)
+        : toolchain.executionMode === "native"
+          ? await runNativeJudge(problem, language, code)
+          : (() => {
+              throw new Error(toolchain.reason ?? "Runtime not found: install the language toolchain locally, or set JUDGE_USE_DOCKER=true with Docker Desktop running.");
+            })();
 
     return buildResult(problem, startedAt, results);
   } catch (error) {

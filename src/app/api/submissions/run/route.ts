@@ -6,10 +6,12 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { apiError } from "@/lib/apiResponse";
 import { apiSuccess } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
+import { ensureJudgeBootstrapLogged } from "@/lib/judgeBootstrap";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  await ensureJudgeBootstrapLogged();
   const body = await request.json().catch(() => null);
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
   const language = body?.language;

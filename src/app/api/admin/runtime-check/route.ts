@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { apiError, apiSuccess } from "@/lib/apiResponse";
 import { runJudgeSelfTest } from "@/lib/judge";
+import { ensureJudgeBootstrapLogged } from "@/lib/judgeBootstrap";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ const probeVersion = async (command: string, args: string[]) => {
 };
 
 export async function GET() {
+  await ensureJudgeBootstrapLogged();
   const clerkUser = await currentUser();
   if (!isAdmin(clerkUser)) return apiError("Admin access required.", 403);
 

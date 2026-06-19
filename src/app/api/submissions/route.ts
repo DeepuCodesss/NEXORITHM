@@ -11,6 +11,7 @@ import { apiError } from "@/lib/apiResponse";
 import { apiSuccess } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
 import { calculateTrustScore, normalizeReplayEvents, type ReplayPayload } from "@/lib/replay";
+import { ensureJudgeBootstrapLogged } from "@/lib/judgeBootstrap";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,7 @@ const getStreakReward = (streakDay: number) => {
 };
 
 export async function POST(request: Request) {
+  await ensureJudgeBootstrapLogged();
   const body = await request.json().catch(() => null);
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
   const language = body?.language;
