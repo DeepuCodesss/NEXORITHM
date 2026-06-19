@@ -5,10 +5,12 @@ export type ReplayEvent =
       code: string;
     }
   | {
-      type: "run" | "submit" | "paste" | "tab_switch" | "tab_hidden" | "tab_visible" | "window_blur" | "window_focus";
+      type: "run" | "submit" | "paste" | "large_insert" | "tab_switch" | "tab_hidden" | "tab_visible" | "window_blur" | "window_focus";
       timestamp: number;
       charsPasted?: number;
       linesPasted?: number;
+      charsInserted?: number;
+      linesInserted?: number;
       label?: string;
       meta?: Record<string, unknown>;
     };
@@ -16,6 +18,7 @@ export type ReplayEvent =
 export type ReplayStats = {
   pasteCount: number;
   pastedCharacters: number;
+  largeInsertCount: number;
   runCount: number;
   tabSwitchCount: number;
   solveTimeSeconds: number;
@@ -46,17 +49,26 @@ export const normalizeReplayEvents = (events: ReplayEvent[]) => {
 
 const clampScore = (score: number) => Math.max(0, Math.min(100, Math.round(score)));
 
-export const calculateTrustScore = (stats: Pick<ReplayStats, "pasteCount" | "pastedCharacters" | "runCount" | "tabSwitchCount" | "solveTimeSeconds">, events: ReplayEvent[]) => {
+export const calculateTrustScore = (
+  stats: Pick<ReplayStats, "pasteCount" | "pastedCharacters" | "largeInsertCount" | "runCount" | "tabSwitchCount" | "solveTimeSeconds">,
+  events: ReplayEvent[],
+) => {
   let score = 100;
   const firstRun = events.findIndex((event) => event.type === "run");
   const firstPaste = events.findIndex((event) => event.type === "paste");
+  const largeInserts = events.filter((event) => event.type === "large_insert");
   const submitEvent = events.find((event) => event.type === "submit");
 
   if (stats.pastedCharacters > 500) score -= 40;
   else if (stats.pastedCharacters > 100) score -= 20;
+  if (stats.largeInsertCount > 2) score -= 25;
+  else if (stats.largeInsertCount > 0) score -= 12;
 
   if (firstRun === -1) score -= 20;
   if (firstPaste !== -1 && (firstRun === -1 || events[firstPaste].timestamp <= events[firstRun]?.timestamp)) score -= 15;
+  if (largeInserts.length && (firstRun === -1 || largeInserts[0].timestamp <= events[firstRun]?.timestamp)) score -= 18;
+  if (largeInserts.length > 1) score -= 12;
+  if (submitEvent && largeInserts.some((event) => event.timestamp >= submitEvent.timestamp - 2)) score -= 18;
 
   if (stats.tabSwitchCount > 10) score -= 30;
   else if (stats.tabSwitchCount > 5) score -= 15;

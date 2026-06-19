@@ -7,7 +7,7 @@ import { useApp } from "@/context/AppContext";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
 import type { SolveRewardResult } from "@/lib/mockData";
 import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
-import { calculateTrustScore, createReplayPayload, normalizeReplayEvents, trustLevelForScore, type ReplayEvent } from "@/lib/replay";
+import { calculateTrustScore, createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
 import {
   BookOpenCheck,
   ChevronLeft,
@@ -160,7 +160,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   });
   const replayClockRef = useRef(0);
   const replayEventsRef = useRef<ReplayEvent[]>([{ type: "snapshot", timestamp: 0, code: starterCode }]);
-  const replayStatsRef = useRef({ pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 });
+  const replayStatsRef = useRef({ pasteCount: 0, pastedCharacters: 0, largeInsertCount: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 });
   const snapshotTimerRef = useRef<number | null>(null);
   const lastSnapshotCodeRef = useRef(starterCode);
 
@@ -214,7 +214,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   useEffect(() => {
     replayClockRef.current = 0;
     replayEventsRef.current = [{ type: "snapshot", timestamp: 0, code: starterCode }];
-    replayStatsRef.current = { pasteCount: 0, pastedCharacters: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 };
+    replayStatsRef.current = { pasteCount: 0, pastedCharacters: 0, largeInsertCount: 0, runCount: 0, tabSwitchCount: 0, solveTimeSeconds: 0, trustScore: 100 };
     lastSnapshotCodeRef.current = starterCode;
     queueMicrotask(() => {
       setCode(starterCode);
@@ -287,6 +287,34 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     recordReplayEvent({ type: "submit", timestamp: replayTimestamp() });
   };
 
+  const recordPaste = (pastedText: string, source: "monaco" | "wrapper") => {
+    if (!pastedText) return;
+    const charsPasted = pastedText.length;
+    const linesPasted = pastedText.split(/\r?\n/).length;
+    replayStatsRef.current.pasteCount += 1;
+    replayStatsRef.current.pastedCharacters += charsPasted;
+    console.log("[replay] paste detected", { source });
+    console.log("[replay] chars pasted", charsPasted);
+    console.log("[replay] lines pasted", linesPasted);
+    recordReplayEvent({
+      type: "paste",
+      timestamp: replayTimestamp(),
+      charsPasted,
+      linesPasted,
+    });
+    scheduleSnapshot(`${code}${pastedText.slice(0, 2000)}`);
+  };
+
+  const recordLargeInsert = (charsInserted: number, linesInserted: number) => {
+    replayStatsRef.current.largeInsertCount += 1;
+    recordReplayEvent({
+      type: "large_insert",
+      timestamp: replayTimestamp(),
+      charsInserted,
+      linesInserted,
+    });
+  };
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       recordReplayEvent({
@@ -313,16 +341,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   const onPaste = (event: ReactClipboardEvent<HTMLDivElement>) => {
     const pasted = event.clipboardData.getData("text");
-    if (!pasted) return;
-    replayStatsRef.current.pasteCount += 1;
-    replayStatsRef.current.pastedCharacters += pasted.length;
-    recordReplayEvent({
-      type: "paste",
-      timestamp: replayTimestamp(),
-      charsPasted: pasted.length,
-      linesPasted: pasted.split(/\r?\n/).length,
-    });
-    scheduleSnapshot(code + pasted.slice(0, 2000));
+    recordPaste(pasted, "wrapper");
   };
 
   const shouldShowCelebration = (reward?: SolveRewardResult) =>
@@ -414,6 +433,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       replayStatsRef.current.solveTimeSeconds = replayTimestamp();
       recordSnapshot(code);
       onSubmitAttempt();
+      console.log("[replay] event count before submit", replayEventsRef.current.length);
     } else {
       onRunAttempt();
     }
@@ -426,6 +446,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
             {
               pasteCount: replayStatsRef.current.pasteCount,
               pastedCharacters: replayStatsRef.current.pastedCharacters,
+              largeInsertCount: replayStatsRef.current.largeInsertCount,
               runCount: replayStatsRef.current.runCount,
               tabSwitchCount: replayStatsRef.current.tabSwitchCount,
               solveTimeSeconds: Math.max(1, replayStatsRef.current.solveTimeSeconds),
@@ -560,12 +581,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       if (lower.includes("c++") || lower.includes("cpp")) return "C++";
       return language;
     };
-    const trustTone = (score: number) => {
-      if (score >= 90) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
-      if (score >= 40) return "border-amber-400/30 bg-amber-400/10 text-amber-100";
-      return "border-rose-400/30 bg-rose-400/10 text-rose-100";
-    };
-
     return (
       <div className="space-y-5">
         <div className="grid gap-3 md:grid-cols-3">
@@ -675,16 +690,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
                   >
                     {leader.rank === 1 ? "🏆 #1" : `#${leader.rank}`}
                   </div>
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-white">{leader.user}</div>
-                        <div className="truncate text-xs text-secondary-text">Accepted solve</div>
-                        <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${trustTone(leader.trustScore)}`}>
-                          {trustLevelForScore(leader.trustScore)}
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-white">{leader.user}</div>
+                          <div className="truncate text-xs text-secondary-text">Accepted solve</div>
                         </div>
-                        <div className="mt-1 text-[11px] text-secondary-text" title={`Paste contribution: ${leader.pasteContribution}%`}>
-                          Paste contribution: {leader.pasteContribution}%
-                        </div>
-                      </div>
                   <div className="font-bold text-white">{formatSolveTime(leader.solveTime)}</div>
                   <div className="flex items-start">
                     <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${languageTone(leader.language)}`}>
@@ -1130,9 +1139,29 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
               theme="vs-dark"
               language={languageById(language).monaco}
               value={code}
-              onChange={(val) => {
+              onMount={(editor) => {
+                editor.onDidPaste((event) => {
+                  const pastedText = event.clipboardEvent?.clipboardData?.getData("text") ?? "";
+                  recordPaste(pastedText, "monaco");
+                });
+              }}
+              onChange={(val, ev) => {
                 const nextCode = val || "";
                 setCode(nextCode);
+                if (ev?.changes?.length) {
+                  let insertedChars = 0;
+                  let insertedLines = 0;
+                  for (const change of ev.changes) {
+                    const text = change.text ?? "";
+                    if (!text) continue;
+                    insertedChars += text.length;
+                    insertedLines += text.split(/\r?\n/).length;
+                  }
+                  if (insertedChars > 100 || insertedLines >= 3) {
+                    console.log("[replay] large insert detected", { insertedChars, insertedLines });
+                    recordLargeInsert(insertedChars, insertedLines);
+                  }
+                }
                 scheduleSnapshot(nextCode);
               }}
               options={{

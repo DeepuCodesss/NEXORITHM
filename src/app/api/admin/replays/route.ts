@@ -6,6 +6,20 @@ export const runtime = "nodejs";
 
 const isAdmin = (user: Awaited<ReturnType<typeof currentUser>>) => user?.publicMetadata?.role === "admin";
 
+const getReplayMetrics = (replayData: unknown) => {
+  const data = replayData as { stats?: { pastedCharacters?: number }; events?: Array<{ type?: string; code?: string; charsInserted?: number }> } | null;
+  const events = data?.events ?? [];
+  const lastSnapshot = [...events].reverse().find((event) => event.type === "snapshot" && typeof event.code === "string");
+  const pastedCharacters = Number(data?.stats?.pastedCharacters ?? 0);
+  const finalCodeLength = Number(lastSnapshot?.code?.length ?? 0);
+  const pasteContribution = finalCodeLength > 0 ? Math.max(0, Math.min(100, Math.round((pastedCharacters / finalCodeLength) * 100))) : 0;
+  const largeInsertCount = events.filter((event) => event.type === "large_insert").length;
+  return {
+    pasteContribution,
+    largeInsertCount,
+  };
+};
+
 export async function GET(request: Request) {
   const clerkUser = await currentUser();
   if (!clerkUser) return apiError("Admin access required.", 403);
@@ -16,23 +30,11 @@ export async function GET(request: Request) {
   const pageSize = Math.min(50, Math.max(10, Number(searchParams.get("pageSize") ?? 20)));
   const skip = (page - 1) * pageSize;
   const sort = searchParams.get("sort") ?? "newest";
-  const orderBy =
-    sort === "lowest_trust"
-      ? [{ trustScore: "asc" as const }, { createdAt: "desc" as const }]
-      : sort === "highest_paste"
-        ? [{ pastedCharacters: "desc" as const }, { createdAt: "desc" as const }]
-        : sort === "most_tab_switches"
-          ? [{ tabSwitchCount: "desc" as const }, { createdAt: "desc" as const }]
-          : sort === "fastest_solve"
-            ? [{ solveTimeSeconds: "asc" as const }, { createdAt: "asc" as const }]
-            : [{ createdAt: "desc" as const }];
+
   const prisma = getPrisma();
   const [total, replays] = await Promise.all([
     prisma.solutionReplay.count(),
     prisma.solutionReplay.findMany({
-      orderBy,
-      skip,
-      take: pageSize,
       select: {
         id: true,
         solveTimeSeconds: true,
@@ -50,8 +52,27 @@ export async function GET(request: Request) {
     }),
   ]);
 
+  const ranked = replays
+    .map((replay) => {
+      const metrics = getReplayMetrics(replay.replayData);
+      return {
+        ...replay,
+        pasteContribution: metrics.pasteContribution,
+        largeInsertCount: metrics.largeInsertCount,
+      };
+    })
+    .sort((a, b) => {
+      if (sort === "lowest_trust") return a.trustScore - b.trustScore || b.createdAt.getTime() - a.createdAt.getTime();
+      if (sort === "highest_paste") return b.pasteContribution - a.pasteContribution || b.createdAt.getTime() - a.createdAt.getTime();
+      if (sort === "most_tab_switches") return b.tabSwitchCount - a.tabSwitchCount || b.createdAt.getTime() - a.createdAt.getTime();
+      if (sort === "most_large_insertions") return b.largeInsertCount - a.largeInsertCount || b.createdAt.getTime() - a.createdAt.getTime();
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+
+  const paged = ranked.slice(skip, skip + pageSize);
+
   return apiSuccess({
-    replays,
+    replays: paged,
     pagination: {
       page,
       pageSize,

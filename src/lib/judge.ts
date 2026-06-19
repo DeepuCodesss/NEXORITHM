@@ -56,7 +56,7 @@ const nativeConfigs: Partial<Record<JudgeLanguage, LanguageConfig>> = {
   java: {
     filename: "Main.java",
     compile: ["javac", "Main.java"],
-    run: ["java", "Main"],
+    run: ["java", "-cp", ".", "Main"],
   },
   go: {
     filename: "Main.go",
@@ -100,7 +100,7 @@ const dockerConfigs: Partial<Record<JudgeLanguage, LanguageConfig & { image: str
   java: {
     image: "eclipse-temurin:21-jdk",
     filename: "Main.java",
-    shellCommand: "javac Main.java && java Main",
+    shellCommand: "javac Main.java && java -cp . Main",
     run: [],
   },
   go: {

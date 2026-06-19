@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Clock3, Play, Trash2 } from "lucide-react";
-import { calculatePasteContribution, pasteContributionLabel } from "@/lib/replay";
 
 type ReplayRow = {
   id: string;
@@ -12,31 +11,27 @@ type ReplayRow = {
   language: string;
   pasteCount: number;
   pastedCharacters: number;
+  largeInsertCount: number;
   runCount: number;
   tabSwitchCount: number;
-  replayData?: { events?: Array<{ type: string; code?: string }> };
+  replayData?: { events?: Array<{ type: string; code?: string; charsInserted?: number; linesInserted?: number }> };
   createdAt: string;
   user: { username: string; fullName: string };
   problem: { title: string; slug: string };
+  pasteContribution?: number;
 };
 
-type SortKey = "newest" | "lowest_trust" | "highest_paste" | "most_tab_switches" | "fastest_solve";
+type SortKey = "newest" | "lowest_trust" | "highest_paste" | "most_tab_switches" | "most_large_insertions";
+
+const getFinalCodeLength = (replay: ReplayRow) => {
+  const lastSnapshot = [...(replay.replayData?.events ?? [])].reverse().find((event) => event.type === "snapshot" && typeof event.code === "string");
+  return lastSnapshot?.code?.length ?? 0;
+};
 
 const trustTone = (score: number) => {
   if (score >= 90) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
   if (score >= 40) return "border-amber-400/30 bg-amber-400/10 text-amber-100";
   return "border-rose-400/30 bg-rose-400/10 text-rose-100";
-};
-
-const trustLabel = (score: number) => {
-  if (score >= 90) return "Trusted";
-  if (score >= 40) return "Suspicious";
-  return "High Risk";
-};
-
-const getFinalCodeLength = (replay: ReplayRow) => {
-  const lastSnapshot = [...(replay.replayData?.events ?? [])].reverse().find((event) => event.type === "snapshot" && typeof event.code === "string");
-  return lastSnapshot?.code?.length ?? 0;
 };
 
 export default function AdminReplaysPage() {
@@ -74,15 +69,15 @@ export default function AdminReplaysPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-2xl font-black text-white">Replay Moderation</h1>
-              <p className="mt-1 text-sm text-secondary-text">Trust score, paste pressure, and tab-switch analytics for replay review.</p>
+              <p className="mt-1 text-sm text-secondary-text">Admin-only anti-cheat analytics and replay review.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
                 ["newest", "Newest"],
                 ["lowest_trust", "Lowest Trust"],
-                ["highest_paste", "Highest Paste"],
+                ["highest_paste", "Highest Paste Contribution"],
                 ["most_tab_switches", "Most Tabs"],
-                ["fastest_solve", "Fastest Solve"],
+                ["most_large_insertions", "Most Large Inserts"],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -101,28 +96,21 @@ export default function AdminReplaysPage() {
           <div className="mt-5 overflow-hidden rounded-2xl border border-border">
             <div className="divide-y divide-white/[0.04]">
               {replays.map((replay) => (
-                <div key={replay.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[1.3fr_1.1fr_0.8fr_0.8fr_0.8fr_auto] lg:items-center">
+                <div key={replay.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[1.3fr_1.1fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-center">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-white">{replay.user.fullName || replay.user.username}</div>
                     <div className="truncate text-xs text-secondary-text">{replay.problem.title}</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{replay.solveTimeSeconds}s</span>
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${trustTone(replay.trustScore)}`}>
-                      {trustLabel(replay.trustScore)} · {replay.trustScore}/100
-                    </span>
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${trustTone(replay.trustScore)}`}>{replay.trustScore}/100</span>
                     <span className="rounded-full border border-border bg-background/50 px-2 py-0.5 text-secondary-text">{replay.language}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Paste: {replay.pasteCount}
-                  </div>
+                  <div className="text-xs text-muted-foreground">Paste: {replay.pasteCount}</div>
                   <div className="text-xs text-muted-foreground">Chars: {replay.pastedCharacters}</div>
-                  <div className="text-xs text-muted-foreground">Tabs: {replay.tabSwitchCount}</div>
+                  <div className="text-xs text-muted-foreground">Large Inserts: {replay.largeInsertCount}</div>
                   <div className="text-xs text-muted-foreground">
-                    Paste contribution: {calculatePasteContribution(replay.pastedCharacters, getFinalCodeLength(replay))}%
-                    <span className="ml-2 text-secondary-text">
-                      Trust impact: {pasteContributionLabel(calculatePasteContribution(replay.pastedCharacters, getFinalCodeLength(replay)))}
-                    </span>
+                    Paste contribution: {replay.pasteContribution ?? Math.max(0, Math.min(100, Math.round((replay.pastedCharacters / Math.max(1, getFinalCodeLength(replay))) * 100)))}%
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Link href={`/replay/${replay.id}`} className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20">
@@ -145,8 +133,12 @@ export default function AdminReplaysPage() {
               Page {page} of {pages}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="btn-secondary h-9 px-3 text-xs">Previous</button>
-              <button onClick={() => setPage((current) => Math.min(pages, current + 1))} disabled={page >= pages} className="btn-secondary h-9 px-3 text-xs">Next</button>
+              <button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="btn-secondary h-9 px-3 text-xs">
+                Previous
+              </button>
+              <button onClick={() => setPage((current) => Math.min(pages, current + 1))} disabled={page >= pages} className="btn-secondary h-9 px-3 text-xs">
+                Next
+              </button>
             </div>
           </div>
         </section>

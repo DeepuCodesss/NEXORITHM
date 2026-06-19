@@ -262,12 +262,21 @@ export async function POST(request: Request) {
             {
               pasteCount: replayPayload.stats.pasteCount,
               pastedCharacters: replayPayload.stats.pastedCharacters,
+              largeInsertCount: replayPayload.stats.largeInsertCount,
               runCount: replayPayload.stats.runCount,
               tabSwitchCount: replayPayload.stats.tabSwitchCount,
               solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
             },
             compactEvents,
           );
+          console.log("[replay] replay payload stored in database", {
+            userId: user.id,
+            problemId: problem.id,
+            submissionId,
+            eventCount: compactEvents.length,
+            pasteCount: replayPayload.stats.pasteCount,
+            pastedCharacters: replayPayload.stats.pastedCharacters,
+          });
           await prisma.solutionReplay.create({
             data: {
               userId: user.id,
