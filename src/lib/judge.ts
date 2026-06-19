@@ -6,6 +6,7 @@ import path from "path";
 import { Worker } from "worker_threads";
 import type { JudgeLanguage } from "@/lib/languages";
 import type { Problem } from "@/lib/mockData";
+import { logger } from "@/lib/logger";
 
 export type { JudgeLanguage } from "@/lib/languages";
 
@@ -32,6 +33,31 @@ type LanguageConfig = {
   compile?: string[];
   run: string[];
   needsPythonRunner?: boolean;
+};
+
+type JudgeMode = "native" | "docker" | "unavailable";
+
+export type JudgeToolchainStatus = {
+  language: JudgeLanguage;
+  executionMode: JudgeMode;
+  runtimeFound: boolean;
+  compilerFound: boolean;
+  runtimePath: string | null;
+  compilerPath: string | null;
+  runtimeVersion: string | null;
+  compilerVersion: string | null;
+  reason?: string;
+};
+
+export type JudgeSelfTestResult = {
+  language: JudgeLanguage;
+  passed: boolean;
+  status: JudgeResult["status"];
+  message: string;
+  expected: string;
+  actual: string;
+  runtimeMs: number;
+  executionMode: JudgeMode;
 };
 
 const isWin = process.platform === "win32";
@@ -130,6 +156,10 @@ const dockerConfigs: Partial<Record<JudgeLanguage, LanguageConfig & { image: str
 };
 
 const normalizeOutput = (value: unknown) => String(value ?? "").replace(/\r\n/g, "\n").trim();
+
+const parseBinaryOutput = (value: string) => normalizeOutput(value.split(/\r?\n/)[0] ?? "");
+
+type ProbeCommand = readonly [string, string[]];
 
 const workerSource = `
 const { parentPort, workerData } = require("worker_threads");
@@ -268,11 +298,43 @@ const runProcess = (
       resolve({ stdout, stderr, timedOut, exitCode, spawnError });
     });
 
-    if (input) {
+  if (input) {
       child.stdin.write(input);
     }
     child.stdin.end();
   });
+
+const detectBinary = async (command: string, args: string[], cwd = process.cwd()) => {
+  const execution = await runProcess(command, args, cwd, "", 4000);
+  return {
+    found: !execution.spawnError && execution.exitCode === 0 && !execution.timedOut,
+    path: execution.spawnError ? null : command,
+    version: parseBinaryOutput(execution.stdout || execution.stderr),
+  };
+};
+
+const versionProbeFor = (language: JudgeLanguage): { runtime: ProbeCommand | null; compiler: ProbeCommand | null } => {
+  switch (language) {
+    case "python":
+      return { runtime: [isWin ? "py" : "python3", isWin ? ["-3", "--version"] : ["--version"]] as const, compiler: null };
+    case "java":
+      return { runtime: ["java", ["-version"]] as const, compiler: ["javac", ["-version"]] as const };
+    case "c":
+      return { runtime: ["gcc", ["--version"]] as const, compiler: ["gcc", ["--version"]] as const };
+    case "cpp":
+      return { runtime: ["g++", ["--version"]] as const, compiler: ["g++", ["--version"]] as const };
+    case "go":
+      return { runtime: ["go", ["version"]] as const, compiler: null };
+    case "rust":
+      return { runtime: ["rustc", ["--version"]] as const, compiler: ["rustc", ["--version"]] as const };
+    case "php":
+      return { runtime: ["php", ["-v"]] as const, compiler: null };
+    case "ruby":
+      return { runtime: ["ruby", ["-v"]] as const, compiler: null };
+    default:
+      return { runtime: null, compiler: null };
+  }
+};
 
 const formatProcessError = (execution: ProcessResult) => {
   if (execution.spawnError) {
@@ -326,6 +388,45 @@ const checkDockerReady = async () => {
   const probe = await runProcess("docker", ["info"], process.cwd(), "", 4000);
   dockerReady = !probe.spawnError && probe.exitCode === 0 && !probe.timedOut;
   return dockerReady;
+};
+
+export const detectToolchain = async (language: JudgeLanguage): Promise<JudgeToolchainStatus> => {
+  const config = nativeConfigs[language];
+  const dockerReadyNow = await checkDockerReady();
+  const probes = versionProbeFor(language);
+
+  if (!config) {
+    return {
+      language,
+      executionMode: dockerReadyNow ? "docker" : "unavailable",
+      runtimeFound: false,
+      compilerFound: false,
+      runtimePath: null,
+      compilerPath: null,
+      runtimeVersion: null,
+      compilerVersion: null,
+      reason: `Language ${language} is not configured for native execution.`,
+    };
+  }
+
+  const runtimeProbe = probes.runtime ? await detectBinary(probes.runtime[0], probes.runtime[1]) : { found: false, path: null, version: null };
+  const compilerProbe =
+    probes.compiler && config.compile ? await detectBinary(probes.compiler[0], probes.compiler[1]) : runtimeProbe;
+  const runtimeFound = runtimeProbe.found;
+  const compilerFound = config.compile ? compilerProbe.found : runtimeProbe.found;
+  const executionMode: JudgeMode = runtimeFound && compilerFound ? "native" : dockerReadyNow ? "docker" : "unavailable";
+
+  return {
+    language,
+    executionMode,
+    runtimeFound,
+    compilerFound,
+    runtimePath: runtimeProbe.path,
+    compilerPath: config.compile ? compilerProbe.path : runtimeProbe.path,
+    runtimeVersion: runtimeProbe.version,
+    compilerVersion: config.compile ? compilerProbe.version : runtimeProbe.version,
+    reason: executionMode === "unavailable" ? "Neither native toolchain nor Docker were available." : undefined,
+  };
 };
 
 const runNativeCase = async (
@@ -429,6 +530,60 @@ const runDockerJudge = async (problem: Problem, language: JudgeLanguage, code: s
   }
 };
 
+const makeSelfTestProblem = (): Problem => ({
+  id: "runtime-self-test",
+  title: "Runtime Self Test",
+  slug: "runtime-self-test",
+  difficulty: "Easy",
+  level: 1,
+  topic: "Infrastructure",
+  pattern: "Judge Health",
+  xpReward: 0,
+  coinReward: 0,
+  description: "Judge self test.",
+  discussions: [],
+  editorial: { overview: "", approach: [], complexity: { time: "O(1)", space: "O(1)" } },
+  optimizedSolutions: [],
+  judge: { kind: "sum" },
+  starterCode: {
+    javascript: "function solve1(input) { return input.trim(); }",
+    python: "def solve1(input):\n    return input.strip()\n",
+    cpp: "#include <bits/stdc++.h>\nusing namespace std;\nint main(){ios::sync_with_stdio(false);cin.tie(nullptr);string s; if(!(cin>>s)) return 0; cout<<s; return 0;}",
+    c: "#include <stdio.h>\nint main(void){char s[64]; if(scanf(\"%63s\", s)!=1) return 0; printf(\"%s\", s); return 0;}",
+    java: "import java.io.*;\npublic class Main { public static void main(String[] args) throws Exception { BufferedReader br = new BufferedReader(new InputStreamReader(System.in)); String s = br.readLine(); if (s != null) System.out.print(s.trim()); } }",
+    go: "package main\nimport (\n  \"bufio\"\n  \"fmt\"\n  \"os\"\n)\nfunc main(){in:=bufio.NewReader(os.Stdin); var s string; fmt.Fscan(in,&s); fmt.Print(s)}",
+    rust: "fn main() {}",
+    php: "<?php $s = trim(stream_get_contents(STDIN)); echo $s;",
+    ruby: "print STDIN.read.strip",
+  },
+  testCases: [{ id: 1, input: "5", expected: "5" }],
+});
+
+export const runJudgeSelfTest = async (): Promise<JudgeSelfTestResult[]> => {
+  const selfTestProblem = makeSelfTestProblem();
+  const inputs: JudgeLanguage[] = ["javascript", "python", "java", "c", "cpp"];
+  const results: JudgeSelfTestResult[] = [];
+
+  for (const language of inputs) {
+    const toolchain = language === "javascript" ? null : await detectToolchain(language);
+    const code = selfTestProblem.starterCode[language];
+    const judgeResult = await judgeSubmission(selfTestProblem, language, code);
+    const caseResult = judgeResult.cases[0];
+    results.push({
+      language,
+      passed: judgeResult.status === "Accepted" && caseResult?.passed === true,
+      status: judgeResult.status,
+      message: judgeResult.message,
+      expected: caseResult?.expected ?? "5",
+      actual: caseResult?.actual ?? "",
+      runtimeMs: judgeResult.runtimeMs,
+      executionMode: toolchain?.executionMode ?? "native",
+    });
+  }
+
+  return results;
+};
+
 const buildResult = (
   problem: Problem,
   startedAt: number,
@@ -478,12 +633,36 @@ export async function judgeSubmission(
   const startedAt = Date.now();
 
   try {
+    logger.info("judge.request", {
+      language,
+      selectedLanguage: language,
+      executionMode: shouldUseDocker() ? "docker-preferred" : "native-preferred",
+    });
+
+    const toolchain = language === "javascript" ? null : await detectToolchain(language);
+    if (toolchain) {
+      logger.info("judge.toolchain", {
+        language: toolchain.language,
+        executionMode: toolchain.executionMode,
+        runtimeFound: toolchain.runtimeFound,
+        compilerFound: toolchain.compilerFound,
+        runtimePath: toolchain.runtimePath,
+        compilerPath: toolchain.compilerPath,
+        runtimeVersion: toolchain.runtimeVersion,
+        compilerVersion: toolchain.compilerVersion,
+      });
+    }
+
     const results =
       language === "javascript"
         ? await runJavaScriptWorker(problem, code, 1600)
-        : (await checkDockerReady())
+        : toolchain?.executionMode === "docker"
           ? await runDockerJudge(problem, language, code)
-          : await runNativeJudge(problem, language, code);
+          : toolchain?.executionMode === "native"
+            ? await runNativeJudge(problem, language, code)
+            : (() => {
+                throw new Error(toolchain?.reason ?? "Runtime not found: install the language toolchain locally, or set JUDGE_USE_DOCKER=true with Docker Desktop running.");
+              })();
 
     return buildResult(problem, startedAt, results);
   } catch (error) {
