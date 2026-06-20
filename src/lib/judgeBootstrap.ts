@@ -5,6 +5,7 @@ import { detectToolchain, runJudgeSelfTest } from "@/lib/judge";
 
 let bootstrapPromise: Promise<void> | null = null;
 const isRemoteJavaJudgeConfigured = () => Boolean(process.env.JAVA_JUDGE_SERVICE_URL?.trim());
+const isProduction = () => process.env.NODE_ENV === "production";
 
 export const ensureJudgeBootstrapLogged = () => {
   if (bootstrapPromise) return bootstrapPromise;
@@ -13,15 +14,17 @@ export const ensureJudgeBootstrapLogged = () => {
     const languages: Array<"javascript" | "python" | "java" | "c" | "cpp"> = isRemoteJavaJudgeConfigured()
       ? ["javascript", "python", "c", "cpp"]
       : ["javascript", "python", "java", "c", "cpp"];
+    const shouldRunSelfTests = !isProduction();
+    const bootstrapStartedAt = Date.now();
     logger.info("judge.bootstrap_start", {
       nodeVersion: process.version,
       skipEnvValidation: process.env.SKIP_ENV_VALIDATION ?? null,
       executionMode: process.env.JUDGE_USE_DOCKER === "true" ? "docker-preferred" : "native-preferred",
+      remoteJavaConfigured: isRemoteJavaJudgeConfigured(),
+      runSelfTests: shouldRunSelfTests,
     });
-    const [toolchains, selfTests] = await Promise.all([
-      Promise.all(languages.map((language) => detectToolchain(language))),
-      runJudgeSelfTest(),
-    ]);
+    const toolchains = await Promise.all(languages.map((language) => detectToolchain(language)));
+    const selfTests = shouldRunSelfTests ? await runJudgeSelfTest() : [];
 
     for (const toolchain of toolchains) {
       logger.info("judge.boot", {
@@ -52,15 +55,16 @@ export const ensureJudgeBootstrapLogged = () => {
           runtimeFound: toolchain.runtimeFound,
           compilerFound: toolchain.compilerFound,
           runtimeVersion: toolchain.runtimeVersion,
-          compilerVersion: toolchain.compilerVersion,
-          executionMode: toolchain.executionMode,
-        })),
+        compilerVersion: toolchain.compilerVersion,
+        executionMode: toolchain.executionMode,
+      })),
         selfTests: selfTests.map((result) => ({
           language: result.language,
           passed: result.passed,
           status: result.status,
           executionMode: result.executionMode,
         })),
+        durationMs: Date.now() - bootstrapStartedAt,
       }),
     );
   })().catch((error) => {

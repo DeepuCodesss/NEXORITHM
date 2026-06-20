@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { randomUUID } from "crypto";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
+import os from "os";
 import path from "path";
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
@@ -41,6 +42,34 @@ type JavaJudgeResult = {
 };
 
 const normalizeOutput = (value: unknown) => String(value ?? "").replace(/\r\n/g, "\n").trim();
+
+const collectEnvironmentSnapshot = async () => {
+  const probe = async (command: string, args: string[]) =>
+    await new Promise<{ found: boolean; version: string }>((resolve) => {
+      const child = spawn(command, args, { windowsHide: true, env: { ...process.env, NO_COLOR: "1" } });
+      let output = "";
+      child.stdout.on("data", (chunk) => {
+        output += chunk.toString();
+      });
+      child.stderr.on("data", (chunk) => {
+        output += chunk.toString();
+      });
+      child.on("error", () => resolve({ found: false, version: "" }));
+      child.on("close", (code) => resolve({ found: code === 0, version: output.trim().split(/\r?\n/)[0] ?? "" }));
+    });
+
+  const [java, javac] = await Promise.all([probe("java", ["-version"]), probe("javac", ["-version"])]);
+
+  return {
+    processVersion: process.version,
+    javaVersion: java.version,
+    javacVersion: javac.version,
+    cpuCount: os.cpus().length,
+    availableParallelism: typeof os.availableParallelism === "function" ? os.availableParallelism() : null,
+    totalMemoryMb: Math.round(os.totalmem() / 1024 / 1024),
+    freeMemoryMb: Math.round(os.freemem() / 1024 / 1024),
+  };
+};
 
 const runProcess = (
   command: string,
@@ -89,11 +118,23 @@ const runProcess = (
   });
 
 const compileJava = async (workdir: string, code: string) => {
+  const writeStartedAt = Date.now();
+  logger.info("java_judge.before_write_file", { route: "/api/java-judge", workdir });
   await writeFile(path.join(workdir, "Main.java"), `${code}\n`, "utf8");
+  logger.info("java_judge.after_write_file", {
+    route: "/api/java-judge",
+    workdir,
+    durationMs: Date.now() - writeStartedAt,
+  });
 
   logger.info("java_judge.compile_started", { route: "/api/java-judge" });
+  logger.info("java_judge.before_javac_spawn", { route: "/api/java-judge" });
   const startedAt = Date.now();
   const compile = await runProcess("javac", ["Main.java"], workdir, "", 15000);
+  logger.info("java_judge.after_javac_spawn", {
+    route: "/api/java-judge",
+    durationMs: Date.now() - startedAt,
+  });
   logger.info("java_judge.compile_finished", {
     route: "/api/java-judge",
     durationMs: Date.now() - startedAt,
@@ -115,7 +156,13 @@ const compileJava = async (workdir: string, code: string) => {
 };
 
 const runJavaCase = async (workdir: string, input: string) => {
+  logger.info("java_judge.before_java_spawn", { route: "/api/java-judge" });
+  const startedAt = Date.now();
   const execution = await runProcess("java", ["-cp", ".", "Main"], workdir, input, 12000);
+  logger.info("java_judge.after_java_spawn", {
+    route: "/api/java-judge",
+    durationMs: Date.now() - startedAt,
+  });
   return {
     execution,
     error: execution.spawnError ?? (execution.timedOut ? "Execution timed out." : undefined),
@@ -161,6 +208,10 @@ const buildResult = (testCases: JavaJudgeTestCase[], startedAt: number, results:
 export async function POST(request: Request) {
   const startedAt = Date.now();
   logger.info("java_judge.request_received", { route: "/api/java-judge" });
+  logger.info("java_judge.environment_snapshot", {
+    route: "/api/java-judge",
+    ...(await collectEnvironmentSnapshot()),
+  });
 
   const body = (await request.json().catch(() => null)) as JavaJudgeRequestBody | null;
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
@@ -258,6 +309,16 @@ export async function POST(request: Request) {
     });
     return response;
   } finally {
+    logger.info("java_judge.before_cleanup", {
+      route: "/api/java-judge",
+      workdir,
+    });
+    const cleanupStartedAt = Date.now();
     await rm(workdir, { force: true, recursive: true });
+    logger.info("java_judge.after_cleanup", {
+      route: "/api/java-judge",
+      workdir,
+      durationMs: Date.now() - cleanupStartedAt,
+    });
   }
 }
