@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -87,19 +88,33 @@ const runProcess = (
     child.stdin.end();
   });
 
-const compileAndRun = async (workdir: string, code: string, input: string) => {
+const compileJava = async (workdir: string, code: string) => {
   await writeFile(path.join(workdir, "Main.java"), `${code}\n`, "utf8");
 
+  logger.info("java_judge.compile_started", { route: "/api/java-judge" });
+  const startedAt = Date.now();
   const compile = await runProcess("javac", ["Main.java"], workdir, "", 15000);
+  logger.info("java_judge.compile_finished", {
+    route: "/api/java-judge",
+    durationMs: Date.now() - startedAt,
+    exitCode: compile.exitCode,
+    timedOut: compile.timedOut,
+    spawnError: compile.spawnError ?? null,
+  });
+
   if (compile.spawnError || compile.timedOut || compile.exitCode !== 0) {
     return {
-      execution: compile,
+      ok: false as const,
       error:
         compile.spawnError ??
         (compile.timedOut ? "Execution timed out." : normalizeOutput(compile.stderr || "Compilation failed.")),
     };
   }
 
+  return { ok: true as const };
+};
+
+const runJavaCase = async (workdir: string, input: string) => {
   const execution = await runProcess("java", ["-cp", ".", "Main"], workdir, input, 12000);
   return {
     execution,
@@ -145,6 +160,8 @@ const buildResult = (testCases: JavaJudgeTestCase[], startedAt: number, results:
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
+  logger.info("java_judge.request_received", { route: "/api/java-judge" });
+
   const body = (await request.json().catch(() => null)) as JavaJudgeRequestBody | null;
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
   const language = typeof body?.language === "string" ? body.language : "";
@@ -166,23 +183,62 @@ export async function POST(request: Request) {
 
   const workdir = await mkdtemp(path.join(tmpdir(), `nexorithm-java-${randomUUID()}-`));
   try {
+    const compileResult = await compileJava(workdir, code);
+    if (!compileResult.ok) {
+      const response = NextResponse.json({
+        status: "Compilation Error",
+        passedCount: 0,
+        totalCount: testCases.length,
+        runtimeMs: Date.now() - startedAt,
+        cases: testCases.map((testCase) => ({
+          ...testCase,
+          actual: "",
+          passed: false,
+          error: compileResult.error,
+        })),
+        message: compileResult.error,
+      });
+      logger.info("java_judge.response_sent", {
+        route: "/api/java-judge",
+        durationMs: Date.now() - startedAt,
+        status: "Compilation Error",
+      });
+      return response;
+    }
+
     const results: Array<{ id: number; actual: string; error?: string }> = [];
     for (const testCase of testCases) {
-      const executionResult = await compileAndRun(workdir, code, testCase.input);
+      logger.info("java_judge.testcase_started", { route: "/api/java-judge", testcaseId: testCase.id });
+      const testcaseStartedAt = Date.now();
+      const executionResult = await runJavaCase(workdir, testCase.input);
+      logger.info("java_judge.testcase_finished", {
+        route: "/api/java-judge",
+        testcaseId: testCase.id,
+        durationMs: Date.now() - testcaseStartedAt,
+        exitCode: executionResult.execution.exitCode,
+        timedOut: executionResult.execution.timedOut,
+      });
       results.push({
         id: testCase.id,
         actual: executionResult.execution.stdout,
-        error: executionResult.error ?? (executionResult.execution.exitCode === 0 ? undefined : normalizeOutput(executionResult.execution.stderr || `Process exited with code ${executionResult.execution.exitCode}.`)),
+        error:
+          executionResult.error ??
+          (executionResult.execution.exitCode === 0
+            ? undefined
+            : normalizeOutput(executionResult.execution.stderr || `Process exited with code ${executionResult.execution.exitCode}.`)),
       });
-      if (executionResult.error?.includes("Compilation")) {
-        break;
-      }
     }
 
-    return NextResponse.json(buildResult(testCases, startedAt, results));
+    const response = NextResponse.json(buildResult(testCases, startedAt, results));
+    logger.info("java_judge.response_sent", {
+      route: "/api/java-judge",
+      durationMs: Date.now() - startedAt,
+      status: "ok",
+    });
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({
+    const response = NextResponse.json({
       status: "Runtime Error",
       passedCount: 0,
       totalCount: testCases.length,
@@ -195,6 +251,12 @@ export async function POST(request: Request) {
       })),
       message,
     });
+    logger.info("java_judge.response_sent", {
+      route: "/api/java-judge",
+      durationMs: Date.now() - startedAt,
+      status: "Runtime Error",
+    });
+    return response;
   } finally {
     await rm(workdir, { force: true, recursive: true });
   }

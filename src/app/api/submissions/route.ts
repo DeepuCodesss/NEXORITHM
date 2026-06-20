@@ -294,8 +294,33 @@ export async function POST(request: Request) {
             pasteCount: replayPayload.stats.pasteCount,
             pastedCharacters: replayPayload.stats.pastedCharacters,
           });
-          await prisma.solutionReplay.create({
-            data: {
+          await prisma.solutionReplay.upsert({
+            where: {
+              userId_problemId: {
+                userId: user.id,
+                problemId: problem.id,
+              },
+            },
+            update: {
+              submissionId,
+              language,
+              replayData: JSON.parse(
+                JSON.stringify({
+                  events: compactEvents,
+                  stats: {
+                    ...replayPayload.stats,
+                    solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
+                    trustScore,
+                  },
+                }),
+              ),
+              solveTimeSeconds: Math.max(1, replayPayload.stats.solveTimeSeconds),
+              pasteCount: replayPayload.stats.pasteCount,
+              pastedCharacters: replayPayload.stats.pastedCharacters,
+              runCount: replayPayload.stats.runCount,
+              tabSwitchCount: replayPayload.stats.tabSwitchCount,
+            },
+            create: {
               userId: user.id,
               problemId: problem.id,
               submissionId,
