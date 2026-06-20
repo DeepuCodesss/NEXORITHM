@@ -44,26 +44,56 @@ type JavaJudgeResult = {
 const normalizeOutput = (value: unknown) => String(value ?? "").replace(/\r\n/g, "\n").trim();
 
 const collectEnvironmentSnapshot = async () => {
-  const probe = async (command: string, args: string[]) =>
-    await new Promise<{ found: boolean; version: string }>((resolve) => {
+  const probe = async (command: string, args: string[], label: string) =>
+    await new Promise<{ found: boolean; version: string; spawnDelayMs: number; durationMs: number }>((resolve) => {
+      const startedAt = Date.now();
       const child = spawn(command, args, { windowsHide: true, env: { ...process.env, NO_COLOR: "1" } });
       let output = "";
+      let spawnDelayMs = 0;
+      child.on("spawn", () => {
+        spawnDelayMs = Date.now() - startedAt;
+        logger.info("java_judge.environment_probe_spawned", {
+          route: "/api/java-judge",
+          label,
+          command,
+          spawnDelayMs,
+        });
+      });
       child.stdout.on("data", (chunk) => {
         output += chunk.toString();
       });
       child.stderr.on("data", (chunk) => {
         output += chunk.toString();
       });
-      child.on("error", () => resolve({ found: false, version: "" }));
-      child.on("close", (code) => resolve({ found: code === 0, version: output.trim().split(/\r?\n/)[0] ?? "" }));
+      child.on("error", () => resolve({ found: false, version: "", spawnDelayMs, durationMs: Date.now() - startedAt }));
+      child.on("close", (code) =>
+        resolve({
+          found: code === 0,
+          version: output.trim().split(/\r?\n/)[0] ?? "",
+          spawnDelayMs,
+          durationMs: Date.now() - startedAt,
+        }),
+      );
     });
 
-  const [java, javac] = await Promise.all([probe("java", ["-version"]), probe("javac", ["-version"])]);
+  const startedAt = Date.now();
+  logger.info("java_judge.environment_snapshot_start", { route: "/api/java-judge" });
+  const [java, javac] = await Promise.all([probe("java", ["-version"], "java-version"), probe("javac", ["-version"], "javac-version")]);
+  logger.info("java_judge.environment_snapshot_end", {
+    route: "/api/java-judge",
+    durationMs: Date.now() - startedAt,
+    javaProbeMs: java.durationMs,
+    javacProbeMs: javac.durationMs,
+  });
 
   return {
     processVersion: process.version,
     javaVersion: java.version,
     javacVersion: javac.version,
+    javaProbeMs: java.durationMs,
+    javacProbeMs: javac.durationMs,
+    javaSpawnDelayMs: java.spawnDelayMs,
+    javacSpawnDelayMs: javac.spawnDelayMs,
     cpuCount: os.cpus().length,
     availableParallelism: typeof os.availableParallelism === "function" ? os.availableParallelism() : null,
     totalMemoryMb: Math.round(os.totalmem() / 1024 / 1024),
@@ -77,8 +107,10 @@ const runProcess = (
   cwd: string,
   input: string,
   timeoutMs: number,
+  label?: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null; timedOut: boolean; spawnError?: string }> =>
   new Promise((resolve) => {
+    const startedAt = Date.now();
     const child = spawn(command, args, {
       cwd,
       windowsHide: true,
@@ -91,6 +123,17 @@ const runProcess = (
     let stderr = "";
     let timedOut = false;
     let spawnError: string | undefined;
+    let spawnDelayMs = 0;
+
+    child.on("spawn", () => {
+      spawnDelayMs = Date.now() - startedAt;
+      logger.info("java_judge.process_spawned", {
+        route: "/api/java-judge",
+        label: label ?? command,
+        command,
+        spawnDelayMs,
+      });
+    });
 
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -108,6 +151,16 @@ const runProcess = (
     });
     child.on("close", (exitCode) => {
       clearTimeout(timeout);
+      logger.info("java_judge.process_closed", {
+        route: "/api/java-judge",
+        label: label ?? command,
+        command,
+        durationMs: Date.now() - startedAt,
+        spawnDelayMs,
+        exitCode,
+        timedOut,
+        spawnError: spawnError ?? null,
+      });
       resolve({ stdout, stderr, exitCode, timedOut, spawnError });
     });
 
@@ -130,7 +183,7 @@ const compileJava = async (workdir: string, code: string) => {
   logger.info("java_judge.compile_started", { route: "/api/java-judge" });
   logger.info("java_judge.before_javac_spawn", { route: "/api/java-judge" });
   const startedAt = Date.now();
-  const compile = await runProcess("javac", ["Main.java"], workdir, "", 15000);
+  const compile = await runProcess("javac", ["Main.java"], workdir, "", 15000, "javac");
   logger.info("java_judge.after_javac_spawn", {
     route: "/api/java-judge",
     durationMs: Date.now() - startedAt,
@@ -158,7 +211,7 @@ const compileJava = async (workdir: string, code: string) => {
 const runJavaCase = async (workdir: string, input: string) => {
   logger.info("java_judge.before_java_spawn", { route: "/api/java-judge" });
   const startedAt = Date.now();
-  const execution = await runProcess("java", ["-cp", ".", "Main"], workdir, input, 12000);
+  const execution = await runProcess("java", ["-cp", ".", "Main"], workdir, input, 12000, "java");
   logger.info("java_judge.after_java_spawn", {
     route: "/api/java-judge",
     durationMs: Date.now() - startedAt,
@@ -208,6 +261,15 @@ const buildResult = (testCases: JavaJudgeTestCase[], startedAt: number, results:
 export async function POST(request: Request) {
   const startedAt = Date.now();
   logger.info("java_judge.request_received", { route: "/api/java-judge" });
+  logger.info("java_judge.request_cpu_memory", {
+    route: "/api/java-judge",
+    cpuUsage: process.cpuUsage(),
+    memoryUsageMb: {
+      rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+    },
+  });
   logger.info("java_judge.environment_snapshot", {
     route: "/api/java-judge",
     ...(await collectEnvironmentSnapshot()),
@@ -232,9 +294,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "testCases must be a non-empty array." }, { status: 400 });
   }
 
+  const tempdirStartedAt = Date.now();
   const workdir = await mkdtemp(path.join(tmpdir(), `nexorithm-java-${randomUUID()}-`));
+  logger.info("java_judge.tempdir_created", {
+    route: "/api/java-judge",
+    workdir,
+    durationMs: Date.now() - tempdirStartedAt,
+  });
   try {
     const compileResult = await compileJava(workdir, code);
+    logger.info("java_judge.after_compile_cpu_memory", {
+      route: "/api/java-judge",
+      cpuUsage: process.cpuUsage(),
+      memoryUsageMb: {
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+      },
+    });
     if (!compileResult.ok) {
       const response = NextResponse.json({
         status: "Compilation Error",
