@@ -37,6 +37,7 @@ npx prisma generate
 - `CLERK_AFTER_SIGN_UP_URL`
 - `REDIS_URL` for distributed rate limiting
 - `JUDGE_USE_DOCKER` if Docker-based judging is enabled
+- `JAVA_JUDGE_SERVICE_URL` for the remote Docker judge endpoint used by Java submissions, for example `https://nexorithm-docker.onrender.com/api/java-judge`
 
 ## Backup Strategy
 

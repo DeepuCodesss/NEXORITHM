@@ -31,6 +31,7 @@ npm start
 - `CLERK_AFTER_SIGN_IN_URL`
 - `CLERK_AFTER_SIGN_UP_URL`
 - `JUDGE_USE_DOCKER`
+- `JAVA_JUDGE_SERVICE_URL`
 
 ## PostgreSQL Migration Steps
 
@@ -44,8 +45,10 @@ npm start
 
 - The judge can run as a separate Render Web Service or Docker-backed service.
 - Required port is whatever your service binds to internally, typically `10000` on Render or the port provided by `PORT`.
-- The Next.js app does not call the judge directly right now; it judges submissions in-process.
-- If you split the judge out later, the app will need a dedicated internal HTTP endpoint or queue.
+- Java submissions are sent to `JAVA_JUDGE_SERVICE_URL`.
+- The Docker deployment exposes the Java judge endpoint at `/api/java-judge`.
+- Set `JAVA_JUDGE_SERVICE_URL` on the main website to `https://nexorithm-docker.onrender.com/api/java-judge`.
+- The Next.js app still judges C, C++, Python, and JavaScript in-process.
 
 ## Notes
 

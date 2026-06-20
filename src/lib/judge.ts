@@ -170,6 +170,8 @@ const normalizeOutput = (value: unknown) => String(value ?? "").replace(/\r\n/g,
 
 const parseBinaryOutput = (value: string) => normalizeOutput(value.split(/\r?\n/)[0] ?? "");
 
+const getJavaJudgeServiceUrl = () => process.env.JAVA_JUDGE_SERVICE_URL?.trim() ?? "";
+
 type ProbeCommand = readonly [string, string[]];
 
 const jsRunner = (functionName: string) => `
@@ -338,6 +340,8 @@ let dockerReady: boolean | null = null;
 
 const shouldUseDocker = () => process.env.JUDGE_USE_DOCKER === "true";
 
+const isRemoteJavaJudgeConfigured = () => Boolean(getJavaJudgeServiceUrl());
+
 const checkDockerReady = async () => {
   if (!shouldUseDocker()) return false;
   if (dockerReady !== null) return dockerReady;
@@ -349,6 +353,20 @@ const checkDockerReady = async () => {
 
 export const detectToolchain = async (language: JudgeLanguage): Promise<JudgeToolchainStatus> => {
   const config = nativeConfigs[language];
+  if (language === "java" && isRemoteJavaJudgeConfigured()) {
+    return {
+      language,
+      executionMode: "docker",
+      runtimeFound: false,
+      compilerFound: false,
+      runtimePath: null,
+      compilerPath: null,
+      runtimeVersion: null,
+      compilerVersion: null,
+      reason: "Java is delegated to the remote Docker judge service.",
+    };
+  }
+
   const dockerReadyNow = await checkDockerReady();
   const probes = versionProbeFor(language);
 
@@ -491,6 +509,64 @@ const runDockerJudge = async (problem: Problem, language: JudgeLanguage, code: s
   }
 };
 
+const runRemoteJavaJudge = async (problem: Problem, code: string) => {
+  const serviceUrl = getJavaJudgeServiceUrl();
+  if (!serviceUrl) {
+    throw new Error("Java remote judge service is not configured. Set JAVA_JUDGE_SERVICE_URL to the Docker judge endpoint.");
+  }
+
+  const response = await fetch(serviceUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      problemId: problem.id,
+      language: "java",
+      code,
+      testCases: problem.testCases,
+      judge: problem.judge,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        status?: JudgeResult["status"];
+        passedCount?: number;
+        totalCount?: number;
+        runtimeMs?: number;
+        cases?: JudgeCaseResult[];
+        message?: string;
+        error?: string;
+      }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Java judge service responded with HTTP ${response.status}.`);
+  }
+
+  if (
+    !payload ||
+    typeof payload.status !== "string" ||
+    typeof payload.passedCount !== "number" ||
+    typeof payload.totalCount !== "number" ||
+    typeof payload.runtimeMs !== "number" ||
+    !Array.isArray(payload.cases) ||
+    typeof payload.message !== "string"
+  ) {
+    throw new Error("Java judge service returned an invalid response.");
+  }
+
+  return {
+    status: payload.status,
+    passedCount: payload.passedCount,
+    totalCount: payload.totalCount,
+    runtimeMs: payload.runtimeMs,
+    cases: payload.cases,
+    message: payload.message,
+  } satisfies JudgeResult;
+};
+
 const makeSelfTestProblem = (): Problem => ({
   id: "runtime-self-test",
   title: "Runtime Self Test",
@@ -612,6 +688,10 @@ export async function judgeSubmission(
         runtimeVersion: toolchain.runtimeVersion,
         compilerVersion: toolchain.compilerVersion,
       });
+    }
+
+    if (language === "java" && isRemoteJavaJudgeConfigured()) {
+      return await runRemoteJavaJudge(problem, code);
     }
 
     const results =
