@@ -11,6 +11,7 @@ import { ensureJudgeBootstrapLogged } from "@/lib/judgeBootstrap";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now();
   await ensureJudgeBootstrapLogged();
   const body = await request.json().catch(() => null);
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
@@ -41,12 +42,31 @@ export async function POST(request: Request) {
     return apiError("Rate limit exceeded.", 429);
   }
 
+  logger.info("submission.request_received", {
+    route: "/api/submissions/run",
+    language,
+    problemId,
+  });
+
+  const judgeStartedAt = Date.now();
   const result = await judgeSubmission(problem, language, code);
+  logger.info("submission.judge_duration", {
+    route: "/api/submissions/run",
+    language,
+    problemId,
+    durationMs: Date.now() - judgeStartedAt,
+  });
   logger.info("submission.run", {
     userId: clerkUser.id,
     problemId: problem.id,
     language,
     status: result.status,
+  });
+  logger.info("submission.total_duration", {
+    route: "/api/submissions/run",
+    language,
+    problemId,
+    durationMs: Date.now() - requestStartedAt,
   });
   return apiSuccess({ problemId: problem.id, saved: false, ...result });
 }

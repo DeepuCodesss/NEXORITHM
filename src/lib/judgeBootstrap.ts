@@ -4,12 +4,15 @@ import { logger } from "@/lib/logger";
 import { detectToolchain, runJudgeSelfTest } from "@/lib/judge";
 
 let bootstrapPromise: Promise<void> | null = null;
+const isRemoteJavaJudgeConfigured = () => Boolean(process.env.JAVA_JUDGE_SERVICE_URL?.trim());
 
 export const ensureJudgeBootstrapLogged = () => {
   if (bootstrapPromise) return bootstrapPromise;
 
   bootstrapPromise = (async () => {
-    const languages: Array<"javascript" | "python" | "java" | "c" | "cpp"> = ["javascript", "python", "java", "c", "cpp"];
+    const languages: Array<"javascript" | "python" | "java" | "c" | "cpp"> = isRemoteJavaJudgeConfigured()
+      ? ["javascript", "python", "c", "cpp"]
+      : ["javascript", "python", "java", "c", "cpp"];
     logger.info("judge.bootstrap_start", {
       nodeVersion: process.version,
       skipEnvValidation: process.env.SKIP_ENV_VALIDATION ?? null,

@@ -35,6 +35,7 @@ const getStreakReward = (streakDay: number) => {
 };
 
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now();
   await ensureJudgeBootstrapLogged();
   const body = await request.json().catch(() => null);
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
@@ -55,7 +56,20 @@ export async function POST(request: Request) {
     return apiError("Unsupported language.", 400);
   }
 
+  logger.info("submission.request_received", {
+    route: "/api/submissions",
+    language,
+    problemId,
+  });
+
+  const judgeStartedAt = Date.now();
   const result = await judgeSubmission(problem, language, code);
+  logger.info("submission.judge_duration", {
+    route: "/api/submissions",
+    language,
+    problemId,
+    durationMs: Date.now() - judgeStartedAt,
+  });
   let submissionId: string | null = null;
   let saved = false;
   let databaseError: string | null = null;
@@ -72,6 +86,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const dbStartedAt = Date.now();
     const prisma = getPrisma();
     const user = await upsertClerkUser(clerkUser);
 
@@ -318,6 +333,12 @@ export async function POST(request: Request) {
       submissionId,
       status: result.status,
     });
+    logger.info("submission.database_duration", {
+      route: "/api/submissions",
+      language,
+      problemId: problem.id,
+      durationMs: Date.now() - dbStartedAt,
+    });
   } catch (error) {
     databaseError = error instanceof Error ? error.message : String(error);
     logger.error("submission.failed", {
@@ -326,6 +347,13 @@ export async function POST(request: Request) {
       error: databaseError,
     });
   }
+
+  logger.info("submission.total_duration", {
+    route: "/api/submissions",
+    language,
+    problemId: problem.id,
+    durationMs: Date.now() - requestStartedAt,
+  });
 
   return apiSuccess({
     problemId: problem.id,

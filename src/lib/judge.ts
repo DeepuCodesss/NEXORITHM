@@ -598,7 +598,7 @@ const makeSelfTestProblem = (): Problem => ({
 
 export const runJudgeSelfTest = async (): Promise<JudgeSelfTestResult[]> => {
   const selfTestProblem = makeSelfTestProblem();
-  const inputs: JudgeLanguage[] = ["javascript", "python", "java", "c", "cpp"];
+  const inputs: JudgeLanguage[] = isRemoteJavaJudgeConfigured() ? ["javascript", "python", "c", "cpp"] : ["javascript", "python", "java", "c", "cpp"];
   const results: JudgeSelfTestResult[] = [];
 
   for (const language of inputs) {
@@ -676,6 +676,14 @@ export async function judgeSubmission(
       executionMode: shouldUseDocker() ? "docker-preferred" : "native-preferred",
     });
 
+    if (language === "java" && isRemoteJavaJudgeConfigured()) {
+      logger.info("judge.remote_java_forward", {
+        language,
+        serviceUrl: getJavaJudgeServiceUrl(),
+      });
+      return await runRemoteJavaJudge(problem, code);
+    }
+
     const toolchain = await detectToolchain(language);
     if (toolchain) {
       logger.info("judge.toolchain", {
@@ -688,10 +696,6 @@ export async function judgeSubmission(
         runtimeVersion: toolchain.runtimeVersion,
         compilerVersion: toolchain.compilerVersion,
       });
-    }
-
-    if (language === "java" && isRemoteJavaJudgeConfigured()) {
-      return await runRemoteJavaJudge(problem, code);
     }
 
     const results =
