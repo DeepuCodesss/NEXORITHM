@@ -11,9 +11,10 @@ export const ensureJudgeBootstrapLogged = () => {
   if (bootstrapPromise) return bootstrapPromise;
 
   bootstrapPromise = (async () => {
-    const languages: Array<"javascript" | "python" | "java" | "c" | "cpp"> = isRemoteJavaJudgeConfigured()
-      ? ["javascript", "python", "c", "cpp"]
-      : ["javascript", "python", "java", "c", "cpp"];
+    const languages: Array<"javascript" | "python" | "java" | "go" | "rust" | "php" | "ruby" | "c" | "cpp"> =
+      isRemoteJavaJudgeConfigured()
+        ? ["javascript", "python", "c", "cpp"]
+        : ["javascript", "python", "java", "go", "rust", "php", "ruby", "c", "cpp"];
     const shouldRunSelfTests = !isProduction();
     const bootstrapStartedAt = Date.now();
     logger.info("judge.bootstrap_start", {
@@ -55,9 +56,9 @@ export const ensureJudgeBootstrapLogged = () => {
           runtimeFound: toolchain.runtimeFound,
           compilerFound: toolchain.compilerFound,
           runtimeVersion: toolchain.runtimeVersion,
-        compilerVersion: toolchain.compilerVersion,
-        executionMode: toolchain.executionMode,
-      })),
+          compilerVersion: toolchain.compilerVersion,
+          executionMode: toolchain.executionMode,
+        })),
         selfTests: selfTests.map((result) => ({
           language: result.language,
           passed: result.passed,

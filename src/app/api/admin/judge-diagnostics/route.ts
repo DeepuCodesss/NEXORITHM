@@ -12,7 +12,7 @@ export async function GET() {
   }
 
   const diagnostics = await Promise.all(
-    SUPPORTED_LANGUAGES.filter((language) => ["javascript", "python", "java", "c", "cpp"].includes(language.id)).map(async (language) => {
+    SUPPORTED_LANGUAGES.filter((language) => ["javascript", "python", "java", "go", "rust", "php", "ruby", "c", "cpp"].includes(language.id)).map(async (language) => {
       if (language.id === "javascript") {
         return {
           language: language.label,
@@ -22,7 +22,7 @@ export async function GET() {
           executionMode: "worker",
         };
       }
-      const status = await detectToolchain(language.id as "python" | "java" | "c" | "cpp");
+      const status = await detectToolchain(language.id as "python" | "java" | "go" | "rust" | "php" | "ruby" | "c" | "cpp");
       return {
         language: language.label,
         runtimeFound: status.runtimeFound,

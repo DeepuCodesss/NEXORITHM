@@ -21,6 +21,11 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    golang-go \
+    rustc \
+    cargo \
+    php-cli \
+    ruby \
     python3 \
     g++ \
     gcc \

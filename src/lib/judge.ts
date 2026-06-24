@@ -38,6 +38,8 @@ type LanguageConfig = {
 
 type JudgeMode = "native" | "docker" | "unavailable";
 
+type RemoteJudgeLanguage = "java" | "go" | "rust" | "php" | "ruby";
+
 export type JudgeToolchainStatus = {
   language: JudgeLanguage;
   executionMode: JudgeMode;
@@ -170,7 +172,10 @@ const normalizeOutput = (value: unknown) => String(value ?? "").replace(/\r\n/g,
 
 const parseBinaryOutput = (value: string) => normalizeOutput(value.split(/\r?\n/)[0] ?? "");
 
+const getDockerJudgeServiceUrl = () => process.env.DOCKER_JUDGE_SERVICE_URL?.trim() ?? "";
 const getJavaJudgeServiceUrl = () => process.env.JAVA_JUDGE_SERVICE_URL?.trim() ?? "";
+const getRemoteJudgeServiceUrl = (language: RemoteJudgeLanguage) =>
+  language === "java" ? getDockerJudgeServiceUrl() || getJavaJudgeServiceUrl() : getDockerJudgeServiceUrl();
 
 type ProbeCommand = readonly [string, string[]];
 
@@ -341,6 +346,7 @@ let dockerReady: boolean | null = null;
 const shouldUseDocker = () => process.env.JUDGE_USE_DOCKER === "true";
 
 const isRemoteJavaJudgeConfigured = () => Boolean(getJavaJudgeServiceUrl());
+const isRemoteDockerJudgeConfigured = () => Boolean(getDockerJudgeServiceUrl() || getJavaJudgeServiceUrl());
 
 const checkDockerReady = async () => {
   if (!shouldUseDocker()) return false;
@@ -351,9 +357,12 @@ const checkDockerReady = async () => {
   return dockerReady;
 };
 
+const isRemoteJudgeLanguage = (language: JudgeLanguage): language is RemoteJudgeLanguage =>
+  language === "java" || language === "go" || language === "rust" || language === "php" || language === "ruby";
+
 export const detectToolchain = async (language: JudgeLanguage): Promise<JudgeToolchainStatus> => {
   const config = nativeConfigs[language];
-  if (language === "java" && isRemoteJavaJudgeConfigured()) {
+  if (isRemoteJudgeLanguage(language) && isRemoteDockerJudgeConfigured()) {
     return {
       language,
       executionMode: "docker",
@@ -363,7 +372,7 @@ export const detectToolchain = async (language: JudgeLanguage): Promise<JudgeToo
       compilerPath: null,
       runtimeVersion: null,
       compilerVersion: null,
-      reason: "Java is delegated to the remote Docker judge service.",
+      reason: `${language} is delegated to the remote Docker judge service.`,
     };
   }
 
@@ -510,7 +519,7 @@ const runDockerJudge = async (problem: Problem, language: JudgeLanguage, code: s
 };
 
 const runRemoteJavaJudge = async (problem: Problem, code: string) => {
-  const serviceUrl = getJavaJudgeServiceUrl();
+  const serviceUrl = getRemoteJudgeServiceUrl("java");
   if (!serviceUrl) {
     throw new Error("Java remote judge service is not configured. Set JAVA_JUDGE_SERVICE_URL to the Docker judge endpoint.");
   }
@@ -567,6 +576,64 @@ const runRemoteJavaJudge = async (problem: Problem, code: string) => {
   } satisfies JudgeResult;
 };
 
+const runRemoteDockerJudge = async (problem: Problem, language: RemoteJudgeLanguage, code: string) => {
+  const serviceUrl = getRemoteJudgeServiceUrl(language);
+  if (!serviceUrl) {
+    throw new Error("Docker judge service is not configured. Set DOCKER_JUDGE_SERVICE_URL to the Docker judge endpoint.");
+  }
+
+  const response = await fetch(serviceUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      problemId: problem.id,
+      language,
+      code,
+      testCases: problem.testCases,
+      judge: problem.judge,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        status?: JudgeResult["status"];
+        passedCount?: number;
+        totalCount?: number;
+        runtimeMs?: number;
+        cases?: JudgeCaseResult[];
+        message?: string;
+        error?: string;
+      }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Docker judge service responded with HTTP ${response.status}.`);
+  }
+
+  if (
+    !payload ||
+    typeof payload.status !== "string" ||
+    typeof payload.passedCount !== "number" ||
+    typeof payload.totalCount !== "number" ||
+    typeof payload.runtimeMs !== "number" ||
+    !Array.isArray(payload.cases) ||
+    typeof payload.message !== "string"
+  ) {
+    throw new Error("Docker judge service returned an invalid response.");
+  }
+
+  return {
+    status: payload.status,
+    passedCount: payload.passedCount,
+    totalCount: payload.totalCount,
+    runtimeMs: payload.runtimeMs,
+    cases: payload.cases,
+    message: payload.message,
+  } satisfies JudgeResult;
+};
+
 const makeSelfTestProblem = (): Problem => ({
   id: "runtime-self-test",
   title: "Runtime Self Test",
@@ -598,7 +665,9 @@ const makeSelfTestProblem = (): Problem => ({
 
 export const runJudgeSelfTest = async (): Promise<JudgeSelfTestResult[]> => {
   const selfTestProblem = makeSelfTestProblem();
-  const inputs: JudgeLanguage[] = isRemoteJavaJudgeConfigured() ? ["javascript", "python", "c", "cpp"] : ["javascript", "python", "java", "c", "cpp"];
+  const inputs: JudgeLanguage[] = isRemoteDockerJudgeConfigured()
+    ? ["javascript", "python", "c", "cpp"]
+    : ["javascript", "python", "java", "go", "rust", "php", "ruby", "c", "cpp"];
   const results: JudgeSelfTestResult[] = [];
 
   for (const language of inputs) {
@@ -684,6 +753,65 @@ export async function judgeSubmission(
       return await runRemoteJavaJudge(problem, code);
     }
 
+    if (isRemoteJudgeLanguage(language) && language !== "java" && isRemoteDockerJudgeConfigured()) {
+      logger.info("judge.remote_docker_forward", {
+        language,
+        serviceUrl: getDockerJudgeServiceUrl() || getJavaJudgeServiceUrl(),
+      });
+      return await runRemoteDockerJudge(problem, language, code);
+    }
+
+    const toolchain = await detectToolchain(language);
+    if (toolchain) {
+      logger.info("judge.toolchain", {
+        language: toolchain.language,
+        executionMode: toolchain.executionMode,
+        runtimeFound: toolchain.runtimeFound,
+        compilerFound: toolchain.compilerFound,
+        runtimePath: toolchain.runtimePath,
+        compilerPath: toolchain.compilerPath,
+        runtimeVersion: toolchain.runtimeVersion,
+        compilerVersion: toolchain.compilerVersion,
+      });
+    }
+
+    const results =
+      toolchain.executionMode === "docker"
+        ? await runDockerJudge(problem, language, code)
+        : toolchain.executionMode === "native"
+          ? await runNativeJudge(problem, language, code)
+          : (() => {
+              throw new Error(toolchain.reason ?? "Runtime not found: install the language toolchain locally, or set JUDGE_USE_DOCKER=true with Docker Desktop running.");
+            })();
+
+    return buildResult(problem, startedAt, results);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return {
+      status: "Runtime Error",
+      passedCount: 0,
+      totalCount: problem.testCases.length,
+      runtimeMs: Date.now() - startedAt,
+      cases: problem.testCases.map((testCase) => ({
+        ...testCase,
+        actual: "",
+        passed: false,
+        error: message,
+      })),
+      message,
+    };
+  }
+}
+
+export async function judgeSubmissionLocal(
+  problem: Problem,
+  language: JudgeLanguage,
+  code: string,
+): Promise<JudgeResult> {
+  const startedAt = Date.now();
+
+  try {
     const toolchain = await detectToolchain(language);
     if (toolchain) {
       logger.info("judge.toolchain", {

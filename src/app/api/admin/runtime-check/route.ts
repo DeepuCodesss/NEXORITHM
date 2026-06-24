@@ -31,13 +31,18 @@ export async function GET() {
   const clerkUser = await currentUser();
   if (!isAdmin(clerkUser)) return apiError("Admin access required.", 403);
 
-  const [node, python, java, javac, gcc, gpp, selfTests] = await Promise.all([
+  const [node, python, java, javac, gcc, gpp, go, rustc, cargo, php, ruby, selfTests] = await Promise.all([
     Promise.resolve({ found: true, version: process.version }),
     probeVersion(process.platform === "win32" ? "py" : "python3", process.platform === "win32" ? ["-3", "--version"] : ["--version"]),
     probeVersion("java", ["-version"]),
     probeVersion("javac", ["-version"]),
     probeVersion("gcc", ["--version"]),
     probeVersion("g++", ["--version"]),
+    probeVersion("go", ["version"]),
+    probeVersion("rustc", ["--version"]),
+    probeVersion("cargo", ["--version"]),
+    probeVersion("php", ["-v"]),
+    probeVersion("ruby", ["-v"]),
     runJudgeSelfTest(),
   ]);
 
@@ -52,6 +57,11 @@ export async function GET() {
       javac,
       gcc,
       gpp,
+      go,
+      rustc,
+      cargo,
+      php,
+      ruby,
       selfTests: selfTests.map((entry) => ({
         language: entry.language,
         passed: entry.passed,
@@ -68,6 +78,11 @@ export async function GET() {
     javac: javac.version,
     gcc: gcc.version,
     gpp: gpp.version,
+    go: go.version,
+    rustc: rustc.version,
+    cargo: cargo.version,
+    php: php.version,
+    ruby: ruby.version,
     selfTestsPassed: selfTests.every((entry) => entry.passed),
   });
 
@@ -77,6 +92,10 @@ export async function GET() {
     { language: "Java", runtimeFound: java.found, compilerFound: javac.found, version: java.version, executionMode: "native" },
     { language: "C", runtimeFound: gcc.found, compilerFound: gcc.found, version: gcc.version, executionMode: "native" },
     { language: "C++", runtimeFound: gpp.found, compilerFound: gpp.found, version: gpp.version, executionMode: "native" },
+    { language: "Go", runtimeFound: go.found, compilerFound: go.found, version: go.version, executionMode: "native" },
+    { language: "Rust", runtimeFound: rustc.found, compilerFound: rustc.found, version: rustc.version, executionMode: "native" },
+    { language: "PHP", runtimeFound: php.found, compilerFound: php.found, version: php.version, executionMode: "native" },
+    { language: "Ruby", runtimeFound: ruby.found, compilerFound: ruby.found, version: ruby.version, executionMode: "native" },
   ];
 
   return apiSuccess({
