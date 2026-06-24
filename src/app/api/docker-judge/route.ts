@@ -1,7 +1,7 @@
 import { judgeSubmissionLocal } from "@/lib/judge";
 import { isJudgeLanguage } from "@/lib/languages";
 import { MOCK_PROBLEMS } from "@/lib/mockData";
-import { apiError, apiSuccess } from "@/lib/apiResponse";
+import { apiError } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 
@@ -25,5 +25,5 @@ export async function POST(request: Request) {
   }
 
   const result = await judgeSubmissionLocal(problem, language, code);
-  return apiSuccess({ problemId: problem.id, saved: false, ...result });
+  return Response.json(result);
 }
