@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookOpen, Gift, Home, Trophy } from "lucide-react";
@@ -6,15 +5,7 @@ import { getPrisma } from "@/lib/db";
 import { currentUser } from "@clerk/nextjs/server";
 import ProfileClient from "./ProfileClient";
 
-type Sub = {
-  id: string;
-  status: string;
-  createdAt: Date;
-  language: string;
-  problem: { title: string; slug: string };
-};
-
-type ProfilePayload = {
+export type ProfilePayload = {
   username: string;
   fullName: string;
   avatarUrl: string;
@@ -32,11 +23,12 @@ type ProfilePayload = {
     status: string;
     problemTitle: string;
     problemSlug: string;
+    difficulty: string;
     language: string;
     createdAt: string;
+    xpEarned: number;
   }>;
-  heatmap: Record<string, number>;
-  submissionsByWeek: number[];
+  heatmap: Record<string, { count: number; xp: number; languages: string[] }>;
   langDist: Array<{ lang: string; pct: number; count: number; color: string }>;
   submissionStats: {
     accepted: number;
@@ -45,6 +37,9 @@ type ProfilePayload = {
     compileError: number;
     acceptanceRate: number;
     totalAttempts: number;
+    problemsAttempted: number;
+    averageAttempts: number;
+    averageRuntime: number;
   };
   collegeRank: number | null;
   monthlyProgress: {
@@ -55,6 +50,14 @@ type ProfilePayload = {
   };
   streakCalendar: Array<{ dayName: string; solved: boolean; dateStr: string }>;
   hasSolvedToday: boolean;
+  weeklyGoal: { solvedDays: number; targetDays: number };
+  journeyTimeline: Array<{
+    id: string;
+    title: string;
+    unlocked: boolean;
+    date: string | null;
+    icon: string;
+  }>;
 };
 
 type PageProps = { params: Promise<{ username: string }> };
@@ -89,17 +92,19 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
       id: true,
       status: true,
       language: true,
+      runtimeMs: true,
       createdAt: true,
-      problem: { select: { title: true, slug: true } },
+      problem: { select: { title: true, slug: true, difficulty: true } },
     },
   });
 
-  const submissions = dbSubmissions as unknown as Array<{
+  const submissions = dbSubmissions as Array<{
     id: string;
     status: string;
     language: string;
+    runtimeMs: number;
     createdAt: Date;
-    problem: { title: string; slug: string };
+    problem: { title: string; slug: string; difficulty: string };
   }>;
 
   // 2. Global & College Rank calculation
@@ -135,33 +140,23 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     collegeRank = indexInCollege !== -1 ? indexInCollege + 1 : null;
   }
 
-  // 3. Heatmap Calculation (Last 90 days of Accepted Solves)
-  const now = new Date();
-  const heatmap: Record<string, number> = {};
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    heatmap[d.toISOString().slice(0, 10)] = 0;
-  }
-
+  // 3. Heatmap Calculation (All time for dynamic monthly view)
+  const heatmap: Record<string, { count: number; xp: number; languages: string[] }> = {};
   const acceptedSubmissions = submissions.filter((s) => s.status === "Accepted");
+  
   for (const sub of acceptedSubmissions) {
     const key = sub.createdAt.toISOString().slice(0, 10);
-    if (key in heatmap) {
-      heatmap[key] = (heatmap[key] ?? 0) + 1;
+    if (!heatmap[key]) {
+      heatmap[key] = { count: 0, xp: 0, languages: [] };
+    }
+    heatmap[key].count += 1;
+    heatmap[key].xp += 10;
+    if (!heatmap[key].languages.includes(sub.language)) {
+      heatmap[key].languages.push(sub.language);
     }
   }
 
-  // 4. Submissions by week (Last 8 weeks)
-  const submissionsByWeek = Array<number>(8).fill(0);
-  for (const sub of submissions) {
-    const dw = Math.floor((now.getTime() - sub.createdAt.getTime()) / (7 * 86400000));
-    if (dw < 8) {
-      submissionsByWeek[7 - dw]++;
-    }
-  }
-
-  // 5. Language Distribution
+  // 4. Language Distribution
   const langMap: Record<string, number> = {};
   for (const sub of submissions) {
     langMap[sub.language] = (langMap[sub.language] ?? 0) + 1;
@@ -186,15 +181,23 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
       color: langColors[lang.toLowerCase()] ?? "#8B5CF6",
     }));
 
-  // 6. Submission Stats from Database
+  // 5. Submission Stats
   const accepted = acceptedSubmissions.length;
   const wrongAnswer = submissions.filter((s) => s.status === "Wrong Answer").length;
   const runtimeError = submissions.filter((s) => s.status === "Runtime Error").length;
   const compileError = submissions.filter((s) => s.status === "Compilation Error").length;
   const totalAttempts = submissions.length;
   const acceptanceRate = totalAttempts > 0 ? Math.round((accepted / totalAttempts) * 100) : 0;
+  
+  const uniqueAttemptedSlugs = new Set(submissions.map(s => s.problem.slug));
+  const problemsAttempted = uniqueAttemptedSlugs.size;
+  const averageAttempts = problemsAttempted > 0 ? Math.round((totalAttempts / problemsAttempted) * 10) / 10 : 0;
+  
+  const runtimes = acceptedSubmissions.map(s => s.runtimeMs).filter(r => r > 0);
+  const averageRuntime = runtimes.length > 0 ? Math.round(runtimes.reduce((a, b) => a + b, 0) / runtimes.length) : 0;
 
-  // 7. Monthly Progress (Last 30 Days)
+  // 6. Monthly Progress (Last 30 Days)
+  const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const monthlySubmissions = submissions.filter((s) => s.createdAt >= thirtyDaysAgo);
   const monthlyAccepted = monthlySubmissions.filter((s) => s.status === "Accepted").length;
@@ -206,7 +209,7 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
   const monthlyCoins = monthlyTransactions.reduce((acc, t) => acc + t.amount, 0);
   const monthlyXP = monthlySubmissions.reduce((acc, s) => acc + (s.status === "Accepted" ? 10 : 5), 0);
 
-  // 8. Streak Calendar (Last 7 Days)
+  // 7. Streak Calendar (Last 7 Days) & Weekly Goal
   const streakCalendar = [];
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   for (let i = 6; i >= 0; i--) {
@@ -224,6 +227,78 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
   const hasSolvedToday = acceptedSubmissions.some(
     (s) => s.createdAt.toISOString().slice(0, 10) === todayStr
   );
+
+  // Calculate Weekly Goal (days solved this week, assuming week starts on Monday)
+  let solvedDaysThisWeek = 0;
+  const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const daysSinceMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - daysSinceMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const uniqueDaysSolvedThisWeek = new Set(
+    acceptedSubmissions
+      .filter((s) => s.createdAt >= startOfWeek)
+      .map((s) => s.createdAt.toISOString().slice(0, 10))
+  );
+  solvedDaysThisWeek = uniqueDaysSolvedThisWeek.size;
+
+  // 8. Journey Timeline
+  const firstAccepted = [...acceptedSubmissions].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+  // firstContest logic reserved for future use
+  const firstBadge = false; // Add real logic when badges exist
+
+  const journeyTimeline = [
+    {
+      id: "joined",
+      title: "Joined Nexorithm",
+      unlocked: true,
+      date: user.createdAt.toISOString(),
+      icon: "UserPlus",
+    },
+    {
+      id: "first_solve",
+      title: "First Accepted Solution",
+      unlocked: !!firstAccepted,
+      date: firstAccepted ? firstAccepted.createdAt.toISOString() : null,
+      icon: "CheckCircle",
+    },
+    {
+      id: "xp_100",
+      title: "100 XP Milestone",
+      unlocked: user.xp >= 100,
+      date: null,
+      icon: "Zap",
+    },
+    {
+      id: "streak_7",
+      title: "7-Day Streak",
+      unlocked: user.longestStreak >= 7,
+      date: null,
+      icon: "Flame",
+    },
+    {
+      id: "xp_500",
+      title: "500 XP Milestone",
+      unlocked: user.xp >= 500,
+      date: null,
+      icon: "Star",
+    },
+    {
+      id: "first_badge",
+      title: "Earned First Badge",
+      unlocked: firstBadge,
+      date: null,
+      icon: "Award",
+    },
+    {
+      id: "xp_1000",
+      title: "1000 XP Milestone",
+      unlocked: user.xp >= 1000,
+      date: null,
+      icon: "Crown",
+    },
+  ];
 
   return {
     username: user.username,
@@ -243,11 +318,12 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
       status: s.status,
       problemTitle: s.problem.title,
       problemSlug: s.problem.slug,
+      difficulty: s.problem.difficulty,
       language: s.language,
       createdAt: s.createdAt.toISOString(),
+      xpEarned: s.status === "Accepted" ? 10 : 5,
     })),
     heatmap,
-    submissionsByWeek,
     langDist,
     submissionStats: {
       accepted,
@@ -256,6 +332,9 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
       compileError,
       acceptanceRate,
       totalAttempts,
+      problemsAttempted,
+      averageAttempts,
+      averageRuntime,
     },
     collegeRank,
     monthlyProgress: {
@@ -266,6 +345,11 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     },
     streakCalendar,
     hasSolvedToday,
+    weeklyGoal: {
+      solvedDays: solvedDaysThisWeek,
+      targetDays: 7,
+    },
+    journeyTimeline,
   };
 };
 

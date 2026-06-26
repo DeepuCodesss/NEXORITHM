@@ -20,7 +20,10 @@ export default function Header() {
     clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
     user.username;
   const displayAvatar = clerkUser?.imageUrl || user.avatarUrl;
-  const profileHref = isSignedIn && displayUsername ? `/profile/${displayUsername}` : `/profile/${user.username}`;
+  // The unique DB username must be used for routing, not the display name (which might have spaces)
+  const profileHref = isSignedIn && user?.username && user.username !== "guest" 
+    ? `/profile/${user.username}` 
+    : `/profile/${clerkUser?.username || user?.username || "guest"}`;
 
 
   const navItems = [

@@ -23,8 +23,8 @@ export async function POST(request: Request) {
     });
 
     return apiSuccess({ user });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to update profile:", err);
-    return apiError(err.message || "Failed to update profile", 500);
+    return apiError(err instanceof Error ? err.message : "Failed to update profile", 500);
   }
 }

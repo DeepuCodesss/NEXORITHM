@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -13,53 +8,53 @@ datasource db {
 }
 
 model Problem {
-  id             String       @id
-  slug           String       @unique
-  title          String
-  difficulty     String
-  level          Int          @unique
-  topic          String
-  pattern        String
-  judgeKind      String
-  xpReward       Int
-  coinReward     Int
-  prizeMoneyInr  Int?
-  description    String
-  starterCode    Json
-  testCases      Json
-  submissions    Submission[]
+  id              String           @id
+  slug            String           @unique
+  title           String
+  difficulty      String
+  level           Int              @unique
+  topic           String
+  pattern         String
+  judgeKind       String
+  xpReward        Int
+  coinReward      Int
+  prizeMoneyInr   Int?
+  description     String
+  starterCode     Json
+  testCases       Json
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   solutionReplays SolutionReplay[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  submissions     Submission[]
 }
 
 model User {
-  id               String        @id
-  clerkId          String        @unique
-  username         String        @unique
-  fullName         String
-  email            String        @unique
-  avatarUrl        String
-  college          String        @default("Connect authentication to set college")
-  authProvider     String
-  xp               Int           @default(0)
-  coins            Int           @default(0)
-  moneyEarnedInr   Int           @default(0)
-  reputation       Int           @default(0)
-  devRank          Int           @default(0)
-  currentStreak    Int           @default(0)
-  longestStreak    Int           @default(0)
-  streakShields    Int           @default(0)
-  isPro            Boolean       @default(false)
-  solvedProblemIds  Json
-  lastSolvedAt      DateTime?
-  submissions      Submission[]
+  id                 String              @id
+  clerkId            String              @unique
+  username           String              @unique
+  fullName           String
+  email              String              @unique
+  avatarUrl          String
+  college            String              @default("Connect authentication to set college")
+  authProvider       String
+  xp                 Int                 @default(0)
+  coins              Int                 @default(0)
+  moneyEarnedInr     Int                 @default(0)
+  reputation         Int                 @default(0)
+  devRank            Int                 @default(0)
+  currentStreak      Int                 @default(0)
+  longestStreak      Int                 @default(0)
+  streakShields      Int                 @default(0)
+  isPro              Boolean             @default(false)
+  solvedProblemIds   Json
+  lastSolvedAt       DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   rewardTransactions RewardTransaction[]
-  withdrawals      Withdrawal[]
+  solutionReplays    SolutionReplay[]
+  submissions        Submission[]
+  withdrawals        Withdrawal[]
   withdrawalRequests WithdrawalRequest[]
-  solutionReplays  SolutionReplay[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
 
   @@index([xp, currentStreak, lastSolvedAt])
   @@index([updatedAt])
@@ -74,8 +69,7 @@ model RewardTransaction {
   amount    Int
   metadata  Json?
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([type, createdAt])
@@ -89,39 +83,37 @@ model Withdrawal {
   upiId      String
   status     String
   createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
 
 model WithdrawalRequest {
-  id         String   @id @default(cuid())
-  userId     String
-  amount     Int
-  upiId      String
-  status     String   @default("pending")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  upiId     String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
 
 model LiveReward {
-  id          String   @id @default(cuid())
-  problemId   String   @unique
-  rewardMoney Float
-  startsAt    DateTime
-  endsAt      DateTime
-  isActive    Boolean  @default(true)
-  winnerUserId String?
+  id                 String    @id @default(cuid())
+  problemId          String    @unique
+  rewardMoney        Float
+  startsAt           DateTime
+  endsAt             DateTime
+  isActive           Boolean   @default(true)
+  winnerUserId       String?
   winnerSubmissionId String?
-  paidAt      DateTime?
-  createdAt   DateTime @default(now())
+  paidAt             DateTime?
+  createdAt          DateTime  @default(now())
 
   @@index([problemId, isActive, startsAt, endsAt])
 }
@@ -129,25 +121,25 @@ model LiveReward {
 model ProblemBoardConfig {
   id                  String   @id @default("singleton")
   showUpcomingRewards Boolean  @default(true)
-  upcomingRewardItems  Json
+  upcomingRewardItems Json
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
 
 model Submission {
-  id             String   @id @default(cuid())
-  problemId      String
-  userId         String?
-  language       String
-  code           String
-  status         String
-  passedCount    Int
-  totalCount     Int
-  runtimeMs      Int
-  output         Json
-  createdAt      DateTime @default(now())
-  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id          String   @id @default(cuid())
+  problemId   String
+  userId      String?
+  language    String
+  code        String
+  status      String
+  passedCount Int
+  totalCount  Int
+  runtimeMs   Int
+  output      Json
+  createdAt   DateTime @default(now())
+  problem     Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id])
 
   @@index([problemId, createdAt])
   @@index([userId, createdAt])
@@ -155,22 +147,21 @@ model Submission {
 }
 
 model SolutionReplay {
-  id              String   @id @default(cuid())
-  userId          String
-  problemId       String
-  submissionId    String   @unique
-  language        String
-  replayData      Json
+  id               String   @id @default(cuid())
+  userId           String
+  problemId        String
+  submissionId     String   @unique
+  language         String
+  replayData       Json
   solveTimeSeconds Int
-  trustScore      Int      @default(100)
-  pasteCount      Int      @default(0)
-  pastedCharacters Int     @default(0)
-  runCount        Int      @default(0)
-  tabSwitchCount  Int      @default(0)
-  createdAt       DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  pasteCount       Int      @default(0)
+  pastedCharacters Int      @default(0)
+  runCount         Int      @default(0)
+  tabSwitchCount   Int      @default(0)
+  createdAt        DateTime @default(now())
+  trustScore       Int      @default(100)
+  problem          Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, problemId])
   @@index([problemId, createdAt])

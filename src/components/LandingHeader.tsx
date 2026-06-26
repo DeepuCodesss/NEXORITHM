@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { Code2, Gift, LogOut, Moon, UserRound } from "lucide-react";
+import { useApp } from "@/context/AppContext";
 
 function UserAvatar({ src, name }: { src?: string; name: string }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -37,12 +38,17 @@ function UserAvatar({ src, name }: { src?: string; name: string }) {
 
 export default function LandingHeader() {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { user } = useApp();
   const displayUsername =
     clerkUser?.username ||
     [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ").trim() ||
     clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
     "Log in";
-  const profileHref = isSignedIn && clerkUser ? `/profile/${clerkUser.username || displayUsername}` : "/problems";
+  
+  // Use the synced database username if available
+  const profileHref = isSignedIn && user?.username && user.username !== "guest" 
+    ? `/profile/${user.username}` 
+    : (isSignedIn ? `/profile/${clerkUser?.username || "guest"}` : "/problems");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/75 backdrop-blur-xl">

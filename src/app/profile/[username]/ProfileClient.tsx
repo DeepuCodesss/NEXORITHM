@@ -9,12 +9,10 @@ import {
   BadgeCheck,
   Code2,
   Globe,
-  BarChart2,
   Trophy,
   Flag,
   Settings,
   Plus,
-  Sparkles,
   X,
   Flame,
   Check,
@@ -22,53 +20,33 @@ import {
   Terminal,
   Calendar,
   ShieldQuestion,
-  ChevronRight
+  ChevronLeft,
+  ChevronRight,
+  Target,
+  Clock,
+  Zap,
+  Star,
+  UserPlus,
+  CheckCircle,
+  Crown
 } from "lucide-react";
+import { ProfilePayload } from "./page";
 
-type SubActivity = {
-  id: string;
-  status: string;
-  problemTitle: string;
-  problemSlug: string;
-  language: string;
-  createdAt: string;
-};
+// Deterministic pseudo-random based on seed (avoids impure Math.random during render)
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
+}
 
-type ProfilePayload = {
-  username: string;
-  fullName: string;
-  avatarUrl: string;
-  xp: number;
-  coins: number;
-  currentStreak: number;
-  longestStreak: number;
-  solvedCount: number;
-  globalRank: number | null;
-  college: string;
-  joinedDate: string;
-  isPro: boolean;
-  recentActivity: SubActivity[];
-  heatmap: Record<string, number>;
-  submissionsByWeek: number[];
-  langDist: Array<{ lang: string; pct: number; count: number; color: string }>;
-  submissionStats: {
-    accepted: number;
-    wrongAnswer: number;
-    runtimeError: number;
-    compileError: number;
-    acceptanceRate: number;
-    totalAttempts: number;
-  };
-  collegeRank: number | null;
-  monthlyProgress: {
-    accepted: number;
-    xp: number;
-    coins: number;
-    solved: number;
-  };
-  streakCalendar: Array<{ dayName: string; solved: boolean; dateStr: string }>;
-  hasSolvedToday: boolean;
-};
+// Pre-computed particle data (static, no hooks needed)
+const HERO_PARTICLES = [...Array(8)].map((_, i) => ({
+  id: i,
+  width: seededRandom(i * 7 + 1) * 4 + 2,
+  height: seededRandom(i * 7 + 2) * 4 + 2,
+  left: `${seededRandom(i * 7 + 3) * 80 + 10}%`,
+  duration: seededRandom(i * 7 + 4) * 5 + 4,
+  delay: seededRandom(i * 7 + 5) * 3,
+}));
 
 type ProfileClientProps = {
   profile: ProfilePayload;
@@ -77,10 +55,16 @@ type ProfileClientProps = {
 
 export default function ProfileClient({ profile: initialProfile, isOwner }: ProfileClientProps) {
   const [profile, setProfile] = useState<ProfilePayload>(initialProfile);
-  const [modalType, setModalType] = useState<"college" | "all-activity" | "all-languages" | "badges" | null>(null);
+  const [modalType, setModalType] = useState<"college" | "all-activity" | "all-languages" | "badges" | "heatmap-day" | null>(null);
   const [collegeInput, setCollegeInput] = useState("");
   const [submittingCollege, setSubmittingCollege] = useState(false);
   const [collegeError, setCollegeError] = useState("");
+  
+  // Heatmap State
+  const [heatmapDate, setHeatmapDate] = useState(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<{ date: string; data: { count: number; xp: number; languages: string[] } } | null>(null);
+
+
 
   const handleConnectCollege = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,12 +83,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        // Refresh page or update local state
-        setProfile((prev) => ({
-          ...prev,
-          college: collegeInput.trim(),
-          // recalculate rankings dynamically locally or let server page handle reload
-        }));
+        setProfile((prev) => ({ ...prev, college: collegeInput.trim() }));
         setModalType(null);
         window.location.reload();
       } else {
@@ -118,36 +97,10 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
     }
   };
 
-  const heatmapEntries = Object.entries(profile.heatmap);
-  const weeks: Array<Array<{ date: string; count: number }>> = [];
-  let week: Array<{ date: string; count: number }> = [];
-  heatmapEntries.forEach(([date, count], i) => {
-    week.push({ date, count });
-    if (week.length === 7 || i === heatmapEntries.length - 1) {
-      weeks.push(week);
-      week = [];
-    }
-  });
+  const currentLevel = Math.floor(profile.xp / 100) + 1;
+  const currentLevelXP = profile.xp % 100;
+  const xpNeeded = 100 - currentLevelXP;
 
-  const maxBar = Math.max(...profile.submissionsByWeek, 1);
-  const r = 32;
-  const circ = 2 * Math.PI * r;
-  const totalSolved = profile.solvedCount || 1;
-  const easy = Math.round(profile.solvedCount * 0.6);
-  const medium = Math.round(profile.solvedCount * 0.28);
-  const hard = Math.max(0, profile.solvedCount - easy - medium);
-  const ePct = easy / totalSolved;
-  const mPct = medium / totalSolved;
-  const hPct = hard / totalSolved;
-
-  function timeAgo(iso: string) {
-    const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-    if (m < 1) return "just now";
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
-  }
 
   function heatColor(count: number) {
     if (count === 0) return "#1C2230";
@@ -172,10 +125,40 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
     }
   };
 
+  const getTimelineIcon = (iconName: string) => {
+    switch(iconName) {
+      case "UserPlus": return <UserPlus className="h-4 w-4" />;
+      case "CheckCircle": return <CheckCircle className="h-4 w-4" />;
+      case "Zap": return <Zap className="h-4 w-4" />;
+      case "Flame": return <Flame className="h-4 w-4" />;
+      case "Star": return <Star className="h-4 w-4" />;
+      case "Award": return <Award className="h-4 w-4" />;
+      case "Crown": return <Crown className="h-4 w-4" />;
+      default: return <Check className="h-4 w-4" />;
+    }
+  }
+
   const hasNoCollege = !profile.college || profile.college.includes("Connect");
 
+  // Heatmap Calendar Logic (1 Month)
+  const currentMonth = heatmapDate.getMonth();
+  const currentYear = heatmapDate.getFullYear();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay(); // 0 = Sun, 6 = Sat
+  
+  const calendarDays = [];
+  for (let i = 0; i < firstDayOfMonth; i++) calendarDays.push(null);
+  for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
+
+  const handlePrevMonth = () => {
+    setHeatmapDate(new Date(currentYear, currentMonth - 1, 1));
+  };
+  const handleNextMonth = () => {
+    setHeatmapDate(new Date(currentYear, currentMonth + 1, 1));
+  };
+
   return (
-    <div className="flex-1 min-w-0 p-3 flex flex-col gap-2 relative overflow-hidden h-full">
+    <div className="flex-1 min-w-0 p-4 flex flex-col gap-4 relative overflow-y-auto custom-scrollbar h-full bg-[#0B0D12]">
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
@@ -197,593 +180,415 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
           100% { background-position: 0% 50%; }
         }
         .hero-gradient {
-          background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(76, 29, 149, 0.15), rgba(15, 17, 23, 0.4));
+          background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(76, 29, 149, 0.05), rgba(11, 13, 18, 0.8));
           background-size: 200% 200%;
           animation: flow-gradient 10s ease infinite;
         }
       `}} />
 
-      {/* Row 1: Profile card / Hero */}
-      <section className="rounded-xl border border-[#2A3242] bg-[#161B22] hero-gradient px-5 py-3 flex items-center justify-between gap-4 relative overflow-hidden shrink-0 transition-all hover:border-[#7C3AED]/40 hover:shadow-[0_0_15px_rgba(124,58,237,0.05)]">
-        {/* Floating particles animation */}
+      {/* Row 1: Hero Section */}
+      <section className="rounded-2xl border border-[#2A3242] bg-[#12161F] hero-gradient px-6 py-5 flex items-center justify-between gap-6 relative overflow-hidden shrink-0 transition-all shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+        {/* Animated Particles */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[...Array(6)].map((_, i) => (
+          {HERO_PARTICLES.map((p) => (
             <motion.div
-              key={i}
-              className="absolute rounded-full bg-[#A78BFA]/10 blur-[1px]"
-              style={{
-                width: Math.random() * 4 + 2,
-                height: Math.random() * 4 + 2,
-                left: `${Math.random() * 80 + 10}%`,
-                bottom: "-10px",
-              }}
-              animate={{
-                y: ["0px", "-100px"],
-                opacity: [0, 0.7, 0],
-              }}
-              transition={{
-                duration: Math.random() * 5 + 4,
-                repeat: Infinity,
-                delay: Math.random() * 3,
-                ease: "easeInOut",
-              }}
+              key={p.id}
+              className="absolute rounded-full bg-[#A78BFA]/20 blur-[1px]"
+              style={{ width: p.width, height: p.height, left: p.left, bottom: "-10px" }}
+              animate={{ y: ["0px", "-150px"], opacity: [0, 0.8, 0] }}
+              transition={{ duration: p.duration, repeat: Infinity, delay: p.delay, ease: "easeInOut" }}
             />
           ))}
-          <div className="absolute right-0 top-0 h-full w-[350px] bg-gradient-to-l from-[#7C3AED]/10 to-transparent blur-3xl pointer-events-none" />
+          <div className="absolute right-0 top-0 h-full w-[400px] bg-gradient-to-l from-[#7C3AED]/10 to-transparent blur-3xl pointer-events-none" />
         </div>
 
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="h-16 w-16 shrink-0 rounded-full border-2 border-[#7C3AED] overflow-hidden bg-[#1C2230] relative shadow-[0_0_12px_rgba(124,58,237,0.3)]">
-            <Image src={profile.avatarUrl} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" />
+        <div className="flex items-center gap-5 relative z-10">
+          <div className="h-20 w-20 shrink-0 rounded-full border-2 border-[#7C3AED] overflow-hidden bg-[#1C2230] relative shadow-[0_0_20px_rgba(124,58,237,0.3)] group">
+            <Image src={profile.avatarUrl} alt="" width={80} height={80} unoptimized className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
             {profile.isPro && (
-              <span className="absolute bottom-0 right-0 bg-[#7C3AED] text-white text-[7px] px-1 font-bold rounded-tl-md uppercase tracking-wider">
+              <span className="absolute bottom-0 w-full text-center bg-[#7C3AED] text-white text-[9px] py-0.5 font-bold uppercase tracking-wider">
                 Pro
               </span>
             )}
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="text-xl font-black text-white tracking-tight">{profile.fullName}</h1>
-              {profile.solvedCount > 0 && (
-                <BadgeCheck className="h-4 w-4 fill-[#7C3AED] text-white shrink-0" />
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <h1 className="text-2xl font-black text-white tracking-tight">{profile.fullName}</h1>
+              {profile.solvedCount >= 100 && (
+                <BadgeCheck className="h-5 w-5 fill-[#7C3AED] text-white shrink-0 drop-shadow-[0_0_8px_rgba(124,58,237,0.5)]" />
               )}
             </div>
-            <p className="text-[11px] font-mono text-[#94A3B8]">@{profile.username}</p>
-            <p className="text-[10px] text-[#64748B] mt-1 flex items-center gap-1.5 flex-wrap">
-              <span>Joined {new Date(profile.joinedDate).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })}</span>
+            <p className="text-xs font-mono text-[#94A3B8] mb-1.5">@{profile.username}</p>
+            <p className="text-[11px] text-[#64748B] flex items-center gap-2 flex-wrap">
+              <span>Joined {new Date(profile.joinedDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
               <span>&bull;</span>
-              <span>India 🇮🇳</span>
               {!hasNoCollege && (
-                <>
-                  <span>&bull;</span>
-                  <span className="text-[#A78BFA] font-medium flex items-center gap-0.5">
-                    🏛️ {profile.college}
-                  </span>
-                </>
+                <span className="text-[#A78BFA] font-medium flex items-center gap-1">
+                  🏛️ {profile.college}
+                </span>
               )}
             </p>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-3">
               {isOwner && (
                 <Link
                   href="/settings"
-                  className="flex items-center gap-1 rounded-md border border-[#2A3242] bg-[#0F1117] px-2.5 py-1 text-[9px] font-bold text-[#94A3B8] hover:text-white hover:border-[#7C3AED]/40 hover:bg-[#161B22] transition-all"
+                  className="flex items-center gap-1.5 rounded-lg border border-[#2A3242] bg-[#0B0D12] px-3 py-1.5 text-[10px] font-bold text-[#94A3B8] hover:text-white hover:border-[#7C3AED]/40 hover:bg-[#161B22] transition-all"
                 >
-                  <Settings className="h-3 w-3" /> Edit Profile
+                  <Settings className="h-3.5 w-3.5" /> Edit Profile
                 </Link>
               )}
               {hasNoCollege && isOwner && (
                 <button
                   onClick={() => setModalType("college")}
-                  className="flex items-center gap-1 rounded-md border border-[#7C3AED]/30 bg-[#7C3AED]/10 px-2.5 py-1 text-[9px] font-bold text-[#A78BFA] hover:bg-[#7C3AED] hover:text-white transition-all shadow-sm"
+                  className="flex items-center gap-1.5 rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED]/10 px-3 py-1.5 text-[10px] font-bold text-[#A78BFA] hover:bg-[#7C3AED] hover:text-white transition-all shadow-sm"
                 >
-                  <Plus className="h-3 w-3" /> Connect College
+                  <Plus className="h-3.5 w-3.5" /> Connect College
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Hero right: Streak Summary card */}
-        <div className="relative z-10 bg-[#0F1117]/60 backdrop-blur-md border border-[#2A3242] rounded-xl px-4 py-2 text-right hidden sm:block shadow-lg">
-          <div className="flex items-center gap-1.5 justify-end mb-0.5">
-            <span className="text-xs">🔥</span>
-            <span className="text-[9px] text-[#64748B] uppercase tracking-wider">Current Streak</span>
+        {/* Current Goal Panel */}
+        <div className="relative z-10 bg-[#0B0D12]/80 backdrop-blur-md border border-[#2A3242] rounded-xl px-5 py-3 hidden md:flex flex-col gap-2 min-w-[200px] shadow-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">Current Goal</span>
+            <span className="text-[10px] font-black text-[#A78BFA]">Level {currentLevel + 1}</span>
           </div>
-          <p className="text-2xl font-black text-white leading-none">
-            {profile.currentStreak} <span className="text-xs font-semibold text-[#94A3B8]">Days</span>
-          </p>
-          <p className="text-[9px] text-[#64748B] mt-1 font-mono">
-            {profile.hasSolvedToday ? (
-              <span className="text-[#22C55E] font-medium">✓ Today's solve complete</span>
-            ) : (
-              <span className="text-[#F59E0B]">⏳ Solve today to save streak</span>
-            )}
-          </p>
+          <div>
+            <div className="flex justify-between text-[11px] font-black text-white mb-1">
+              <span>{currentLevelXP} XP</span>
+              <span>100 XP</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[#1C2230] overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-[#7C3AED] to-[#C084FC]"
+                initial={{ width: 0 }}
+                animate={{ width: `${currentLevelXP}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+          <p className="text-[9px] text-[#64748B] font-mono text-right">{xpNeeded} XP until next level</p>
         </div>
       </section>
 
-      {/* Row 2: Stat cards */}
-      <div className="grid grid-cols-5 gap-2 shrink-0">
-        {[
-          { label: "Current Streak", value: `${profile.currentStreak} Days`, emoji: "🔥", color: "#F97316" },
-          { label: "Best Streak", value: `${profile.longestStreak} Days`, emoji: "📅", color: "#60A5FA" },
-          {
-            label: "Global Rank",
-            value: profile.globalRank ? `#${profile.globalRank}` : "N/A",
-            emoji: "🏆",
-            color: "#FBBF24"
-          },
-          { label: "XP Points", value: profile.xp, emoji: null, isXP: true, color: "#A78BFA" },
-          { label: "Wallet Balance", value: `${profile.coins} Coins`, emoji: "🪙", color: "#FBBF24" }
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="rounded-xl border border-[#2A3242] bg-[#161B22] px-3 py-2.5 transition-all hover:border-[#2A3242]/80 hover:translate-y-[-1px]"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[9px] text-[#64748B] font-bold uppercase tracking-wider">{s.label}</span>
-              {s.emoji && <span className="text-sm leading-none">{s.emoji}</span>}
-              {s.isXP && (
-                <span className="text-[8px] font-bold border border-[#7C3AED]/40 bg-[#7C3AED]/10 text-[#A78BFA] rounded px-1 py-0.5 leading-none">
-                  XP
-                </span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
+        
+        {/* Left Column (Main Content) */}
+        <div className="lg:col-span-8 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-1">
+          
+          {/* Row: Streaks & Weekly Goal */}
+          <div className="grid grid-cols-3 gap-3 shrink-0">
+            <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-4 flex flex-col justify-center transition-all hover:border-[#7C3AED]/40 hover:-translate-y-0.5 shadow-sm group">
+              <div className="flex items-center gap-2 mb-2">
+                <Flame className="h-4 w-4 text-[#F97316] group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider">Current Streak</span>
+              </div>
+              <p className="text-2xl font-black text-white">{profile.currentStreak} <span className="text-xs text-[#64748B]">Days</span></p>
+              <p className="text-[9px] mt-1 font-mono">
+                {profile.hasSolvedToday ? (
+                  <span className="text-[#22C55E]">✓ Safe today</span>
+                ) : (
+                  <span className="text-[#F59E0B]">⏳ Solve 1 today</span>
+                )}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-4 flex flex-col justify-center transition-all hover:border-[#60A5FA]/40 hover:-translate-y-0.5 shadow-sm group">
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="h-4 w-4 text-[#60A5FA] group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider">Best Streak</span>
+              </div>
+              <p className="text-2xl font-black text-white">{profile.longestStreak} <span className="text-xs text-[#64748B]">Days</span></p>
+              <p className="text-[9px] mt-1 font-mono text-[#64748B]">All time personal best</p>
+            </div>
+            <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-4 flex flex-col justify-center transition-all hover:border-[#22C55E]/40 hover:-translate-y-0.5 shadow-sm group">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4 text-[#22C55E] group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider">Weekly Goal</span>
+              </div>
+              <p className="text-2xl font-black text-white">{profile.weeklyGoal.solvedDays} <span className="text-xs text-[#64748B]">/ {profile.weeklyGoal.targetDays}</span></p>
+              <div className="mt-2 h-1 rounded-full bg-[#1C2230] overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-[#22C55E]"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(profile.weeklyGoal.solvedDays / profile.weeklyGoal.targetDays) * 100}%` }}
+                  transition={{ duration: 0.8 }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 1-Month Heatmap */}
+          <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-5 shrink-0 transition-all hover:border-[#2A3242]/80">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-black text-white flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-[#7C3AED]" /> Activity Calendar
+              </span>
+              <div className="flex items-center gap-3">
+                <select 
+                  className="bg-[#0B0D12] border border-[#2A3242] text-[#94A3B8] text-xs rounded px-2 py-1 outline-none font-mono"
+                  value={currentYear}
+                  onChange={(e) => setHeatmapDate(new Date(parseInt(e.target.value), currentMonth, 1))}
+                >
+                  {[currentYear - 1, currentYear, currentYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <div className="flex items-center gap-1 bg-[#0B0D12] border border-[#2A3242] rounded p-0.5">
+                  <button onClick={handlePrevMonth} className="p-1 hover:bg-[#1C2230] rounded text-[#94A3B8] transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                  <span className="text-xs font-bold text-white w-20 text-center font-mono">
+                    {heatmapDate.toLocaleDateString('en-US', { month: 'short' })}
+                  </span>
+                  <button onClick={handleNextMonth} className="p-1 hover:bg-[#1C2230] rounded text-[#94A3B8] transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                <div key={d} className="text-[10px] font-bold text-[#64748B] text-center uppercase tracking-wider">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {calendarDays.map((day, idx) => {
+                if (!day) return <div key={`empty-${idx}`} className="aspect-square rounded-md bg-transparent" />;
+                
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const data = profile.heatmap[dateStr] || { count: 0, xp: 0, languages: [] };
+                
+                return (
+                  <div key={dateStr} className="relative group aspect-square">
+                    <button 
+                      className="w-full h-full rounded-md border border-[#2A3242]/50 transition-all hover:scale-105 hover:ring-2 ring-[#7C3AED]/50"
+                      style={{ background: heatColor(data.count) }}
+                      onClick={() => {
+                        if (data.count > 0) {
+                          setSelectedDay({ date: dateStr, data });
+                          setModalType("heatmap-day");
+                        }
+                      }}
+                    />
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                      <div className="bg-[#0B0D12] border border-[#2A3242] px-3 py-2 rounded-lg shadow-xl w-32 flex flex-col gap-1.5">
+                        <span className="text-[10px] font-bold text-white border-b border-[#2A3242] pb-1">
+                          {new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        <div className="flex justify-between text-[9px] font-mono">
+                          <span className="text-[#94A3B8]">Solved:</span>
+                          <span className="text-white font-bold">{data.count}</span>
+                        </div>
+                        <div className="flex justify-between text-[9px] font-mono">
+                          <span className="text-[#94A3B8]">XP Earned:</span>
+                          <span className="text-[#A78BFA] font-bold">+{data.xp}</span>
+                        </div>
+                        {data.languages.length > 0 && (
+                          <div className="flex flex-col text-[9px] font-mono mt-0.5">
+                            <span className="text-[#94A3B8]">Languages:</span>
+                            <span className="text-[#22C55E] truncate">{data.languages.join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-4 border-transparent border-t-[#2A3242] -mt-1" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-5 shrink-0 flex flex-col transition-all hover:border-[#2A3242]/80 h-[300px]">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <span className="text-sm font-black text-white flex items-center gap-2">
+                <Code2 className="h-4 w-4 text-[#7C3AED]" /> Submissions Log
+              </span>
+              {profile.recentActivity.length > 5 && (
+                <button
+                  onClick={() => setModalType("all-activity")}
+                  className="text-[10px] font-bold text-[#A78BFA] hover:text-[#7C3AED] transition-colors flex items-center gap-1"
+                >
+                  View All <ChevronRight className="h-3 w-3" />
+                </button>
               )}
             </div>
-            <p className="text-lg font-black leading-tight" style={{ color: s.color }}>
-              {s.value}
-            </p>
-            {s.isXP && (
-              <div className="mt-2.5">
-                <div className="h-1 rounded-full bg-[#2A3242] overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[#7C3AED] transition-all duration-500"
-                    style={{ width: `${Math.min(100, profile.xp % 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between items-center text-[8px] text-[#64748B] mt-1 font-mono">
-                  <span>Level {Math.floor(profile.xp / 100) + 1}</span>
-                  <span>{Math.min(100, profile.xp % 100)}/100 XP</span>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
 
-      {/* Row 3: Heatmap | Recent Activity | Badges */}
-      <div className="grid gap-2 flex-1 min-h-0" style={{ gridTemplateColumns: "1.2fr 1fr 230px" }}>
-        {/* Heatmap */}
-        <div className="rounded-xl border border-[#2A3242] bg-[#161B22] p-3 flex flex-col overflow-hidden transition-all hover:border-[#2A3242]/80">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold text-white flex items-center gap-1">
-              <Flame className="h-3.5 w-3.5 text-[#F97316]" /> Solved Submissions Heatmap
-            </span>
-            <span className="text-[9px] text-[#64748B] font-mono">Last 90 Days</span>
-          </div>
-
-          {heatmapEntries.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[#2A3242] rounded-xl p-4">
-              <p className="text-[10px] text-[#64748B] text-center">No submissions tracked yet.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col flex-1 min-h-0 justify-center">
-              <div className="flex gap-[3px] mb-1 pl-5">
-                {["Apr", "May", "Jun"].map((m) => (
-                  <span key={m} className="flex-1 text-[8px] text-[#64748B] text-center">
-                    {m}
-                  </span>
-                ))}
+            {profile.recentActivity.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[#2A3242]/60 rounded-xl bg-[#0B0D12]/50">
+                <Terminal className="h-8 w-8 text-[#2A3242] mb-2" />
+                <p className="text-xs font-bold text-[#64748B]">No submissions yet</p>
+                <p className="text-[10px] text-[#64748B] mt-1">Your recent coding activity will appear here.</p>
               </div>
-              <div className="flex gap-[3px] flex-1 min-h-0 items-stretch">
-                <div className="flex flex-col justify-around pr-1.5 font-mono text-[7px] text-[#64748B] shrink-0 select-none">
-                  <span>Mon</span>
-                  <span>Wed</span>
-                  <span>Fri</span>
-                  <span>Sun</span>
-                </div>
-                <div className="flex gap-[3px] flex-1">
-                  {weeks.map((w, wi) => (
-                    <div key={wi} className="flex flex-col gap-[3px] flex-1">
-                      {w.map(({ date, count }) => (
-                        <div key={date} className="relative group flex-1">
-                          <div
-                            className="w-full rounded-[2px] transition-opacity hover:opacity-60 aspect-square"
-                            style={{ background: heatColor(count), minHeight: "5px" }}
-                          />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-50 bg-[#0F1117] border border-[#2A3242] text-[8px] text-white px-1.5 py-1 rounded shadow-xl whitespace-nowrap pointer-events-none font-mono">
-                            {new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}:{" "}
-                            {count === 0 ? "0 solved" : `${count} solved`}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0F1117]" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#2A3242]/30 shrink-0">
-                <div className="flex items-center gap-1">
-                  <span className="text-[8px] text-[#64748B]">Less</span>
-                  {["#1C2230", "#4C1D95", "#6D28D9", "#7C3AED", "#A78BFA"].map((c) => (
-                    <div key={c} className="h-1.5 w-1.5 rounded-[1px]" style={{ background: c }} />
-                  ))}
-                  <span className="text-[8px] text-[#64748B]">More</span>
-                </div>
-                <span className="text-[8px] text-[#64748B] font-mono">
-                  Total Solved: {profile.solvedCount} problems
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Activity */}
-        <div className="rounded-xl border border-[#2A3242] bg-[#161B22] p-3 flex flex-col overflow-hidden transition-all hover:border-[#2A3242]/80">
-          <div className="flex items-center justify-between mb-1.5 shrink-0">
-            <span className="text-[11px] font-bold text-white flex items-center gap-1">
-              <Code2 className="h-3.5 w-3.5 text-[#7C3AED]" /> Submissions Log
-            </span>
-            {profile.recentActivity.length > 5 && (
-              <button
-                onClick={() => setModalType("all-activity")}
-                className="text-[9px] font-bold text-[#A78BFA] hover:text-[#7C3AED] transition-colors"
-              >
-                View All
-              </button>
-            )}
-          </div>
-
-          {profile.recentActivity.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[#2A3242] rounded-xl p-4">
-              <p className="text-[10px] text-[#64748B] text-center">No submissions yet.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5 flex-1 overflow-hidden">
-              <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar flex flex-col gap-1 max-h-[110px]">
-                {profile.recentActivity.slice(0, 10).map((item) => {
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
+                {profile.recentActivity.slice(0, 15).map((item) => {
                   const stat = getStatusDisplay(item.status);
                   const Icon = stat.icon;
                   return (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-[#0F1117] hover:bg-[#0F1117]/80 px-2.5 py-1.5 transition-colors border border-[#2A3242]/30"
+                      className="flex items-center justify-between gap-3 rounded-xl bg-[#0B0D12] hover:bg-[#1C2230]/50 px-4 py-2.5 transition-colors border border-[#2A3242]/40 group"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`p-1 rounded-md ${stat.bg} ${stat.color} shrink-0`}>
-                          <Icon className="h-3 w-3" />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`p-1.5 rounded-lg ${stat.bg} ${stat.color} shrink-0`}>
+                          <Icon className="h-4 w-4" />
                         </span>
                         <div className="min-w-0">
                           <Link
                             href={`/problems/${item.problemSlug}`}
-                            className="text-[10px] font-bold text-white truncate hover:text-[#A78BFA] transition-colors block"
+                            className="text-xs font-bold text-white truncate hover:text-[#A78BFA] transition-colors block leading-tight mb-0.5"
                           >
                             {item.problemTitle}
                           </Link>
-                          <span className="text-[8px] text-[#64748B] font-mono uppercase">{item.language}</span>
+                          <div className="flex items-center gap-2 text-[9px] font-mono">
+                            <span className="text-[#64748B] uppercase px-1.5 py-0.5 bg-[#1C2230] rounded-sm">{item.language}</span>
+                            {item.difficulty && (
+                              <span className={`px-1.5 py-0.5 rounded-sm bg-opacity-10 font-bold ${item.difficulty === 'Easy' ? 'text-[#22C55E] bg-[#22C55E]' : item.difficulty === 'Medium' ? 'text-[#F59E0B] bg-[#F59E0B]' : 'text-[#EF4444] bg-[#EF4444]'}`}>
+                                {item.difficulty}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 text-right">
-                        <p className="text-[8px] text-[#64748B] font-mono">{timeAgo(item.createdAt)}</p>
-                        <span
-                          className={`text-[9px] font-black ${
-                            item.status === "Accepted" ? "text-[#22C55E]" : "text-[#94A3B8]"
-                          }`}
-                        >
-                          {item.status === "Accepted" ? "+10 XP" : "+5 XP"}
+                      <div className="flex flex-col items-end shrink-0 gap-1">
+                        <span className={`text-[10px] font-black ${item.status === "Accepted" ? "text-[#22C55E]" : "text-[#94A3B8]"}`}>
+                          +{item.xpEarned} XP
                         </span>
+                        <p className="text-[9px] text-[#64748B] font-mono">
+                          {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </p>
                       </div>
                     </div>
                   );
                 })}
               </div>
-
-              {/* Monthly Progress Timeline below Recent Activity list */}
-              <div className="mt-2 pt-2 border-t border-[#2A3242]/30 shrink-0">
-                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-wider mb-1.5">
-                  📅 Monthly Progress (Last 30 Days)
-                </p>
-                <div className="grid grid-cols-4 gap-1">
-                  {[
-                    { label: "Solved", val: profile.monthlyProgress.solved, color: "text-[#22C55E]" },
-                    { label: "Accepted", val: profile.monthlyProgress.accepted, color: "text-[#22C55E]" },
-                    { label: "XP", val: `+${profile.monthlyProgress.xp}`, color: "text-[#A78BFA]" },
-                    { label: "Coins", val: `+${profile.monthlyProgress.coins}`, color: "text-[#FBBF24]" }
-                  ].map((stat) => (
-                    <div key={stat.label} className="bg-[#0F1117] rounded-md px-1.5 py-1 text-center border border-[#2A3242]/20">
-                      <p className={`text-[10px] font-black leading-none ${stat.color}`}>{stat.val}</p>
-                      <p className="text-[7px] text-[#64748B] mt-0.5">{stat.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Badges */}
-        <div className="rounded-xl border border-[#2A3242] bg-[#161B22] p-3 flex flex-col overflow-hidden transition-all hover:border-[#2A3242]/80">
-          <div className="flex items-center justify-between mb-1.5 shrink-0">
-            <span className="text-[11px] font-bold text-white flex items-center gap-1">
-              <Award className="h-3.5 w-3.5 text-[#7C3AED]" /> Badges
-            </span>
-            <button
-              onClick={() => setModalType("badges")}
-              className="text-[9px] font-bold text-[#A78BFA] hover:text-[#7C3AED] transition-colors"
-            >
-              View Collection
-            </button>
+            )}
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[#2A3242]/60 rounded-xl p-3 bg-[#0F1117]/30">
-            <div className="h-10 w-10 rounded-full bg-[#2A3242]/30 flex items-center justify-center mb-1.5 text-base">
-              🛡️
-            </div>
-            <p className="text-[9px] font-bold text-white text-center leading-tight">No badges earned yet</p>
-            <p className="text-[8px] text-[#64748B] text-center leading-snug mt-1 max-w-[150px]">
-              Solve problems, maintain streaks, and participate in contests to unlock achievements.
-            </p>
-            <button
-              onClick={() => setModalType("badges")}
-              className="mt-2.5 flex items-center gap-1 rounded bg-[#7C3AED]/20 border border-[#7C3AED]/40 px-2 py-1 text-[8px] font-bold text-[#A78BFA] hover:bg-[#7C3AED] hover:text-white transition-all"
-            >
-              View Collection
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 4: Solved | Submission Stats | Language Dist */}
-      <div className="grid grid-cols-3 gap-2 shrink-0" style={{ height: "135px" }}>
-        {/* Solved Problems */}
-        <div className="rounded-xl border border-[#2A3242] bg-[#161B22] p-3 flex items-center gap-3 overflow-hidden transition-all hover:border-[#2A3242]/80">
-          <div className="shrink-0 relative">
-            <svg width="72" height="72" viewBox="0 0 72 72">
-              <circle cx="36" cy="36" r={r} fill="none" stroke="#1C2230" strokeWidth="8" />
-              <circle
-                cx="36"
-                cy="36"
-                r={r}
-                fill="none"
-                stroke="#22C55E"
-                strokeWidth="8"
-                strokeDasharray={`${ePct * circ} ${circ}`}
-                strokeDashoffset={circ * 0.25}
-                strokeLinecap="round"
-              />
-              <circle
-                cx="36"
-                cy="36"
-                r={r}
-                fill="none"
-                stroke="#F59E0B"
-                strokeWidth="8"
-                strokeDasharray={`${mPct * circ} ${circ}`}
-                strokeDashoffset={circ * 0.25 - ePct * circ}
-                strokeLinecap="round"
-              />
-              <circle
-                cx="36"
-                cy="36"
-                r={r}
-                fill="none"
-                stroke="#EF4444"
-                strokeWidth="8"
-                strokeDasharray={`${hPct * circ} ${circ}`}
-                strokeDashoffset={circ * 0.25 - ePct * circ - mPct * circ}
-                strokeLinecap="round"
-              />
-              <text x="36" y="32" textAnchor="middle" fill="white" fontSize="13" fontWeight="900">
-                {profile.solvedCount}
-              </text>
-              <text x="36" y="44" textAnchor="middle" fill="#64748B" fontSize="7" fontWeight="bold" className="uppercase tracking-wider">
-                Solved
-              </text>
-            </svg>
-          </div>
-          <div className="flex-1 flex flex-col gap-1.5">
-            <p className="text-[10px] font-bold text-white mb-0.5">Problem Difficulty</p>
+          {/* Statistics Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
             {[
-              { label: "Easy", count: easy, pct: Math.round(ePct * 100), color: "#22C55E" },
-              { label: "Medium", count: medium, pct: Math.round(mPct * 100), color: "#F59E0B" },
-              { label: "Hard", count: hard, pct: Math.round(hPct * 100), color: "#EF4444" }
-            ].map((d) => (
-              <div key={d.label} className="flex items-center justify-between text-[9px]">
-                <div className="flex items-center gap-1 font-medium">
-                  <span className="text-[8px]" style={{ color: d.color }}>
-                    ●
-                  </span>
-                  <span className="text-[#94A3B8]">{d.label}</span>
+              { label: "Acceptance Rate", value: `${profile.submissionStats.acceptanceRate}%`, color: "text-[#22C55E]" },
+              { label: "Problems Solved", value: profile.submissionStats.accepted, color: "text-white" },
+              { label: "Avg Attempts", value: profile.submissionStats.averageAttempts || "N/A", color: "text-[#F59E0B]" },
+              { label: "Avg Runtime", value: profile.submissionStats.averageRuntime ? `${profile.submissionStats.averageRuntime}ms` : "N/A", color: "text-[#A78BFA]" },
+            ].map(stat => (
+              <div key={stat.label} className="rounded-xl border border-[#2A3242] bg-[#12161F] p-3 text-center transition-all hover:border-[#2A3242]/80">
+                <p className={`text-lg font-black leading-tight ${stat.color}`}>{stat.value}</p>
+                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-wider mt-1">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+        </div>
+
+        {/* Right Column (Sidebar) */}
+        <div className="lg:col-span-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-1">
+          
+          {/* Rankings */}
+          <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-4 flex flex-col gap-3 shrink-0">
+            <span className="text-sm font-black text-white flex items-center gap-2 mb-1">
+              <Trophy className="h-4 w-4 text-[#FBBF24]" /> Leaderboards
+            </span>
+            {[
+              { label: "Global Rank", Icon: Globe, value: profile.globalRank ? `#${profile.globalRank}` : "Not Available Yet", sub: "Based on total XP & Solves", color: "#60A5FA" },
+              { label: "College Rank", Icon: Award, value: hasNoCollege ? "Not Available Yet" : profile.collegeRank ? `#${profile.collegeRank}` : "Not Available Yet", sub: hasNoCollege ? "Connect college to unlock" : profile.college, color: "#A78BFA" },
+              { label: "Contest Rank", Icon: Flag, value: "Not Available Yet", sub: "Participate in contests", color: "#F59E0B" }
+            ].map(r => (
+              <div key={r.label} className="flex items-center gap-3 bg-[#0B0D12] p-2.5 rounded-lg border border-[#2A3242]/50">
+                <div className="h-8 w-8 rounded bg-[#1C2230] flex items-center justify-center shrink-0">
+                  <r.Icon className="h-4 w-4" style={{ color: r.color }} />
                 </div>
-                <div className="flex items-center gap-1 font-mono">
-                  <span className="font-bold text-white">{d.count}</span>
-                  <span className="text-[8px] text-[#64748B]">({d.pct}%)</span>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold text-[#64748B] uppercase tracking-wider">{r.label}</p>
+                  <p className={`font-black truncate ${r.value === "Not Available Yet" ? "text-[11px] text-[#64748B]" : "text-sm text-white"}`}>{r.value}</p>
+                  <p className="text-[8px] text-[#64748B] font-mono truncate">{r.sub}</p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Submission Stats */}
-        <div className="rounded-xl border border-[#2A3242] bg-[#161B22] p-3 flex flex-col overflow-hidden transition-all hover:border-[#2A3242]/80">
-          <div className="flex items-center justify-between mb-1.5 shrink-0">
-            <span className="text-[10px] font-bold text-white flex items-center gap-1">
-              <BarChart2 className="h-3 w-3 text-[#7C3AED]" /> Statistics Breakdown
-            </span>
-            <span className="text-[8px] text-[#64748B] font-mono">
-              Acceptance: {profile.submissionStats.acceptanceRate}%
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 flex-1 items-center">
-            <div className="space-y-1.5">
-              {[
-                { label: "Accepted", count: profile.submissionStats.accepted, color: "bg-[#22C55E]" },
-                { label: "Wrong Answers", count: profile.submissionStats.wrongAnswer, color: "bg-[#EF4444]" }
-              ].map((item) => (
-                <div key={item.label} className="flex flex-col gap-0.5">
-                  <div className="flex justify-between text-[8px] font-bold text-[#94A3B8]">
-                    <span>{item.label}</span>
-                    <span className="text-white font-mono">{item.count}</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-[#2A3242] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${item.color}`}
-                      style={{
-                        width: `${
-                          profile.submissionStats.totalAttempts > 0
-                            ? (item.count / profile.submissionStats.totalAttempts) * 100
-                            : 0
-                        }%`
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 text-center bg-[#0F1117]/60 rounded-lg p-2 border border-[#2A3242]/30">
-              {[
-                { label: "Runtime Err", v: profile.submissionStats.runtimeError, color: "text-[#F59E0B]" },
-                { label: "Compile Err", v: profile.submissionStats.compileError, color: "text-[#A78BFA]" },
-                { label: "Total Attempts", v: profile.submissionStats.totalAttempts, color: "text-white" },
-                { label: "Solve Rate", v: `${profile.submissionStats.acceptanceRate}%`, color: "text-[#22C55E]" }
-              ].map((s) => (
-                <div key={s.label}>
-                  <p className={`text-[10px] font-black leading-none ${s.color}`}>{s.v}</p>
-                  <p className="text-[7px] text-[#64748B] mt-0.5 leading-tight">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Language Distribution */}
-        <div className="rounded-xl border border-[#2A3242] bg-[#161B22] p-3 flex flex-col overflow-hidden transition-all hover:border-[#2A3242]/80">
-          <div className="flex items-center justify-between mb-1.5 shrink-0">
-            <span className="text-[10px] font-bold text-white">Languages Spoken</span>
-            {profile.langDist.length > 3 && (
+          {/* Badges */}
+          <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-4 flex flex-col shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-black text-white flex items-center gap-2">
+                <Award className="h-4 w-4 text-[#7C3AED]" /> Badges
+              </span>
               <button
-                onClick={() => setModalType("all-languages")}
-                className="text-[9px] font-bold text-[#A78BFA] hover:text-[#7C3AED] transition-colors"
+                onClick={() => setModalType("badges")}
+                className="text-[10px] font-bold text-[#A78BFA] hover:text-[#7C3AED] transition-colors"
               >
-                View All
+                View Collection
               </button>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2 flex-1 justify-center">
-            {profile.langDist.length === 0 ? (
-              <p className="text-[9px] text-[#64748B] text-center font-mono">No submissions yet.</p>
-            ) : (
-              profile.langDist.slice(0, 3).map((l) => (
-                <div key={l.lang} className="flex items-center gap-2">
-                  <span className="w-14 text-[9px] font-bold text-white truncate">{l.lang}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-[#2A3242] overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: l.color }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${l.pct}%` }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
-                    />
-                  </div>
-                  <span className="text-[9px] text-[#94A3B8] w-7 text-right font-mono font-bold">
-                    {l.pct}%
-                  </span>
-                  <span className="text-[8px] text-[#64748B] w-12 text-right font-mono">
-                    {l.count} solves
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Row 5: Rankings */}
-      <div className="grid grid-cols-4 gap-2 shrink-0">
-        {[
-          {
-            label: "Global Ranking",
-            Icon: Globe,
-            value: profile.globalRank ? `#${profile.globalRank}` : "Not Available Yet",
-            sub: profile.globalRank ? "Recalculated post-solve" : "Complete your first challenge",
-            color: "#60A5FA"
-          },
-          {
-            label: "Country Ranking",
-            Icon: Flag,
-            value: "Not Available Yet",
-            sub: "Requires regional validation",
-            color: "#22C55E"
-          },
-          {
-            label: "College Ranking",
-            Icon: Award,
-            value: hasNoCollege ? "Not Available Yet" : profile.collegeRank ? `#${profile.collegeRank}` : "#1",
-            sub: hasNoCollege ? "Connect college to unlock" : profile.college,
-            color: "#A78BFA"
-          },
-          {
-            label: "Contest Rank (Month)",
-            Icon: Trophy,
-            value: "Not Available Yet",
-            sub: "Participate in contests to rank",
-            color: "#FBBF24"
-          }
-        ].map(({ label, Icon, value, sub, color }) => (
-          <div
-            key={label}
-            className="rounded-xl border border-[#2A3242] bg-[#161B22] px-3 py-2 flex items-center gap-2.5 transition-all hover:border-[#2A3242]/80"
-          >
-            <div className="h-7 w-7 rounded-lg bg-[#1C2230] flex items-center justify-center shrink-0">
-              <Icon className="h-3.5 w-3.5" style={{ color }} />
             </div>
-            <div className="min-w-0">
-              <p className="text-[8px] text-[#64748B] font-bold uppercase tracking-wider truncate">{label}</p>
-              <p
-                className={`font-black leading-tight ${
-                  value === "Not Available Yet" ? "text-[10px] text-[#64748B]" : "text-sm"
-                }`}
-                style={{ color: value === "Not Available Yet" ? undefined : color }}
-              >
-                {value}
+            <div className="flex flex-col items-center justify-center border border-dashed border-[#2A3242]/60 rounded-xl py-6 bg-[#0B0D12]/50">
+              <div className="h-12 w-12 rounded-full bg-[#1C2230] flex items-center justify-center mb-3">
+                <Award className="h-6 w-6 text-[#2A3242]" />
+              </div>
+              <p className="text-xs font-bold text-[#94A3B8]">No badges earned yet.</p>
+              <p className="text-[9px] text-[#64748B] text-center max-w-[200px] mt-1.5 leading-relaxed">
+                Solve problems, maintain streaks, and participate in contests to unlock achievements.
               </p>
-              <p className="text-[8px] text-[#64748B] truncate font-mono mt-0.5">{sub}</p>
             </div>
           </div>
-        ))}
+
+          {/* Journey Timeline */}
+          <div className="rounded-xl border border-[#2A3242] bg-[#12161F] p-4 flex flex-col flex-1 min-h-[300px]">
+            <span className="text-sm font-black text-white flex items-center gap-2 mb-4 shrink-0">
+              <Clock className="h-4 w-4 text-[#60A5FA]" /> Journey Timeline
+            </span>
+            <div className="relative pl-3 flex-1 overflow-y-auto custom-scrollbar">
+              <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-[#2A3242]" />
+              <div className="flex flex-col gap-4">
+                {profile.journeyTimeline.map((item) => (
+                  <div key={item.id} className="relative flex items-start gap-4">
+                    <div className={`h-8 w-8 rounded-full border-4 border-[#12161F] flex items-center justify-center shrink-0 relative z-10 transition-colors ${item.unlocked ? 'bg-[#7C3AED] text-white shadow-[0_0_10px_rgba(124,58,237,0.4)]' : 'bg-[#1C2230] text-[#64748B]'}`}>
+                      {getTimelineIcon(item.icon)}
+                    </div>
+                    <div className={`pt-1.5 ${item.unlocked ? 'opacity-100' : 'opacity-40'}`}>
+                      <p className="text-xs font-bold text-white leading-tight">{item.title}</p>
+                      <p className="text-[9px] text-[#64748B] font-mono mt-0.5">
+                        {item.unlocked 
+                          ? (item.date ? new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unlocked') 
+                          : 'Locked'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* MODALS */}
       <AnimatePresence>
         {modalType && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-md bg-[#161B22] border border-[#2A3242] rounded-2xl overflow-hidden shadow-2xl relative"
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="w-full max-w-lg bg-[#12161F] border border-[#2A3242] rounded-2xl overflow-hidden shadow-2xl relative"
             >
               <button
                 onClick={() => setModalType(null)}
-                className="absolute top-3.5 right-3.5 text-[#94A3B8] hover:text-white transition-colors"
+                className="absolute top-4 right-4 p-1.5 rounded-lg bg-[#1C2230] text-[#94A3B8] hover:text-white hover:bg-[#2A3242] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
 
-              {/* Connect College Modal */}
               {modalType === "college" && (
                 <form onSubmit={handleConnectCollege} className="p-6">
-                  <h3 className="text-base font-black text-white flex items-center gap-2 mb-2">
+                  <h3 className="text-lg font-black text-white flex items-center gap-2 mb-2">
                     🏛️ Connect College
                   </h3>
-                  <p className="text-[11px] text-[#94A3B8] leading-relaxed mb-4">
+                  <p className="text-xs text-[#94A3B8] leading-relaxed mb-5">
                     Enter the name of your college or university. This allows you to view and compete in college-specific leaderboards and rankings.
                   </p>
                   {collegeError && (
-                    <div className="mb-3 px-3 py-2 rounded bg-[#EF4444]/10 border border-[#EF4444]/25 text-[10px] font-bold text-[#EF4444]">
+                    <div className="mb-4 px-3 py-2 rounded bg-[#EF4444]/10 border border-[#EF4444]/30 text-xs font-bold text-[#EF4444]">
                       {collegeError}
                     </div>
                   )}
@@ -792,61 +597,121 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                     value={collegeInput}
                     onChange={(e) => setCollegeInput(e.target.value)}
                     placeholder="Enter College Name (e.g. GLA University)"
-                    className="w-full h-10 rounded-lg border border-[#2A3242] bg-[#0F1117] px-3 text-xs text-white placeholder-[#64748B] focus:border-[#7C3AED] focus:outline-none transition-all mb-4"
+                    className="w-full h-11 rounded-lg border border-[#2A3242] bg-[#0B0D12] px-4 text-sm text-white placeholder-[#64748B] focus:border-[#7C3AED] focus:outline-none transition-all mb-5"
                   />
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-3">
                     <button
                       type="button"
                       onClick={() => setModalType(null)}
-                      className="px-4 py-2 rounded-lg border border-[#2A3242] text-xs font-bold text-[#94A3B8] hover:bg-[#1C2230] hover:text-white transition-all"
+                      className="px-5 py-2 rounded-lg text-xs font-bold text-[#94A3B8] hover:bg-[#1C2230] hover:text-white transition-all"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={submittingCollege}
-                      className="px-4 py-2 rounded-lg bg-[#7C3AED] text-xs font-bold text-white hover:bg-[#6D28D9] disabled:opacity-50 transition-all flex items-center gap-1"
+                      className="px-5 py-2 rounded-lg bg-[#7C3AED] text-xs font-bold text-white hover:bg-[#6D28D9] disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg"
                     >
-                      {submittingCollege ? "Connecting..." : "Connect"}
+                      {submittingCollege ? "Connecting..." : "Connect Now"}
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* All Activity Modal */}
-              {modalType === "all-activity" && (
-                <div className="p-5">
-                  <h3 className="text-base font-black text-white flex items-center gap-2 mb-3">
-                    📜 Submissions Log (All)
+              {modalType === "badges" && (
+                <div className="p-8 text-center">
+                  <div className="h-20 w-20 rounded-full bg-[#1C2230] border-2 border-[#2A3242] flex items-center justify-center mx-auto mb-4 text-3xl shadow-xl">
+                    🛡️
+                  </div>
+                  <h3 className="text-xl font-black text-white mb-2">Badge Collection</h3>
+                  <div className="inline-block bg-[#7C3AED]/20 border border-[#7C3AED]/40 text-[#A78BFA] text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider mb-4">
+                    Coming Soon
+                  </div>
+                  <p className="text-sm text-[#94A3B8] leading-relaxed max-w-sm mx-auto">
+                    We are currently building the achievements and badge engine. In a future update, you will be able to display your earned certificates, contest medals, and contest credentials right here!
+                  </p>
+                  <button
+                    onClick={() => setModalType(null)}
+                    className="mt-8 w-full max-w-[200px] mx-auto py-2.5 rounded-lg bg-[#2A3242] hover:bg-[#7C3AED] text-xs font-bold text-white transition-all"
+                  >
+                    Got it!
+                  </button>
+                </div>
+              )}
+
+              {modalType === "heatmap-day" && selectedDay && (
+                <div className="p-6">
+                  <h3 className="text-lg font-black text-white flex items-center gap-2 mb-4 border-b border-[#2A3242] pb-3">
+                    <Calendar className="h-5 w-5 text-[#7C3AED]" /> 
+                    {new Date(selectedDay.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </h3>
-                  <div className="max-h-[300px] overflow-y-auto pr-1 custom-scrollbar flex flex-col gap-1.5">
+                  <div className="grid grid-cols-2 gap-4 mb-5">
+                    <div className="bg-[#0B0D12] border border-[#2A3242] rounded-xl p-4 text-center">
+                      <p className="text-2xl font-black text-[#22C55E]">{selectedDay.data.count}</p>
+                      <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider mt-1">Problems Solved</p>
+                    </div>
+                    <div className="bg-[#0B0D12] border border-[#2A3242] rounded-xl p-4 text-center">
+                      <p className="text-2xl font-black text-[#A78BFA]">+{selectedDay.data.xp}</p>
+                      <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider mt-1">XP Earned</p>
+                    </div>
+                  </div>
+                  <div className="bg-[#0B0D12] border border-[#2A3242] rounded-xl p-4">
+                    <p className="text-xs font-bold text-white mb-2">Languages Used</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedDay.data.languages.map(lang => (
+                        <span key={lang} className="px-2 py-1 bg-[#1C2230] rounded-md text-[10px] font-mono text-[#94A3B8] uppercase">
+                          {lang}
+                        </span>
+                      ))}
+                      {selectedDay.data.languages.length === 0 && (
+                        <span className="text-[10px] text-[#64748B]">No languages recorded.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {modalType === "all-activity" && (
+                <div className="p-6">
+                  <h3 className="text-lg font-black text-white flex items-center gap-2 mb-4">
+                    📜 Full Submissions Log
+                  </h3>
+                  <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
                     {profile.recentActivity.map((item) => {
                       const stat = getStatusDisplay(item.status);
                       const Icon = stat.icon;
                       return (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-[#0F1117] border border-[#2A3242]/30 px-3 py-2 hover:bg-[#0F1117]/70 transition-colors"
+                          className="flex items-center justify-between gap-3 rounded-xl bg-[#0B0D12] border border-[#2A3242]/50 px-4 py-3 hover:bg-[#1C2230]/50 transition-colors"
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`p-1 rounded-md ${stat.bg} ${stat.color} shrink-0`}>
-                              <Icon className="h-3.5 w-3.5" />
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`p-2 rounded-lg ${stat.bg} ${stat.color} shrink-0`}>
+                              <Icon className="h-4 w-4" />
                             </span>
                             <div className="min-w-0">
                               <Link
                                 href={`/problems/${item.problemSlug}`}
                                 onClick={() => setModalType(null)}
-                                className="text-[10px] font-bold text-white truncate hover:text-[#A78BFA] transition-colors block"
+                                className="text-xs font-bold text-white truncate hover:text-[#A78BFA] transition-colors block mb-0.5"
                               >
                                 {item.problemTitle}
                               </Link>
-                              <span className="text-[8px] text-[#64748B] font-mono uppercase">
-                                {item.language}
-                              </span>
+                              <div className="flex items-center gap-2 text-[10px] font-mono">
+                                <span className="text-[#64748B] uppercase bg-[#1C2230] px-1.5 py-0.5 rounded-sm">{item.language}</span>
+                                {item.difficulty && (
+                                  <span className={`px-1.5 py-0.5 rounded-sm bg-opacity-10 font-bold ${item.difficulty === 'Easy' ? 'text-[#22C55E] bg-[#22C55E]' : item.difficulty === 'Medium' ? 'text-[#F59E0B] bg-[#F59E0B]' : 'text-[#EF4444] bg-[#EF4444]'}`}>
+                                    {item.difficulty}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-[8px] text-[#64748B] font-mono">
+                            <span className={`text-[11px] font-black block mb-0.5 ${item.status === "Accepted" ? "text-[#22C55E]" : "text-[#94A3B8]"}`}>
+                              +{item.xpEarned} XP
+                            </span>
+                            <p className="text-[9px] text-[#64748B] font-mono">
                               {new Date(item.createdAt).toLocaleString("en-US", {
                                 month: "short",
                                 day: "numeric",
@@ -854,63 +719,11 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                                 minute: "2-digit"
                               })}
                             </p>
-                            <span
-                              className={`text-[9px] font-black ${
-                                item.status === "Accepted" ? "text-[#22C55E]" : "text-[#94A3B8]"
-                              }`}
-                            >
-                              {item.status === "Accepted" ? "+10 XP" : "+5 XP"}
-                            </span>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                </div>
-              )}
-
-              {/* All Languages Modal */}
-              {modalType === "all-languages" && (
-                <div className="p-5">
-                  <h3 className="text-base font-black text-white flex items-center gap-2 mb-4">
-                    💻 Language Breakdown
-                  </h3>
-                  <div className="space-y-3">
-                    {profile.langDist.map((l) => (
-                      <div key={l.lang} className="flex items-center gap-3">
-                        <span className="w-16 text-xs font-bold text-white truncate">{l.lang}</span>
-                        <div className="flex-1 h-2 rounded-full bg-[#2A3242] overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${l.pct}%`, background: l.color }} />
-                        </div>
-                        <span className="text-xs text-[#94A3B8] w-8 text-right font-mono font-bold">
-                          {l.pct}%
-                        </span>
-                        <span className="text-[10px] text-[#64748B] w-14 text-right font-mono">
-                          {l.count} solves
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Badges Modal */}
-              {modalType === "badges" && (
-                <div className="p-5 text-center">
-                  <div className="h-14 w-14 rounded-full bg-[#7C3AED]/10 border border-[#7C3AED]/30 flex items-center justify-center mx-auto mb-3 text-2xl shadow-[0_0_15px_rgba(124,58,237,0.15)]">
-                    🛡️
-                  </div>
-                  <h3 className="text-base font-black text-white mb-1">Badge Collection</h3>
-                  <p className="text-xs text-[#A78BFA] font-bold">Coming Soon</p>
-                  <p className="text-[11px] text-[#94A3B8] leading-relaxed mt-2.5 max-w-sm mx-auto">
-                    We are currently building the achievements and badge engine. In a future update, you will be able to display your earned certificates, contest medals, and contest credentials right here!
-                  </p>
-                  <button
-                    onClick={() => setModalType(null)}
-                    className="mt-5 w-full py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-bold text-white transition-all"
-                  >
-                    Got it!
-                  </button>
                 </div>
               )}
             </motion.div>
