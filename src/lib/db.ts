@@ -16,7 +16,10 @@ export const getPrisma = () => {
     return globalForPrisma.prisma;
   }
 
-  const adapter = new PrismaPg({ connectionString: databaseUrl });
+  const adapter = new PrismaPg({
+    connectionString: databaseUrl,
+    ssl: { rejectUnauthorized: false },
+  });
   globalForPrisma.prisma ??= new PrismaClient({ adapter });
   return globalForPrisma.prisma;
 };

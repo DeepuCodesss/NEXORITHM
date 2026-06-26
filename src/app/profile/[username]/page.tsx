@@ -1,8 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Award, BadgeCheck, BookOpen, CircleDollarSign, Code2, Flame, Gift, Home, Medal, Trophy } from "lucide-react";
+import { BookOpen, Gift, Home, Trophy } from "lucide-react";
 import { getPrisma } from "@/lib/db";
+import { currentUser } from "@clerk/nextjs/server";
+import ProfileClient from "./ProfileClient";
+
+type Sub = {
+  id: string;
+  status: string;
+  createdAt: Date;
+  language: string;
+  problem: { title: string; slug: string };
+};
 
 type ProfilePayload = {
   username: string;
@@ -11,12 +21,40 @@ type ProfilePayload = {
   xp: number;
   coins: number;
   currentStreak: number;
+  longestStreak: number;
   solvedCount: number;
-  globalRank: number;
+  globalRank: number | null;
   college: string;
   joinedDate: string;
-  recentActivity: Array<{ id: string; status: string; problemTitle: string; problemSlug: string; createdAt: string }>;
-  badges: Array<{ id: string; label: string; active: boolean }>;
+  isPro: boolean;
+  recentActivity: Array<{
+    id: string;
+    status: string;
+    problemTitle: string;
+    problemSlug: string;
+    language: string;
+    createdAt: string;
+  }>;
+  heatmap: Record<string, number>;
+  submissionsByWeek: number[];
+  langDist: Array<{ lang: string; pct: number; count: number; color: string }>;
+  submissionStats: {
+    accepted: number;
+    wrongAnswer: number;
+    runtimeError: number;
+    compileError: number;
+    acceptanceRate: number;
+    totalAttempts: number;
+  };
+  collegeRank: number | null;
+  monthlyProgress: {
+    accepted: number;
+    xp: number;
+    coins: number;
+    solved: number;
+  };
+  streakCalendar: Array<{ dayName: string; solved: boolean; dateStr: string }>;
+  hasSolvedToday: boolean;
 };
 
 type PageProps = { params: Promise<{ username: string }> };
@@ -33,53 +71,159 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
       xp: true,
       coins: true,
       currentStreak: true,
+      longestStreak: true,
       solvedProblemIds: true,
       college: true,
       createdAt: true,
-      submissions: {
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          problem: { select: { title: true, slug: true } },
-        },
-      },
+      isPro: true,
     },
   });
 
   if (!user) return null;
 
-  const ranked = await prisma.user.findMany({
+  // 1. Fetch user's submissions
+  const dbSubmissions = await prisma.submission.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      xp: true,
-      currentStreak: true,
-      solvedProblemIds: true,
-      lastSolvedAt: true,
-      updatedAt: true,
+      status: true,
+      language: true,
+      createdAt: true,
+      problem: { select: { title: true, slug: true } },
     },
   });
 
+  const submissions = dbSubmissions as unknown as Array<{
+    id: string;
+    status: string;
+    language: string;
+    createdAt: Date;
+    problem: { title: string; slug: string };
+  }>;
+
+  // 2. Global & College Rank calculation
+  const ranked = await prisma.user.findMany({
+    select: { id: true, xp: true, college: true, solvedProblemIds: true, lastSolvedAt: true, updatedAt: true },
+  });
+
   const solvedProblemIds = Array.isArray(user.solvedProblemIds)
-    ? user.solvedProblemIds.filter((value): value is string => typeof value === "string")
+    ? user.solvedProblemIds.filter((v): v is string => typeof v === "string")
     : [];
-  const globalRank =
-    ranked
-      .map((entry) => ({
-        ...entry,
-        solvedCount: Array.isArray(entry.solvedProblemIds) ? entry.solvedProblemIds.length : 0,
-        lastSolvedTs: entry.lastSolvedAt ? new Date(entry.lastSolvedAt).getTime() : 0,
-      }))
-      .sort((a, b) => {
-        if (b.xp !== a.xp) return b.xp - a.xp;
-        if (b.solvedCount !== a.solvedCount) return b.solvedCount - a.solvedCount;
-        if (b.currentStreak !== a.currentStreak) return b.currentStreak - a.currentStreak;
-        if (a.lastSolvedTs !== b.lastSolvedTs) return a.lastSolvedTs - b.lastSolvedTs;
-        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-      })
-      .findIndex((entry) => entry.id === user.id) + 1;
+
+  const sortedLeaderboard = ranked
+    .map((e) => ({
+      ...e,
+      sc: Array.isArray(e.solvedProblemIds) ? e.solvedProblemIds.length : 0,
+      ls: e.lastSolvedAt ? new Date(e.lastSolvedAt).getTime() : 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.xp - a.xp ||
+        b.sc - a.sc ||
+        a.ls - b.ls ||
+        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+    );
+
+  const globalRankIndex = sortedLeaderboard.findIndex((e) => e.id === user.id);
+  const globalRank = solvedProblemIds.length > 0 ? globalRankIndex + 1 : null;
+
+  let collegeRank: number | null = null;
+  if (user.college && !user.college.includes("Connect")) {
+    const collegeUsers = sortedLeaderboard.filter((u) => u.college === user.college);
+    const indexInCollege = collegeUsers.findIndex((e) => e.id === user.id);
+    collegeRank = indexInCollege !== -1 ? indexInCollege + 1 : null;
+  }
+
+  // 3. Heatmap Calculation (Last 90 days of Accepted Solves)
+  const now = new Date();
+  const heatmap: Record<string, number> = {};
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    heatmap[d.toISOString().slice(0, 10)] = 0;
+  }
+
+  const acceptedSubmissions = submissions.filter((s) => s.status === "Accepted");
+  for (const sub of acceptedSubmissions) {
+    const key = sub.createdAt.toISOString().slice(0, 10);
+    if (key in heatmap) {
+      heatmap[key] = (heatmap[key] ?? 0) + 1;
+    }
+  }
+
+  // 4. Submissions by week (Last 8 weeks)
+  const submissionsByWeek = Array<number>(8).fill(0);
+  for (const sub of submissions) {
+    const dw = Math.floor((now.getTime() - sub.createdAt.getTime()) / (7 * 86400000));
+    if (dw < 8) {
+      submissionsByWeek[7 - dw]++;
+    }
+  }
+
+  // 5. Language Distribution
+  const langMap: Record<string, number> = {};
+  for (const sub of submissions) {
+    langMap[sub.language] = (langMap[sub.language] ?? 0) + 1;
+  }
+  const totalSubs = Object.values(langMap).reduce((a, b) => a + b, 0) || 1;
+  const langColors: Record<string, string> = {
+    javascript: "#F59E0B",
+    typescript: "#38BDF8",
+    python: "#22C55E",
+    "c++": "#A78BFA",
+    java: "#FB923C",
+    c: "#94A3B8",
+    rust: "#F97316",
+    go: "#06B6D4",
+  };
+  const langDist = Object.entries(langMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([lang, count]) => ({
+      lang: lang.charAt(0).toUpperCase() + lang.slice(1),
+      pct: Math.round((count / totalSubs) * 100),
+      count,
+      color: langColors[lang.toLowerCase()] ?? "#8B5CF6",
+    }));
+
+  // 6. Submission Stats from Database
+  const accepted = acceptedSubmissions.length;
+  const wrongAnswer = submissions.filter((s) => s.status === "Wrong Answer").length;
+  const runtimeError = submissions.filter((s) => s.status === "Runtime Error").length;
+  const compileError = submissions.filter((s) => s.status === "Compilation Error").length;
+  const totalAttempts = submissions.length;
+  const acceptanceRate = totalAttempts > 0 ? Math.round((accepted / totalAttempts) * 100) : 0;
+
+  // 7. Monthly Progress (Last 30 Days)
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const monthlySubmissions = submissions.filter((s) => s.createdAt >= thirtyDaysAgo);
+  const monthlyAccepted = monthlySubmissions.filter((s) => s.status === "Accepted").length;
+
+  const monthlyTransactions = await prisma.rewardTransaction.findMany({
+    where: { userId: user.id, createdAt: { gte: thirtyDaysAgo } },
+    select: { amount: true },
+  });
+  const monthlyCoins = monthlyTransactions.reduce((acc, t) => acc + t.amount, 0);
+  const monthlyXP = monthlySubmissions.reduce((acc, s) => acc + (s.status === "Accepted" ? 10 : 5), 0);
+
+  // 8. Streak Calendar (Last 7 Days)
+  const streakCalendar = [];
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const dayName = daysOfWeek[d.getDay()];
+    const solved = acceptedSubmissions.some(
+      (s) => s.createdAt.toISOString().slice(0, 10) === dateStr
+    );
+    streakCalendar.push({ dayName, solved, dateStr });
+  }
+
+  const todayStr = now.toISOString().slice(0, 10);
+  const hasSolvedToday = acceptedSubmissions.some(
+    (s) => s.createdAt.toISOString().slice(0, 10) === todayStr
+  );
 
   return {
     username: user.username,
@@ -88,35 +232,50 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     xp: user.xp,
     coins: user.coins,
     currentStreak: user.currentStreak,
+    longestStreak: user.longestStreak,
     solvedCount: solvedProblemIds.length,
     globalRank,
     college: user.college,
     joinedDate: user.createdAt.toISOString(),
-    recentActivity: user.submissions.map((item) => ({
-      id: item.id,
-      status: item.status,
-      problemTitle: item.problem.title,
-      problemSlug: item.problem.slug,
-      createdAt: item.createdAt.toISOString(),
+    isPro: user.isPro,
+    recentActivity: submissions.map((s) => ({
+      id: s.id,
+      status: s.status,
+      problemTitle: s.problem.title,
+      problemSlug: s.problem.slug,
+      language: s.language,
+      createdAt: s.createdAt.toISOString(),
     })),
-    badges: [
-      { id: "first-solve", label: "First Solve", active: solvedProblemIds.length > 0 },
-      { id: "streak-7", label: "7 Day Streak", active: user.currentStreak >= 7 },
-      { id: "xp-500", label: "500 XP", active: user.xp >= 500 },
-    ],
+    heatmap,
+    submissionsByWeek,
+    langDist,
+    submissionStats: {
+      accepted,
+      wrongAnswer,
+      runtimeError,
+      compileError,
+      acceptanceRate,
+      totalAttempts,
+    },
+    collegeRank,
+    monthlyProgress: {
+      accepted: monthlyAccepted,
+      xp: monthlyXP,
+      coins: monthlyCoins,
+      solved: monthlyAccepted,
+    },
+    streakCalendar,
+    hasSolvedToday,
   };
 };
 
 export async function generateMetadata({ params }: PageProps) {
   const { username } = await params;
   const profile = await buildProfile(username);
-  if (!profile) {
-    return { title: "Profile not found | Nexorithm" };
-  }
-
+  if (!profile) return { title: "Profile not found | Nexorithm" };
   return {
     title: `${profile.fullName} (@${profile.username}) | Nexorithm`,
-    description: `View ${profile.fullName}'s Nexorithm profile, rank, XP, streak, and recent activity.`,
+    description: `View ${profile.fullName}'s Nexorithm profile.`,
   };
 }
 
@@ -125,101 +284,50 @@ export default async function ProfilePage({ params }: PageProps) {
   const profile = await buildProfile(username);
   if (!profile) notFound();
 
-  const navItems = [
-    { label: "Overview", href: `/profile/${profile.username}`, icon: Home },
-    { label: "Problems", href: "/problems", icon: BookOpen },
-    { label: "Rankings", href: "/rankings", icon: Trophy },
-    { label: "Rewards", href: "/rewards", icon: Gift },
-  ];
+  const clerkUser = await currentUser();
+  const isOwner = clerkUser ? clerkUser.username === username || clerkUser.id === profile.username : false;
 
-  const stats = [
-    { label: "Current Streak", value: `${profile.currentStreak} Days`, icon: Flame },
-    { label: "Global Rank", value: `#${profile.globalRank}`, icon: Medal },
-    { label: "XP", value: profile.xp.toLocaleString(), icon: Award },
-    { label: "Coins", value: profile.coins.toLocaleString(), icon: CircleDollarSign },
+  const navItems = [
+    { label: "Overview", href: `/profile/${profile.username}`, icon: Home, active: true },
+    { label: "Problems", href: "/problems", icon: BookOpen, active: false },
+    { label: "Rankings", href: "/rankings", icon: Trophy, active: false },
+    { label: "Rewards", href: "/rewards", icon: Gift, active: false },
   ];
 
   return (
-    <div className="app-shell min-h-screen bg-background">
-      <div className="mx-auto grid w-full max-w-[1540px] gap-5 px-4 py-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="surface-panel hidden rounded-lg p-3 lg:sticky lg:top-20 lg:block lg:h-[calc(100vh-6rem)]">
-          <nav className="space-y-2">
-            {navItems.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <Link key={item.href} href={item.href} className={`flex h-12 items-center gap-3 rounded-lg px-3 text-sm font-bold transition ${index === 0 ? "bg-primary text-white" : "text-secondary-text hover:bg-hover hover:text-white"}`}>
-                  <Icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+    <div className="flex bg-[#0F1117]" style={{ height: "calc(100vh - 3.5rem)", overflow: "hidden" }}>
+      {/* Sidebar */}
+      <aside className="hidden lg:flex flex-col w-[196px] shrink-0 border-r border-[#2A3242] py-3 px-2 gap-1 select-none">
+        <nav className="flex flex-col gap-0.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href}
+                className={`flex h-9 items-center gap-2.5 rounded-lg px-3 text-xs font-semibold transition-all ${item.active ? "bg-[#7C3AED] text-white shadow-lg" : "text-[#94A3B8] hover:bg-[#1C2230] hover:text-white"}`}>
+                <Icon className="h-3.5 w-3.5" />{item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mt-auto mx-0.5 rounded-xl border border-[#7C3AED]/30 bg-[#7C3AED]/10 p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-base">🚀</span>
+            <p className="text-[10px] font-bold text-[#A78BFA]">Upgrade to Pro</p>
+          </div>
+          <p className="text-[9px] text-[#64748B] leading-relaxed mb-2">Unlock advanced analytics, custom badges, and more exciting features!</p>
+          <Link href="/pro" className="flex items-center justify-center gap-1 rounded-lg bg-[#7C3AED] px-2 py-1.5 text-[10px] font-bold text-white hover:bg-[#6D28D9] transition-all">
+            Upgrade Now →
+          </Link>
+        </div>
+        <div className="mx-0.5 rounded-xl border border-[#2A3242] bg-[#161B22] p-3 mt-1">
+          <p className="text-[9px] font-bold text-[#94A3B8] mb-1">⚡ Nexorithm is in Beta</p>
+          <p className="text-[9px] text-[#64748B] leading-relaxed mb-2">Your feedback helps us build a better platform for coders.</p>
+          <button className="text-[9px] text-[#7C3AED] hover:underline">Share Feedback →</button>
+        </div>
+      </aside>
 
-        <main className="min-w-0 space-y-5">
-          <section className="surface-panel rounded-lg p-5">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-primary bg-hover p-1">
-                <Image src={profile.avatarUrl} alt="" width={112} height={112} unoptimized className="h-full w-full rounded-full object-cover" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-black text-white">{profile.fullName}</h1>
-                  <BadgeCheck className="h-5 w-5 fill-primary text-white" />
-                </div>
-                <p className="mt-1 font-mono text-sm text-secondary-text">@{profile.username}</p>
-                <p className="mt-4 text-sm leading-6 text-secondary-text">Joined {new Date(profile.joinedDate).toLocaleDateString()}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-secondary-text">{profile.college}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="surface-card rounded-lg p-5">
-                  <Icon className="h-6 w-6 text-primary" />
-                  <p className="mt-4 text-2xl font-black text-white">{stat.value}</p>
-                  <p className="mt-1 text-xs font-bold text-secondary-text">{stat.label}</p>
-                </div>
-              );
-            })}
-          </section>
-
-          <section className="surface-card rounded-lg p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-black text-white">
-                <Code2 className="h-4 w-4 text-primary" />
-                Recent Activity
-              </h2>
-            </div>
-            <div className="mt-4 divide-y divide-border">
-              {profile.recentActivity.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                  <span className="font-bold text-white">{item.problemTitle}</span>
-                  <span className="text-secondary-text">{item.status}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="surface-card rounded-lg p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="font-black text-white">Badges</h2>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {profile.badges.map((badge) => (
-                <span key={badge.id} className={`rounded-lg border px-3 py-2 text-xs font-bold ${badge.active ? "border-success/20 bg-success/10 text-success" : "border-border bg-card text-secondary-text"}`}>
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          </section>
-        </main>
-      </div>
+      {/* Main interactive area */}
+      <ProfileClient profile={profile} isOwner={isOwner} />
     </div>
   );
 }
