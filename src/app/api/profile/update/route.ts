@@ -11,15 +11,29 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { college } = await request.json();
-    if (typeof college !== "string") {
-      return apiError("Invalid college name", 400);
+    const body = await request.json();
+    const { college, avatarUrl } = body as { college?: unknown; avatarUrl?: unknown };
+
+    const updates: { college?: string; avatarUrl?: string } = {};
+
+    if (college !== undefined) {
+      if (typeof college !== "string") {
+        return apiError("Invalid college name", 400);
+      }
+      updates.college = college.trim();
+    }
+
+    if (avatarUrl !== undefined) {
+      if (typeof avatarUrl !== "string" || !avatarUrl.trim()) {
+        return apiError("Invalid avatar image", 400);
+      }
+      updates.avatarUrl = avatarUrl.trim();
     }
 
     const prisma = getPrisma();
     const user = await prisma.user.update({
       where: { clerkId: clerkUser.id },
-      data: { college: college.trim() },
+      data: updates,
     });
 
     return apiSuccess({ user });

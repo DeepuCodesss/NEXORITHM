@@ -89,6 +89,117 @@ const HERO_SYMBOLS = [...Array(6)].map((_, i) => ({
   delay: seededRandom(i + 8) * -10,
 }));
 
+const AVATAR_GRADIENTS = [
+  "from-[#F97316] via-[#FB7185] to-[#8B5CF6]",
+  "from-[#8B5CF6] via-[#06B6D4] to-[#22C55E]",
+  "from-[#0EA5E9] via-[#6366F1] to-[#A78BFA]",
+  "from-[#F59E0B] via-[#F97316] to-[#EF4444]",
+  "from-[#22C55E] via-[#14B8A6] to-[#38BDF8]",
+  "from-[#EC4899] via-[#8B5CF6] to-[#06B6D4]",
+];
+
+function getInitials(name: string) {
+  const initials = name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return initials || "?";
+}
+
+function getAvatarTheme(seed: string) {
+  const hash = seed.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
+
+function getProfileBorder(level: number) {
+  if (level >= 20) {
+    return {
+      shell: "p-[2px] bg-[conic-gradient(from_180deg_at_50%_50%,#8B5CF6_0%,#06B6D4_20%,#22C55E_40%,#F59E0B_60%,#EC4899_80%,#8B5CF6_100%)] animate-[spin_7s_linear_infinite]",
+      inner: "bg-[#111827] shadow-[0_0_30px_rgba(139,92,246,0.18)]",
+      ring: "ring-1 ring-white/10",
+    };
+  }
+  if (level >= 10) {
+    return {
+      shell: "p-[2px] bg-gradient-to-br from-[#A78BFA] via-[#8B5CF6] to-[#06B6D4]",
+      inner: "bg-[#111827] shadow-[0_0_24px_rgba(139,92,246,0.14)]",
+      ring: "ring-1 ring-[#A78BFA]/20",
+    };
+  }
+  if (level >= 5) {
+    return {
+      shell: "p-[2px] bg-gradient-to-br from-[#22C55E] via-[#38BDF8] to-[#8B5CF6]",
+      inner: "bg-[#111827] shadow-[0_0_20px_rgba(34,197,94,0.12)]",
+      ring: "ring-1 ring-[#22C55E]/20",
+    };
+  }
+  return {
+    shell: "p-[2px] bg-gradient-to-br from-[#1E2736] to-[#2A3242]",
+    inner: "bg-[#1C2230] shadow-[0_0_16px_rgba(124,58,237,0.08)]",
+    ring: "ring-1 ring-[#1E2736]",
+  };
+}
+
+function ProfileAvatar({
+  src,
+  name,
+  username,
+  level,
+  size = 80,
+  pro = false,
+}: {
+  src?: string;
+  name: string;
+  username: string;
+  level: number;
+  size?: number;
+  pro?: boolean;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const initials = getInitials(name);
+  const theme = getAvatarTheme(username || name);
+  const border = getProfileBorder(level);
+  const showImage = !!src && !imageFailed;
+
+  return (
+    <div className={`relative shrink-0 rounded-full ${border.shell}`}>
+      <div
+        className={`relative overflow-hidden rounded-full ${border.inner} ${border.ring}`}
+        style={{ width: size, height: size }}
+      >
+        {showImage ? (
+          <Image
+            src={src}
+            alt={`${name}'s avatar`}
+            width={size}
+            height={size}
+            unoptimized
+            className="h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${theme} text-white`}>
+            <span className="text-[1.75rem] font-black tracking-tight" style={{ lineHeight: 1 }}>
+              {initials}
+            </span>
+          </div>
+        )}
+        {pro && (
+          <span className="absolute bottom-0 w-full text-center bg-gradient-to-r from-[#7C3AED] to-[#C084FC] text-white text-[9px] py-0.5 font-bold uppercase tracking-widest">
+            Pro
+          </span>
+        )}
+        {level >= 20 && (
+          <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-white/10" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────────── Design Tokens ──────────────────────────── */
 const CARD = "rounded-2xl border border-[#1E2736] bg-[#111827] shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all duration-200";
 const CARD_HOVER = "hover:border-[#7C3AED]/40 hover:shadow-[0_8px_30px_rgba(124,58,237,0.12)] hover:-translate-y-[2px]";
@@ -113,6 +224,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
   const [selectedDay, setSelectedDay] = useState<{ date: string; data: { count: number; xp: number; languages: string[] } } | null>(null);
   const [graphPeriod, setGraphPeriod] = useState<7 | 30>(7);
   const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const handleConnectCollege = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +251,48 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
     } finally {
       setSubmittingCollege(false);
     }
+  };
+
+  const handleAvatarUpload = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCollegeError("Please choose an image file");
+      return;
+    }
+
+    const maxSizeMb = 5;
+    if (file.size > maxSizeMb * 1024 * 1024) {
+      setCollegeError(`Image must be under ${maxSizeMb}MB`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const avatarUrl = typeof reader.result === "string" ? reader.result : "";
+      if (!avatarUrl) {
+        setCollegeError("Could not read the selected image");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/profile/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ avatarUrl }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setProfile((prev) => ({ ...prev, avatarUrl }));
+          window.location.reload();
+        } else {
+          setCollegeError(data.error || "Failed to update avatar");
+        }
+      } catch (err) {
+        console.error(err);
+        setCollegeError("Network error. Please try again.");
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   /* ── Derived values ── */
@@ -284,7 +438,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
 
       {/* ════════════════ HERO ════════════════ */}
       <section
-        className="rounded-2xl border border-[#1E2736] bg-gradient-to-br from-[#111827] to-[#0B0D12] px-8 py-9 flex items-center justify-between gap-8 relative overflow-hidden"
+        className="rounded-2xl border border-[#1E2736] bg-gradient-to-br from-[#111827] to-[#0B0D12] px-8 pt-6 pb-4 flex items-start justify-between gap-6 relative overflow-hidden"
         aria-label="Profile hero"
       >
         {/* Particles */}
@@ -312,33 +466,63 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
           ))}
         </div>
 
-        <div className="flex items-center gap-4 relative z-10 w-full">
+        <div className="flex items-start gap-4 relative z-10 w-full">
           {/* Avatar */}
-          <motion.div
-            animate={{ y: ["0px", "-4px", "0px"] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            className="h-[88px] w-[88px] shrink-0 rounded-full border-2 border-[#1E2736] overflow-hidden bg-[#1C2230] relative shadow-[0_0_24px_rgba(124,58,237,0.12)]"
-          >
-            <Image src={profile.avatarUrl} alt={`${profile.fullName}'s avatar`} width={88} height={88} unoptimized className="h-full w-full object-cover" />
-            {profile.isPro && (
-              <span className="absolute bottom-0 w-full text-center bg-gradient-to-r from-[#7C3AED] to-[#C084FC] text-white text-[9px] py-0.5 font-bold uppercase tracking-widest" aria-label="Pro member">
-                Pro
-              </span>
+          <div className="relative shrink-0">
+            <motion.div
+              animate={{ y: ["0px", "-4px", "0px"] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+              className="shrink-0"
+            >
+              <ProfileAvatar
+                src={profile.avatarUrl}
+                name={profile.fullName}
+                username={profile.username}
+                level={profile.level}
+                size={80}
+                pro={profile.isPro}
+              />
+            </motion.div>
+            {isOwner && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute -right-1 -bottom-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#1E2736] bg-[#111827] text-[#A78BFA] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-transform hover:scale-105 hover:text-white hover:border-[#7C3AED]/50"
+                  aria-label="Upload profile image"
+                  title="Upload profile image"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarUpload(e.target.files?.[0] ?? null);
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </>
             )}
-          </motion.div>
+          </div>
 
           {/* Info */}
-          <div className="min-w-0 flex-1 flex flex-col justify-center">
-            <div className="flex flex-col gap-1">
+          <div className="min-w-0 flex-1 flex flex-col justify-start pt-1">
+            <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-4">
-                <h1 className="text-[40px] font-black text-white tracking-tight leading-none">{profile.fullName}</h1>
+                <h1 className="text-[36px] font-black text-white tracking-tight leading-none">{profile.fullName}</h1>
                 {profile.solvedCount >= 100 && (
-                  <BadgeCheck className="h-6 w-6 fill-[#7C3AED] text-white shrink-0" aria-label="Verified solver" />
+                  <BadgeCheck className="h-5 w-5 fill-[#7C3AED] text-white shrink-0" aria-label="Verified solver" />
                 )}
               </div>
-              <p className="text-[15px] font-mono text-[#A78BFA] leading-none mb-2">@{profile.username}</p>
+              <p className="text-[14px] font-mono text-[#A78BFA] leading-none mb-1">@{profile.username}</p>
             </div>
-            <div className="flex items-center gap-6 text-[15px] text-[#94A3B8] flex-wrap mt-4 select-none">
+            <div className="flex items-center gap-5 text-[14px] text-[#94A3B8] flex-wrap mt-2 select-none">
               <span className="flex items-center gap-2 text-white font-semibold"><Code2 className="h-4 w-4 text-[#60A5FA]" /> {profile.solvedCount} Solved</span>
               <span className="text-[#1E2736] font-bold">•</span>
               <span className="flex items-center gap-2 text-white font-semibold"><Target className="h-4 w-4 text-[#22C55E]" /> Level {currentLevel}</span>
@@ -353,7 +537,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                 </>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex items-center gap-3 mt-2">
               {isOwner && (
                 <Link
                   href="/settings"
@@ -375,10 +559,10 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
           </div>
 
           {/* Profile Summary (Hero right) */}
-          <div className="shrink-0 hidden md:flex flex-col justify-center border-l border-[#1E2736]/60 pl-6 ml-6 relative z-10 w-[250px] self-center">
-            <div className="flex flex-col gap-4 text-[13px]">
+          <div className="shrink-0 hidden md:flex flex-col justify-start border-l border-[#1E2736]/60 pl-5 ml-5 relative z-10 w-[250px] self-start">
+            <div className="flex flex-col gap-3 text-[13px]">
               <div>
-                <div className="flex justify-between items-baseline mb-2">
+                <div className="flex justify-between items-baseline mb-1.5">
                   <span className="font-bold text-white uppercase tracking-wider text-[12px]">Level {profile.level}</span>
                   <span className="text-[#94A3B8]/60 font-mono text-[11px]">{currentLevelXP}/100 XP</span>
                 </div>
@@ -390,13 +574,13 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                     transition={{ duration: 1 }}
                   />
                 </div>
-                <div className="flex justify-between text-[11px] mt-2">
+                <div className="flex justify-between text-[11px] mt-1.5">
                   <span className="text-[#94A3B8]/50 uppercase tracking-wide font-bold">Next Reward</span>
                   <span className="text-[#A78BFA] font-bold">Profile Border</span>
                 </div>
               </div>
               <div className="h-px bg-[#1E2736]/60" />
-              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div>
                   <p className="text-[#94A3B8]/50 text-[11px] uppercase tracking-wider font-black">Global Rank</p>
                   <p className="font-mono text-[16px] font-black text-white mt-1">#{profile.globalRank || "—"}</p>
