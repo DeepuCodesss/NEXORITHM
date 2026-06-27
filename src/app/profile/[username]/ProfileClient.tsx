@@ -27,7 +27,9 @@ import {
   Star,
   UserPlus,
   CheckCircle,
-  Crown
+  Crown,
+  TrendingUp,
+  BarChart3
 } from "lucide-react";
 import { ProfilePayload } from "./page";
 
@@ -109,6 +111,8 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
   const [collegeError, setCollegeError] = useState("");
   const [heatmapDate, setHeatmapDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<{ date: string; data: { count: number; xp: number; languages: string[] } } | null>(null);
+  const [graphPeriod, setGraphPeriod] = useState<7 | 30>(7);
+  const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
 
   const handleConnectCollege = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,12 +159,85 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
 
   /* ── Helpers ── */
   function heatColor(count: number) {
-    if (count === 0) return "#202738";
-    if (count === 1) return "#3B0764";
-    if (count <= 3) return "#581C87";
-    if (count <= 6) return "#7E22CE";
-    return "#A855F7";
+    if (count === 0) return "#1A1E29";
+    if (count === 1) return "#4C1D95";
+    if (count <= 3) return "#6D28D9";
+    if (count <= 5) return "#8B5CF6";
+    return "#A78BFA";
   }
+
+  /* ── Solves Overview Chart Data ── */
+  const getChartData = (days: number) => {
+    const data: { label: string; val: number; dateStr: string }[] = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const label = days <= 7
+        ? d.toLocaleDateString("en-US", { weekday: "short" })
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const val = profile.heatmap[dateStr]?.count || 0;
+      data.push({ label, val, dateStr });
+    }
+    return data;
+  };
+
+  const chartData = getChartData(graphPeriod);
+  const chartTotal = chartData.reduce((a, b) => a + b.val, 0);
+  const chartMax = Math.max(...chartData.map(d => d.val), 1);
+
+  // Previous period comparison
+  const getPrevTotal = (days: number) => {
+    const now = new Date();
+    let total = 0;
+    for (let i = days * 2 - 1; i >= days; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      total += profile.heatmap[dateStr]?.count || 0;
+    }
+    return total;
+  };
+  const prevTotal = getPrevTotal(graphPeriod);
+  const trendPct = prevTotal > 0 ? Math.round(((chartTotal - prevTotal) / prevTotal) * 100) : chartTotal > 0 ? 100 : 0;
+
+  // Difficulty breakdown for selected period
+  const periodStart = new Date();
+  periodStart.setDate(periodStart.getDate() - graphPeriod);
+  const periodStartStr = periodStart.toISOString().slice(0, 10);
+  const periodSubs = profile.recentActivity.filter(s => s.status === "Accepted" && s.createdAt.slice(0, 10) >= periodStartStr);
+  const easyCount = periodSubs.filter(s => s.difficulty?.toLowerCase() === "easy").length;
+  const mediumCount = periodSubs.filter(s => s.difficulty?.toLowerCase() === "medium").length;
+  const hardCount = periodSubs.filter(s => s.difficulty?.toLowerCase() === "hard").length;
+
+  /* ── SVG Chart Helpers ── */
+  const chartW = 300;
+  const chartH = 130;
+  const padX = 20;
+  const padY = 20;
+  const chartPoints = chartData.map((d, i) => ({
+    x: padX + (i / Math.max(chartData.length - 1, 1)) * (chartW - 2 * padX),
+    y: padY + (1 - d.val / chartMax) * (chartH - 2 * padY),
+    ...d,
+  }));
+
+  const getBezierPath = (pts: { x: number; y: number }[]) => {
+    if (pts.length < 2) return `M ${pts[0]?.x || 0} ${pts[0]?.y || 0}`;
+    let path = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const cpX1 = p0.x + (p1.x - p0.x) / 3;
+      const cpX2 = p0.x + (2 * (p1.x - p0.x)) / 3;
+      path += ` C ${cpX1} ${p0.y}, ${cpX2} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+    return path;
+  };
+  const linePath = getBezierPath(chartPoints);
+  const fillPath = chartPoints.length >= 2
+    ? `${linePath} L ${chartPoints[chartPoints.length - 1].x} ${chartH} L ${chartPoints[0].x} ${chartH} Z`
+    : "";
 
   const getStatusDisplay = (status: string) => {
     switch (status) {
@@ -345,34 +422,34 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
       {/* ════════════════ MAIN GRID ════════════════ */}
       <div className="flex flex-col gap-5">
 
-        {/* ── ROW 1: Activity (≈50%) | Badges (≈25%) | Journey (≈25%) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* ── ROW 1: Activity | Solves Overview | Badges | Journey ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
 
-          {/* ── Activity Heatmap (col-span-6 ≈ 50%) ── */}
+          {/* ── Activity Heatmap (col-span-4) ── */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-            className={`${CARD} ${CARD_HOVER} px-4 pt-3.5 pb-3 lg:col-span-6 h-[340px] flex flex-col`}
+            className={`${CARD} ${CARD_HOVER} px-5 pt-4 pb-4 lg:col-span-4 h-[360px] flex flex-col`}
             aria-label="Activity calendar"
           >
-            {/* Header — single tight row */}
-            <div className="flex items-center justify-between mb-2">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
               <span className={CARD_TITLE}><Calendar className="h-5 w-5 text-[#7C3AED]" /> Activity</span>
-              <div className="flex items-center gap-3 select-none">
-                <span className="text-[13px] font-bold text-[#94A3B8]/60 font-mono">{profile.solvedCount} solves</span>
-                <div className="flex items-center gap-0.5 bg-[#0B0D12] border border-[#1E2736] rounded-lg p-0.5 shadow-inner">
+              <div className="flex items-center gap-2.5 select-none">
+                <span className="text-[12px] font-semibold text-[#64748B] font-mono">{profile.solvedCount} Solves</span>
+                <div className="flex items-center gap-0 bg-[#0B0D12] border border-[#1E2736] rounded-lg p-0.5 shadow-inner">
                   <button
                     onClick={() => setHeatmapDate(new Date(currentYear, currentMonth - 1, 1))}
-                    className="p-1 hover:bg-[#1C2230] rounded text-[#94A3B8] transition-colors focus:outline-none hover:text-white"
+                    className="p-1 hover:bg-[#1C2230] rounded text-[#64748B] transition-colors focus:outline-none hover:text-white"
                     aria-label="Previous month"
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </button>
-                  <span className="text-[12px] font-bold text-white w-[72px] text-center font-mono select-none">
+                  <span className="text-[11px] font-bold text-white w-[68px] text-center font-mono select-none">
                     {heatmapDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                   </span>
                   <button
                     onClick={() => setHeatmapDate(new Date(currentYear, currentMonth + 1, 1))}
-                    className="p-1 hover:bg-[#1C2230] rounded text-[#94A3B8] transition-colors focus:outline-none hover:text-white"
+                    className="p-1 hover:bg-[#1C2230] rounded text-[#64748B] transition-colors focus:outline-none hover:text-white"
                     aria-label="Next month"
                   >
                     <ChevronRight className="h-3.5 w-3.5" />
@@ -381,112 +458,296 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
               </div>
             </div>
 
-            <div className="max-w-[280px] mx-auto w-full flex flex-col flex-1 justify-center">
-              {/* Day-of-week headers */}
-              <div className="grid grid-cols-7 gap-[2px] mb-0.5">
-                {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-                  <div key={`${d}-${i}`} className="text-[9px] font-bold text-[#64748B]/80 text-center select-none">{d}</div>
-                ))}
-              </div>
+            {/* Heatmap Grid — centered, dense */}
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="w-full max-w-[300px]">
+                {/* Day-of-week headers */}
+                <div className="grid grid-cols-7 gap-[3px] mb-[3px]">
+                  {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                    <div key={`${d}-${i}`} className="text-[10px] font-semibold text-[#64748B]/60 text-center select-none">{d}</div>
+                  ))}
+                </div>
 
-              {/* Calendar Grid — dense GitHub-style */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`${currentYear}-${currentMonth}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.18 }}
-                  className="grid grid-cols-7 gap-[2px] w-full content-start mt-0.5"
-                >
-                  {calendarDays.map((day, idx) => {
-                    if (!day) return <div key={`empty-${idx}`} className="aspect-square rounded-[3px]" />;
+                {/* Calendar Grid */}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`${currentYear}-${currentMonth}`}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2 }}
+                    className="grid grid-cols-7 gap-[3px] w-full"
+                  >
+                    {calendarDays.map((day, idx) => {
+                      if (!day) return <div key={`empty-${idx}`} className="aspect-square rounded-[4px]" />;
 
-                    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                    const data = profile.heatmap[dateStr] || { count: 0, xp: 0, languages: [] };
-                    const daySubmissions = profile.recentActivity.filter(s => s.createdAt.startsWith(dateStr));
-                    const acceptedCount = daySubmissions.filter(s => s.status === "Accepted").length;
-                    const wrongCount = daySubmissions.filter(s => s.status !== "Accepted").length;
+                      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                      const data = profile.heatmap[dateStr] || { count: 0, xp: 0, languages: [] };
+                      const daySubmissions = profile.recentActivity.filter(s => s.createdAt.startsWith(dateStr));
+                      const acceptedCount = daySubmissions.filter(s => s.status === "Accepted").length;
+                      const wrongCount = daySubmissions.filter(s => s.status !== "Accepted").length;
 
-                    return (
-                      <div key={dateStr} className="relative group aspect-square">
-                        <button
-                          className="w-full h-full rounded-[3px] border border-transparent transition-all duration-150 hover:scale-110 hover:z-10 hover:shadow-[0_0_10px_#A855F7] hover:ring-1 hover:ring-[#A855F7]/70 focus:outline-none"
-                          style={{ background: heatColor(data.count) }}
-                          onClick={() => {
-                            if (data.count > 0) {
-                              setSelectedDay({ date: dateStr, data });
-                              setModalType("heatmap-day");
-                            }
-                          }}
-                          aria-label={`${new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${data.count} solved, +${data.xp} XP`}
-                        />
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none" role="tooltip">
-                          <motion.div
-                            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.12 }}
-                            className="bg-[#1C2230] border border-[#2A3242] px-3 py-2 rounded-lg shadow-2xl w-[155px] flex flex-col gap-0.5"
-                          >
-                            <span className="text-[10px] font-semibold text-white border-b border-[#2A3242] pb-1 mb-0.5">
-                              {new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            </span>
-                            <div className="flex justify-between text-[9px]">
-                              <span className="text-[#94A3B8]">Solved</span>
-                              <span className="text-white font-semibold">{data.count}</span>
-                            </div>
-                            <div className="flex justify-between text-[9px]">
-                              <span className="text-[#94A3B8]">XP Earned</span>
-                              <span className="text-[#A78BFA] font-semibold">+{data.xp}</span>
-                            </div>
-                            <div className="flex justify-between text-[9px]">
-                              <span className="text-[#94A3B8]">Accepted</span>
-                              <span className="text-[#22C55E] font-semibold">{acceptedCount}</span>
-                            </div>
-                            <div className="flex justify-between text-[9px]">
-                              <span className="text-[#94A3B8]">Wrong</span>
-                              <span className="text-[#EF4444] font-semibold">{wrongCount}</span>
-                            </div>
-                            {data.languages.length > 0 && (
-                              <div className="flex justify-between text-[9px] pt-0.5 border-t border-[#2A3242]">
-                                <span className="text-[#94A3B8]">Languages</span>
-                                <span className="text-[#22C55E] truncate max-w-[70px]">{data.languages.join(", ")}</span>
+                      return (
+                        <div key={dateStr} className="relative group aspect-square">
+                          <button
+                            className="w-full h-full rounded-[4px] border border-transparent transition-all duration-150 hover:scale-[1.15] hover:z-10 hover:shadow-[0_0_12px_rgba(139,92,246,0.4)] hover:ring-1 hover:ring-[#A855F7]/60 focus:outline-none"
+                            style={{ background: heatColor(data.count) }}
+                            onClick={() => {
+                              if (data.count > 0) {
+                                setSelectedDay({ date: dateStr, data });
+                                setModalType("heatmap-day");
+                              }
+                            }}
+                            aria-label={`${new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${data.count} solved, +${data.xp} XP`}
+                          />
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none" role="tooltip">
+                            <motion.div
+                              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.1 }}
+                              className="bg-[#1C2230] border border-[#2A3242] px-3 py-2 rounded-lg shadow-2xl w-[150px] flex flex-col gap-0.5"
+                            >
+                              <span className="text-[10px] font-semibold text-white border-b border-[#2A3242] pb-1 mb-0.5">
+                                {new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                              <div className="flex justify-between text-[9px]">
+                                <span className="text-[#94A3B8]">Solved</span>
+                                <span className="text-white font-semibold">{data.count}</span>
                               </div>
-                            )}
-                          </motion.div>
-                          <div className="border-[5px] border-transparent border-t-[#1C2230] -mt-px" />
+                              <div className="flex justify-between text-[9px]">
+                                <span className="text-[#94A3B8]">XP</span>
+                                <span className="text-[#A78BFA] font-semibold">+{data.xp}</span>
+                              </div>
+                              {acceptedCount > 0 && (
+                                <div className="flex justify-between text-[9px]">
+                                  <span className="text-[#94A3B8]">Accepted</span>
+                                  <span className="text-[#22C55E] font-semibold">{acceptedCount}</span>
+                                </div>
+                              )}
+                              {wrongCount > 0 && (
+                                <div className="flex justify-between text-[9px]">
+                                  <span className="text-[#94A3B8]">Wrong</span>
+                                  <span className="text-[#EF4444] font-semibold">{wrongCount}</span>
+                                </div>
+                              )}
+                            </motion.div>
+                            <div className="border-[5px] border-transparent border-t-[#1C2230] -mt-px" />
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </motion.div>
-              </AnimatePresence>
+                      );
+                    })}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             </div>
           </motion.div>
 
-          {/* ── Badges (col-span-3 ≈ 25%) ── */}
+          {/* ── Solves Overview Graph (col-span-4) ── */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-            className={`${CARD} ${CARD_HOVER} px-4 pt-3.5 pb-3 lg:col-span-3 h-[340px] flex flex-col`}
+            className={`${CARD} ${CARD_HOVER} px-5 pt-4 pb-4 lg:col-span-4 h-[360px] flex flex-col`}
+            aria-label="Solves overview"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <span className={CARD_TITLE}><BarChart3 className="h-5 w-5 text-[#7C3AED]" /> Solves Overview</span>
+                <p className="text-[11px] text-[#64748B] font-medium mt-0.5">Last {graphPeriod} Days</p>
+              </div>
+              <div className="flex items-center gap-0 bg-[#0B0D12] border border-[#1E2736] rounded-lg p-0.5 shadow-inner select-none">
+                {([7, 30] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setGraphPeriod(p)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all duration-150 ${
+                      graphPeriod === p
+                        ? "bg-[#7C3AED]/20 text-[#A78BFA] border border-[#7C3AED]/30"
+                        : "text-[#64748B] hover:text-white border border-transparent"
+                    }`}
+                  >
+                    {p}D
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="flex items-end gap-3 mb-2">
+              <span className="text-[36px] font-black text-white leading-none tracking-tight">
+                <AnimatedCounter value={chartTotal} />
+              </span>
+              <span className="text-[11px] text-[#64748B] font-medium pb-1">Total Solves</span>
+              <div className="ml-auto flex items-center gap-1 pb-1">
+                <TrendingUp className={`h-3.5 w-3.5 ${trendPct >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`} />
+                <span className={`text-[13px] font-bold ${trendPct >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                  {trendPct >= 0 ? '+' : ''}{trendPct}%
+                </span>
+                <span className="text-[10px] text-[#64748B] ml-1">vs last {graphPeriod}d</span>
+              </div>
+            </div>
+
+            {/* SVG Chart */}
+            <div className="flex-1 min-h-0 relative">
+              {hoveredPointIdx !== null && chartPoints[hoveredPointIdx] && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute bg-[#1C2230] border border-[#2A3242] px-3 py-1.5 rounded-lg shadow-2xl pointer-events-none flex flex-col gap-0.5 z-50 text-[10px]"
+                  style={{
+                    left: `${(chartPoints[hoveredPointIdx].x / chartW) * 100}%`,
+                    bottom: `${100 - (chartPoints[hoveredPointIdx].y / (chartH + 20)) * 100 + 10}%`,
+                    transform: "translateX(-50%)"
+                  }}
+                >
+                  <span className="font-semibold text-white border-b border-[#2A3242] pb-0.5 mb-0.5 whitespace-nowrap">
+                    {new Date(chartPoints[hoveredPointIdx].dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-[#94A3B8]">Solves</span>
+                    <span className="text-[#A78BFA] font-bold">{chartPoints[hoveredPointIdx].val}</span>
+                  </div>
+                </motion.div>
+              )}
+
+              <svg viewBox={`0 0 ${chartW} ${chartH + 20}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#7C3AED" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {/* Grid lines */}
+                {[0.25, 0.5, 0.75].map((pct) => (
+                  <line
+                    key={pct}
+                    x1={padX} y1={padY + pct * (chartH - 2 * padY)}
+                    x2={chartW - padX} y2={padY + pct * (chartH - 2 * padY)}
+                    stroke="#1E2736" strokeWidth="0.5" strokeDasharray="4 3"
+                  />
+                ))}
+                {/* Fill */}
+                {fillPath && (
+                  <motion.path
+                    d={fillPath}
+                    fill="url(#chartFill)"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.8, delay: 0.3 }}
+                  />
+                )}
+                {/* Line */}
+                <motion.path
+                  d={linePath}
+                  fill="none"
+                  stroke="#7C3AED"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+                />
+                {/* Points */}
+                {chartPoints.map((pt, i) => (
+                  <g key={i}>
+                    {/* Active highlight ring */}
+                    {hoveredPointIdx === i && (
+                      <circle
+                        cx={pt.x} cy={pt.y} r="8"
+                        fill="none" stroke="#7C3AED" strokeWidth="1.5"
+                        className="animate-ping opacity-75"
+                      />
+                    )}
+                    <motion.circle
+                      cx={pt.x} cy={pt.y} r={hoveredPointIdx === i ? "5" : "4"}
+                      fill={hoveredPointIdx === i ? "#7C3AED" : "#111827"} 
+                      stroke="#7C3AED" strokeWidth="2"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.4 + i * 0.05, duration: 0.3 }}
+                    />
+                    {pt.val > 0 && hoveredPointIdx !== i && (
+                      <motion.text
+                        x={pt.x} y={pt.y - 10}
+                        textAnchor="middle"
+                        fill="#94A3B8"
+                        fontSize="9"
+                        fontWeight="700"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 + i * 0.05 }}
+                      >
+                        {pt.val}
+                      </motion.text>
+                    )}
+                    {/* Invisible larger hover region for easy interaction */}
+                    <circle
+                      cx={pt.x} cy={pt.y} r="14"
+                      fill="transparent"
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHoveredPointIdx(i)}
+                      onMouseLeave={() => setHoveredPointIdx(null)}
+                    />
+                  </g>
+                ))}
+                {/* X-axis labels */}
+                {chartPoints.filter((_, i) => graphPeriod <= 7 || i % Math.ceil(graphPeriod / 7) === 0).map((pt) => (
+                  <text
+                    key={pt.dateStr}
+                    x={pt.x} y={chartH + 12}
+                    textAnchor="middle"
+                    fill="#64748B"
+                    fontSize="9"
+                    fontWeight="600"
+                  >
+                    {pt.label}
+                  </text>
+                ))}
+              </svg>
+            </div>
+
+            {/* Difficulty Breakdown */}
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              {[
+                { label: "Easy", count: easyCount, icon: Code2, color: "text-[#22C55E]", bg: "bg-[#22C55E]/8", border: "border-[#22C55E]/15" },
+                { label: "Medium", count: mediumCount, icon: Zap, color: "text-[#F59E0B]", bg: "bg-[#F59E0B]/8", border: "border-[#F59E0B]/15" },
+                { label: "Hard", count: hardCount, icon: Flame, color: "text-[#EF4444]", bg: "bg-[#EF4444]/8", border: "border-[#EF4444]/15" },
+              ].map((d) => {
+                const DIcon = d.icon;
+                return (
+                  <div key={d.label} className={`${d.bg} border ${d.border} rounded-xl py-2 flex flex-col items-center gap-0.5`}>
+                    <DIcon className={`h-3.5 w-3.5 ${d.color}`} />
+                    <span className="text-[18px] font-black text-white leading-none">{d.count}</span>
+                    <span className={`text-[10px] font-semibold ${d.color}`}>{d.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* ── Badges (col-span-2) ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+            className={`${CARD} ${CARD_HOVER} px-4 pt-4 pb-3 lg:col-span-2 h-[360px] flex flex-col`}
             aria-label="Badges"
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <span className={CARD_TITLE}><Award className="h-5 w-5 text-[#FBBF24]" /> Badges</span>
             </div>
             <div className="flex-1 flex flex-col gap-2 min-h-0 select-none">
               <div className="grid grid-cols-2 gap-2 flex-1 content-start">
-                {/* 3 Earned Badges — top row priority */}
                 {MOCK_BADGES.filter(b => b.unlocked).slice(0, 3).map((badge) => (
-                  <div key={badge.id} className="relative group flex flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-[#1C2230] to-[#12161F] border border-[#FBBF24]/30 hover:border-[#FBBF24]/70 min-h-[76px] px-1.5 py-1.5 hover:shadow-[0_0_15px_rgba(251,191,36,0.15)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
-                    <span className="text-[36px] group-hover:scale-110 transition-transform duration-200 leading-none">{badge.icon}</span>
-                    <span className="text-[11px] font-black text-white mt-1 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
+                  <div key={badge.id} className="relative group flex flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#1C2230] to-[#12161F] border border-[#FBBF24]/20 hover:border-[#FBBF24]/60 min-h-[72px] px-1 py-1.5 hover:shadow-[0_0_12px_rgba(251,191,36,0.12)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+                    <span className="text-[28px] group-hover:scale-110 transition-transform duration-200 leading-none">{badge.icon}</span>
+                    <span className="text-[9px] font-bold text-white mt-1 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
                     {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none w-[170px]">
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none w-[160px]">
                       <motion.div
-                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.12 }}
+                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.1 }}
                         className="bg-[#1C2230] border border-[#2A3242] px-3 py-2 rounded-lg shadow-2xl w-full flex flex-col gap-0.5"
                       >
-                        <span className="text-[11px] font-bold text-white border-b border-[#2A3242] pb-1 mb-0.5">{badge.name}</span>
-                        <span className="text-[10px] text-[#94A3B8] leading-snug">{badge.description}</span>
+                        <span className="text-[10px] font-bold text-white border-b border-[#2A3242] pb-1 mb-0.5">{badge.name}</span>
+                        <span className="text-[9px] text-[#94A3B8] leading-snug">{badge.description}</span>
                         <div className="flex justify-between text-[9px] mt-1 pt-1 border-t border-[#2A3242]">
                           <span className="text-[#A78BFA] font-bold">+{badge.xp} XP</span>
                           <span className="text-[#22C55E]">{badge.rarity}</span>
@@ -496,66 +757,63 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                     </div>
                   </div>
                 ))}
-                {/* 3 Locked Badges */}
                 {MOCK_BADGES.filter(b => !b.unlocked).slice(0, 3).map((badge) => (
-                  <div key={badge.id} className="relative group flex flex-col items-center justify-center rounded-2xl bg-[#12161F]/10 border border-[#1E2736]/30 min-h-[76px] px-1.5 py-1.5 opacity-25 hover:opacity-45 transition-all duration-200 cursor-pointer">
-                    <span className="text-[36px] grayscale leading-none">{badge.icon}</span>
-                    <span className="text-[11px] font-bold text-[#64748B] mt-1 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
+                  <div key={badge.id} className="relative group flex flex-col items-center justify-center rounded-xl bg-[#12161F]/10 border border-[#1E2736]/20 min-h-[72px] px-1 py-1.5 opacity-20 hover:opacity-40 transition-all duration-200 cursor-pointer">
+                    <span className="text-[28px] grayscale leading-none">{badge.icon}</span>
+                    <span className="text-[9px] font-bold text-[#64748B] mt-1 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
                   </div>
                 ))}
               </div>
               <button
                 onClick={() => setModalType("badges")}
-                className="shrink-0 w-full py-2 rounded-xl border border-[#1E2736] bg-[#0B0D12] text-[11px] font-bold text-[#94A3B8] hover:text-white hover:border-[#FBBF24]/30 hover:bg-[#111827] transition-all duration-[180ms] ease-out flex items-center justify-center gap-1 focus:outline-none"
+                className="shrink-0 w-full py-1.5 rounded-lg border border-[#1E2736] bg-[#0B0D12] text-[10px] font-bold text-[#64748B] hover:text-white hover:border-[#FBBF24]/30 hover:bg-[#111827] transition-all duration-[180ms] ease-out flex items-center justify-center gap-1 focus:outline-none"
               >
                 View All <ChevronRight className="h-3 w-3" />
               </button>
             </div>
           </motion.div>
 
-          {/* ── Journey Timeline (col-span-3 ≈ 25%) ── */}
+          {/* ── Journey Timeline (col-span-2) ── */}
           <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-            className={`${CARD} ${CARD_HOVER} px-4 pt-3.5 pb-3 lg:col-span-3 h-[340px] flex flex-col`}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+            className={`${CARD} ${CARD_HOVER} px-4 pt-4 pb-3 lg:col-span-2 h-[360px] flex flex-col`}
             aria-label="Journey timeline"
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <span className={CARD_TITLE}><Clock className="h-5 w-5 text-[#60A5FA]" /> Journey</span>
             </div>
-            {/* Scrollable timeline area */}
             <div className="relative flex-1 min-h-0 flex flex-col">
               <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth pr-1 relative pl-4 pb-4">
                 <div className="absolute left-[13px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#7C3AED] via-[#7C3AED]/40 to-transparent shadow-[0_0_8px_rgba(124,58,237,0.5)]" aria-hidden="true" />
-                <div className="flex flex-col gap-[22px] py-1">
+                <div className="flex flex-col gap-5 py-1">
                   {profile.journeyTimeline.map((item, idx) => (
                     <motion.div
-                      initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + idx * 0.06, duration: 0.35 }}
+                      initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + idx * 0.06, duration: 0.35 }}
                       key={item.id}
-                      className="relative flex items-center gap-3 group/item"
+                      className="relative flex items-center gap-2.5 group/item"
                     >
                       <motion.div
                         whileInView={{ scale: [1, 1.1, 1] }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.5 }}
-                        className={`h-7 w-7 rounded-full border-2 border-[#111827] flex items-center justify-center shrink-0 relative z-10 transition-all duration-200 ${
+                        className={`h-6 w-6 rounded-full border-2 border-[#111827] flex items-center justify-center shrink-0 relative z-10 transition-all duration-200 ${
                           item.unlocked
-                            ? "bg-[#7C3AED] text-white shadow-[0_0_10px_rgba(124,58,237,0.35)] group-hover/item:scale-110"
+                            ? "bg-[#7C3AED] text-white shadow-[0_0_8px_rgba(124,58,237,0.3)] group-hover/item:scale-110"
                             : "bg-[#1C2230] text-[#64748B]"
                         }`}
                       >
                         {getTimelineIcon(item.icon)}
                       </motion.div>
-                      <div className={`min-w-0 flex-1 ${item.unlocked ? "" : "opacity-35 group-hover/item:opacity-70 transition-opacity"}`}>
-                        <p className={`text-[12px] font-bold leading-tight ${item.unlocked ? "text-white" : "text-[#94A3B8]"}`}>{item.title}</p>
-                        <p className="text-[10px] text-[#A78BFA]/60 font-mono mt-0.5">
-                          {item.unlocked && item.date ? new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : item.unlocked ? "Unlocked" : "Locked"}
+                      <div className={`min-w-0 flex-1 ${item.unlocked ? "" : "opacity-30 group-hover/item:opacity-60 transition-opacity"}`}>
+                        <p className={`text-[11px] font-bold leading-tight ${item.unlocked ? "text-white" : "text-[#94A3B8]"}`}>{item.title}</p>
+                        <p className="text-[9px] text-[#A78BFA]/50 font-mono mt-0.5">
+                          {item.unlocked && item.date ? new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : item.unlocked ? "Unlocked" : "Locked"}
                         </p>
                       </div>
                     </motion.div>
                   ))}
                 </div>
               </div>
-              {/* Fade bottom hint */}
               <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#111827] to-transparent pointer-events-none z-20" />
             </div>
           </motion.div>
