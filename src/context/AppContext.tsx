@@ -81,6 +81,19 @@ type DbUserSnapshot = {
   streakShields: number;
   isPro: boolean;
   solvedProblemIds: unknown;
+  bio?: string;
+  graduationYear?: string;
+  country?: string;
+  preferredLanguage?: string;
+  publicProfile?: boolean;
+  showCollege?: boolean;
+  showStats?: boolean;
+  website?: string;
+  github?: string;
+  linkedin?: string;
+  twitter?: string;
+  avatarMode?: string;
+  avatarTheme?: string;
 };
 
 const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
@@ -103,6 +116,19 @@ const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
   solvedProblemIds: Array.isArray(dbUser.solvedProblemIds)
     ? dbUser.solvedProblemIds.filter((value): value is string => typeof value === "string")
     : [],
+  bio: dbUser.bio || "",
+  graduationYear: dbUser.graduationYear || "",
+  country: dbUser.country || "",
+  preferredLanguage: dbUser.preferredLanguage || "C++",
+  publicProfile: dbUser.publicProfile !== false,
+  showCollege: dbUser.showCollege !== false,
+  showStats: dbUser.showStats !== false,
+  website: dbUser.website || "",
+  github: dbUser.github || "",
+  linkedin: dbUser.linkedin || "",
+  twitter: dbUser.twitter || "",
+  avatarMode: dbUser.avatarMode || "image",
+  avatarTheme: dbUser.avatarTheme || "violet",
 });
 
 const emptyReward = (): SolveRewardResult => ({

@@ -92,6 +92,19 @@ export interface UserState {
   isPro: boolean;
   college: string;
   solvedProblemIds: string[];
+  bio?: string;
+  graduationYear?: string;
+  country?: string;
+  preferredLanguage?: string;
+  publicProfile?: boolean;
+  showCollege?: boolean;
+  showStats?: boolean;
+  website?: string;
+  github?: string;
+  linkedin?: string;
+  twitter?: string;
+  avatarMode?: string;
+  avatarTheme?: string;
 }
 
 export interface SolveRewardResult {
@@ -653,7 +666,7 @@ export const INITIAL_USER: UserState = {
   fullName: "",
   username: "guest",
   email: "",
-  avatarUrl: "https://api.dicebear.com/9.x/avataaars/svg?seed=guest",
+  avatarUrl: "/default-avatar.svg",
   authProvider: "guest",
   xp: 0,
   coins: 0,
@@ -666,6 +679,8 @@ export const INITIAL_USER: UserState = {
   isPro: false,
   college: "",
   solvedProblemIds: [],
+  avatarMode: "image",
+  avatarTheme: "violet",
 };
 
 export const MOCK_MISSIONS: Mission[] = [

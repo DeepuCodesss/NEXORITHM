@@ -9,6 +9,8 @@ export type ProfilePayload = {
   username: string;
   fullName: string;
   avatarUrl: string;
+  avatarMode: string;
+  avatarTheme: string;
   xp: number;
   level: number;
   coins: number;
@@ -19,6 +21,11 @@ export type ProfilePayload = {
   college: string;
   joinedDate: string;
   isPro: boolean;
+  bio: string;
+  website: string;
+  github: string;
+  linkedin: string;
+  twitter: string;
   recentActivity: Array<{
     id: string;
     status: string;
@@ -66,23 +73,36 @@ type PageProps = { params: Promise<{ username: string }> };
 
 const buildProfile = async (username: string): Promise<ProfilePayload | null> => {
   const prisma = getPrisma();
-  const user = await prisma.user.findUnique({
-    where: { username },
-    select: {
-      id: true,
-      username: true,
-      fullName: true,
-      avatarUrl: true,
-      xp: true,
-      coins: true,
-      currentStreak: true,
-      longestStreak: true,
-      solvedProblemIds: true,
-      college: true,
-      createdAt: true,
-      isPro: true,
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        avatarUrl: true,
+        avatarMode: true,
+        avatarTheme: true,
+        xp: true,
+        coins: true,
+        currentStreak: true,
+        longestStreak: true,
+        solvedProblemIds: true,
+        college: true,
+        createdAt: true,
+        isPro: true,
+        bio: true,
+        website: true,
+        github: true,
+        linkedin: true,
+        twitter: true,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to load profile user:", err);
+    return null;
+  }
 
   if (!user) return null;
 
@@ -308,6 +328,8 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     username: user.username,
     fullName: user.fullName,
     avatarUrl: user.avatarUrl,
+    avatarMode: user.avatarMode,
+    avatarTheme: user.avatarTheme,
     xp: user.xp,
     level,
     coins: user.coins,
@@ -318,6 +340,11 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     college: user.college,
     joinedDate: user.createdAt.toISOString(),
     isPro: user.isPro,
+    bio: user.bio || "",
+    website: user.website || "",
+    github: user.github || "",
+    linkedin: user.linkedin || "",
+    twitter: user.twitter || "",
     recentActivity: submissions.map((s) => ({
       id: s.id,
       status: s.status,

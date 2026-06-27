@@ -29,11 +29,23 @@ import {
   CheckCircle,
   Crown,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  ExternalLink
 } from "lucide-react";
 import { ProfilePayload } from "./page";
 
-/* ───────────────────────── Mock Badges ───────────────────────── */
+/* Brand SVG icons (not available in lucide-react) */
+const GithubIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+);
+const LinkedinIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+);
+const TwitterIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+);
+
+/* ------------------------- Mock Badges ------------------------- */
 const MOCK_BADGES = [
   { id: 1, name: "First Blood", description: "Solve your first problem", xp: 50, date: "2023-10-12", rarity: "Common", icon: "🥇", unlocked: true },
   { id: 2, name: "Algorithm Master", description: "Solve 50 medium problems", xp: 500, date: "2024-01-05", rarity: "Rare", icon: "🧠", unlocked: true },
@@ -43,13 +55,13 @@ const MOCK_BADGES = [
   { id: 6, name: "Weekend Warrior", description: "Solve 10 problems on weekends", xp: 150, date: null, rarity: "Uncommon", icon: "🛡️", unlocked: false },
 ];
 
-/* ───────────────────────── Animated Counter ───────────────────────── */
+/* ------------------------- Animated Counter ------------------------- */
 function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!value) { setCount(0); return; }
+    if (!value) return;
     const duration = 1200;
     const start = performance.now();
     const tick = (now: number) => {
@@ -64,7 +76,7 @@ function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: strin
   return <span ref={ref}>{count}{suffix}</span>;
 }
 
-/* ───────────────────────── Deterministic Random ───────────────────── */
+/* ------------------------- Deterministic Random --------------------- */
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9301 + 49297) * 49297;
   return x - Math.floor(x);
@@ -98,6 +110,15 @@ const AVATAR_GRADIENTS = [
   "from-[#EC4899] via-[#8B5CF6] to-[#06B6D4]",
 ];
 
+const AVATAR_THEME_OPTIONS = [
+  { id: "violet", label: "Violet Ember", theme: AVATAR_GRADIENTS[0] },
+  { id: "aurora", label: "Aurora Shift", theme: AVATAR_GRADIENTS[1] },
+  { id: "sky", label: "Sky Bloom", theme: AVATAR_GRADIENTS[2] },
+  { id: "sunset", label: "Sunset Edge", theme: AVATAR_GRADIENTS[3] },
+  { id: "mint", label: "Mint Pulse", theme: AVATAR_GRADIENTS[4] },
+  { id: "rose", label: "Rose Neon", theme: AVATAR_GRADIENTS[5] },
+];
+
 function getInitials(name: string) {
   const initials = name
     .split(" ")
@@ -112,6 +133,10 @@ function getInitials(name: string) {
 function getAvatarTheme(seed: string) {
   const hash = seed.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
+
+function getThemeById(themeId?: string) {
+  return AVATAR_THEME_OPTIONS.find((option) => option.id === themeId)?.theme ?? AVATAR_GRADIENTS[0];
 }
 
 function getProfileBorder(level: number) {
@@ -148,6 +173,8 @@ function ProfileAvatar({
   name,
   username,
   level,
+  mode,
+  themeId,
   size = 80,
   pro = false,
 }: {
@@ -155,14 +182,17 @@ function ProfileAvatar({
   name: string;
   username: string;
   level: number;
+  mode?: string;
+  themeId?: string;
   size?: number;
   pro?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const initials = getInitials(name);
-  const theme = getAvatarTheme(username || name);
+  const theme = getThemeById(themeId) || getAvatarTheme(username || name);
   const border = getProfileBorder(level);
-  const showImage = !!src && !imageFailed;
+  const resolvedSrc = src && !src.includes("dicebear.com") ? src : "/default-avatar.svg";
+  const showImage = mode !== "initials" && !imageFailed;
 
   return (
     <div className={`relative shrink-0 rounded-full ${border.shell}`}>
@@ -172,7 +202,7 @@ function ProfileAvatar({
       >
         {showImage ? (
           <Image
-            src={src}
+            src={resolvedSrc}
             alt={`${name}'s avatar`}
             width={size}
             height={size}
@@ -200,7 +230,7 @@ function ProfileAvatar({
   );
 }
 
-/* ───────────────────────── Design Tokens ──────────────────────────── */
+/* ------------------------- Design Tokens ---------------------------- */
 const CARD = "rounded-2xl border border-[#1E2736] bg-[#111827] shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all duration-200";
 const CARD_HOVER = "hover:border-[#7C3AED]/40 hover:shadow-[0_8px_30px_rgba(124,58,237,0.12)] hover:-translate-y-[2px]";
 const CARD_PAD = "p-6";
@@ -208,7 +238,7 @@ const CARD_TITLE = "text-[18px] font-bold text-white tracking-tight flex items-c
 const LABEL = "text-[12px] font-bold text-[#94A3B8]/70 uppercase tracking-wider";
 const META = "text-[13px] text-[#64748B] font-mono";
 
-/* ───────────────────────── Component ──────────────────────────────── */
+/* ------------------------- Component -------------------------------- */
 type ProfileClientProps = {
   profile: ProfilePayload;
   isOwner: boolean;
@@ -225,6 +255,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
   const [graphPeriod, setGraphPeriod] = useState<7 | 30>(7);
   const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
   const handleConnectCollege = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,13 +326,34 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
     reader.readAsDataURL(file);
   };
 
-  /* ── Derived values ── */
+  const handleAvatarThemeSelect = async (avatarTheme: string) => {
+    try {
+      const res = await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarMode: "initials", avatarTheme }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProfile((prev) => ({ ...prev, avatarMode: "initials", avatarTheme }));
+        setAvatarMenuOpen(false);
+        window.location.reload();
+      } else {
+        setCollegeError(data.error || "Failed to update avatar theme");
+      }
+    } catch (err) {
+      console.error(err);
+      setCollegeError("Network error. Please try again.");
+    }
+  };
+
+  /* -- Derived values -- */
   const currentLevel = profile.level;
   const currentLevelXP = profile.xp % 100;
   const xpToNext = 100 - currentLevelXP;
   const hasNoCollege = !profile.college || profile.college.includes("Connect");
 
-  /* ── Heatmap ── */
+  /* -- Heatmap -- */
   const currentMonth = heatmapDate.getMonth();
   const currentYear = heatmapDate.getFullYear();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -311,7 +363,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
   for (let i = 0; i < firstDayOfMonth; i++) calendarDays.push(null);
   for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
 
-  /* ── Helpers ── */
+  /* -- Helpers -- */
   function heatColor(count: number) {
     if (count === 0) return "#1A1E29";
     if (count === 1) return "#4C1D95";
@@ -320,7 +372,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
     return "#A78BFA";
   }
 
-  /* ── Solves Overview Chart Data ── */
+  /* -- Solves Overview Chart Data -- */
   const getChartData = (days: number) => {
     const data: { label: string; val: number; dateStr: string }[] = [];
     const now = new Date();
@@ -365,7 +417,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
   const mediumCount = periodSubs.filter(s => s.difficulty?.toLowerCase() === "medium").length;
   const hardCount = periodSubs.filter(s => s.difficulty?.toLowerCase() === "hard").length;
 
-  /* ── SVG Chart Helpers ── */
+  /* -- SVG Chart Helpers -- */
   const chartW = 300;
   const chartH = 130;
   const padX = 20;
@@ -436,9 +488,9 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
         }
       `}} />
 
-      {/* ════════════════ HERO ════════════════ */}
+      {/* ================ HERO ================ */}
       <section
-        className="rounded-2xl border border-[#1E2736] bg-gradient-to-br from-[#111827] to-[#0B0D12] px-8 pt-6 pb-4 flex items-start justify-between gap-6 relative overflow-hidden"
+        className="rounded-2xl border border-[#1E2736] bg-gradient-to-br from-[#111827] to-[#0B0D12] px-8 pt-6 pb-4 flex items-start justify-between gap-6 relative"
         aria-label="Profile hero"
       >
         {/* Particles */}
@@ -479,6 +531,8 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                 name={profile.fullName}
                 username={profile.username}
                 level={profile.level}
+                mode={profile.avatarMode}
+                themeId={profile.avatarTheme}
                 size={80}
                 pro={profile.isPro}
               />
@@ -487,7 +541,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
               <>
                 <button
                   type="button"
-                  onClick={() => avatarInputRef.current?.click()}
+                  onClick={() => setAvatarMenuOpen((prev) => !prev)}
                   className="absolute -right-1 -bottom-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#1E2736] bg-[#111827] text-[#A78BFA] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-transform hover:scale-105 hover:text-white hover:border-[#7C3AED]/50"
                   aria-label="Upload profile image"
                   title="Upload profile image"
@@ -497,16 +551,54 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                   </svg>
                 </button>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    void handleAvatarUpload(e.target.files?.[0] ?? null);
-                    e.currentTarget.value = "";
-                  }}
-                />
+                {avatarMenuOpen && (
+                  <div className="absolute left-0 top-full z-20 mt-3 w-[260px] overflow-hidden rounded-2xl border border-[#1E2736] bg-[#111827] shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="flex w-full items-center gap-3 border-b border-[#1E2736] px-4 py-3 text-left text-[12px] font-semibold text-white hover:bg-[#161B22]"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#A78BFA]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      Upload image
+                    </button>
+                    <div className="px-4 py-3">
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#64748B]">Gradient initials</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {AVATAR_THEME_OPTIONS.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => void handleAvatarThemeSelect(option.id)}
+                            className={`rounded-xl border px-2 py-2 text-left transition-all hover:-translate-y-[1px] hover:border-[#7C3AED]/50 ${
+                              profile.avatarMode === "initials" && profile.avatarTheme === option.id
+                                ? "border-[#7C3AED]/50 bg-[#7C3AED]/10"
+                                : "border-[#1E2736] bg-[#0B0D12]"
+                            }`}
+                          >
+                            <div className={`mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${option.theme} text-[12px] font-black text-white`}>
+                              {getInitials(profile.fullName)}
+                            </div>
+                            <p className="text-[11px] font-semibold text-white">{option.label}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        void handleAvatarUpload(e.target.files?.[0] ?? null);
+                        e.currentTarget.value = "";
+                        setAvatarMenuOpen(false);
+                      }}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -537,7 +629,70 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                 </>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-2">
+
+            {/* Bio */}
+            {profile.bio && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="mt-4 text-[13px] leading-relaxed text-[#94A3B8]/90 line-clamp-2 max-w-2xl"
+              >
+                {profile.bio}
+              </motion.p>
+            )}
+
+            {/* Social Links */}
+            {(profile.website || profile.github || profile.linkedin || profile.twitter) && (
+              <div className="flex flex-wrap items-center gap-5 mt-[18px]">
+                {profile.website && (
+                  <a
+                    href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-[#7C3AED] hover:underline transition-colors duration-150"
+                  >
+                    <Globe className="h-3.5 w-3.5 text-[#60A5FA]" />
+                    <span className="truncate max-w-[150px]">{profile.website.replace(/(^\w+:|^)\/\//, "")}</span>
+                  </a>
+                )}
+                {profile.github && (
+                  <a
+                    href={`https://github.com/${profile.github.replace(/^@/, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-[#7C3AED] hover:underline transition-colors duration-150"
+                  >
+                    <GithubIcon className="h-3.5 w-3.5 text-white" />
+                    <span>GitHub</span>
+                  </a>
+                )}
+                {profile.linkedin && (
+                  <a
+                    href={profile.linkedin.startsWith("http") ? profile.linkedin : `https://linkedin.com/in/${profile.linkedin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-[#7C3AED] hover:underline transition-colors duration-150"
+                  >
+                    <LinkedinIcon className="h-3.5 w-3.5 text-[#0077B5]" />
+                    <span>LinkedIn</span>
+                  </a>
+                )}
+                {profile.twitter && (
+                  <a
+                    href={`https://x.com/${profile.twitter.replace(/^@/, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-[#7C3AED] hover:underline transition-colors duration-150"
+                  >
+                    <TwitterIcon className="h-3.5 w-3.5 text-[#1DA1F2]" />
+                    <span>X</span>
+                  </a>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 mt-[18px]">
               {isOwner && (
                 <Link
                   href="/settings"
@@ -603,13 +758,13 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
         </div>
       </section>
 
-      {/* ════════════════ MAIN GRID ════════════════ */}
+      {/* ================ MAIN GRID ================ */}
       <div className="flex flex-col gap-5">
 
-        {/* ── ROW 1: Activity | Solves Overview | Badges | Journey ── */}
+        {/* -- ROW 1: Activity | Solves Overview | Badges | Journey -- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
 
-          {/* ── Activity Heatmap (col-span-4) ── */}
+          {/* -- Activity Heatmap (col-span-4) -- */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
             className={`${CARD} ${CARD_HOVER} px-5 pt-4 pb-4 lg:col-span-4 h-[360px] flex flex-col`}
@@ -725,7 +880,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
             </div>
           </motion.div>
 
-          {/* ── Solves Overview Graph (col-span-4) ── */}
+          {/* -- Solves Overview Graph (col-span-4) -- */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
             className={`${CARD} ${CARD_HOVER} px-5 pt-4 pb-4 lg:col-span-4 h-[360px] flex flex-col`}
@@ -909,7 +1064,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
             </div>
           </motion.div>
 
-          {/* ── Badges (col-span-2) ── */}
+          {/* -- Badges (col-span-2) -- */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
             className={`${CARD} ${CARD_HOVER} px-4 pt-4 pb-3 lg:col-span-2 h-[360px] flex flex-col`}
@@ -957,7 +1112,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
             </div>
           </motion.div>
 
-          {/* ── Journey Timeline (col-span-2) ── */}
+          {/* -- Journey Timeline (col-span-2) -- */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
             className={`${CARD} ${CARD_HOVER} px-4 pt-4 pb-3 lg:col-span-2 h-[360px] flex flex-col`}
@@ -1004,7 +1159,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
 
         </div>
 
-        {/* ── ROW 2: Submissions ── */}
+        {/* -- ROW 2: Submissions -- */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
           className={`${CARD} ${CARD_HOVER} pt-5 pb-5 pr-6 pl-[28px] flex flex-col h-[340px]`}
@@ -1080,7 +1235,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
           )}
         </motion.div>
 
-        {/* ── ROW 3: Weekly Quest ── */}
+        {/* -- ROW 3: Weekly Quest -- */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
           className={`${CARD} border-[#F59E0B]/20 bg-gradient-to-br from-[#F59E0B]/5 to-[#111827] px-5 py-3.5 relative overflow-hidden group/reward hover:border-[#F59E0B]/30 hover:-translate-y-[2px] transition-all duration-[180ms] ease-out`}
@@ -1120,7 +1275,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
           </div>
         </motion.div>
 
-        {/* ── ROW 4: Performance — 4 separate stat cards ── */}
+        {/* -- ROW 4: Performance — 4 separate stat cards -- */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "Acceptance", value: profile.submissionStats.acceptanceRate, suffix: "%", color: "text-[#22C55E]", glow: "drop-shadow-[0_0_8px_rgba(34,197,94,0.15)]", icon: Check, iconColor: "text-[#22C55E]", hoverBorder: "hover:border-[#22C55E]/30" },
@@ -1149,7 +1304,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
 
       </div>
 
-      {/* ════════════════ MODALS ════════════════ */}
+      {/* ================ MODALS ================ */}
       <AnimatePresence>
         {modalType && (
           <div

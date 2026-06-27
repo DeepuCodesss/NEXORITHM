@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Definitions of premium gradients and filters -->
+  <defs>
+    <!-- Background: dark slate to deep purple gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F1117" />
+      <stop offset="50%" stop-color="#1E1B4B" />
+      <stop offset="100%" stop-color="#2E1065" />
+    </linearGradient>
+    
+    <!-- Faceless character silhouette gradient: violet to purple -->
+    <linearGradient id="userGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+    
+    <!-- Ambient inner border glow -->
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#EC4899" stop-opacity="0.1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Circular background -->
+  <circle cx="50" cy="50" r="50" fill="url(#bgGrad)" />
+
+  <!-- Subtle glow inner ring -->
+  <circle cx="50" cy="50" r="48" stroke="url(#glowGrad)" stroke-width="2" />
+
+  <!-- Premium Minimalist Faceless Figure -->
+  <!-- Head -->
+  <circle cx="50" cy="38" r="15" fill="url(#userGrad)" />
+  
+  <!-- Shoulders / Body with smooth curvature -->
+  <path d="M22 80 C 22 66, 30 58, 50 58 C 70 58, 78 66, 78 80 C 78 83, 76 85, 73 85 H 27 C 24 85, 22 83, 22 80 Z" fill="url(#userGrad)" />
+  
+  <!-- Sleek highlight line across shoulders to give depth -->
+  <path d="M25 80 C 35 70, 65 70, 75 80" stroke="#E9D5FF" stroke-width="1.5" stroke-linecap="round" opacity="0.25" />
+</svg>

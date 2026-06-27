@@ -17,7 +17,7 @@ export const buildUserProfile = (clerkUser: ClerkUser) => {
   const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses[0]?.emailAddress || fallbackEmail;
   const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() || clerkUser.username || "Nexorithm Coder";
   const username = clerkUser.username || `${usernameFromEmail(email)}-${clerkUser.id.slice(0, 6)}`;
-  const avatarUrl = clerkUser.imageUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(username)}`;
+  const avatarUrl = clerkUser.imageUrl && !clerkUser.imageUrl.includes("dicebear.com") ? clerkUser.imageUrl : "/default-avatar.svg";
 
   return {
     id: clerkUser.id,
@@ -41,7 +41,6 @@ export const upsertClerkUser = async (clerkUser: ClerkUser) => {
       username: profile.username,
       fullName: profile.fullName,
       email: profile.email,
-      avatarUrl: profile.avatarUrl,
       authProvider: profile.authProvider,
     },
     create: {

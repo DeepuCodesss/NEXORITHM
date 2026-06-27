@@ -8,6 +8,38 @@ import { useApp } from "@/context/AppContext";
 import { BookOpen, Flame, Coins, ShieldAlert, Award, Menu, X, Trophy, Gift, CalendarDays, UserRound, IndianRupee } from "lucide-react";
 import { useState } from "react";
 
+const AVATAR_GRADIENTS = [
+  "from-[#F97316] via-[#FB7185] to-[#8B5CF6]",
+  "from-[#8B5CF6] via-[#06B6D4] to-[#22C55E]",
+  "from-[#0EA5E9] via-[#6366F1] to-[#A78BFA]",
+  "from-[#F59E0B] via-[#F97316] to-[#EF4444]",
+  "from-[#22C55E] via-[#14B8A6] to-[#38BDF8]",
+  "from-[#EC4899] via-[#8B5CF6] to-[#06B6D4]",
+];
+
+function getInitials(name: string) {
+  const initials = name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return initials || "?";
+}
+
+function getThemeById(themeId?: string) {
+  const themes: Record<string, string> = {
+    violet: AVATAR_GRADIENTS[0],
+    aurora: AVATAR_GRADIENTS[1],
+    sky: AVATAR_GRADIENTS[2],
+    sunset: AVATAR_GRADIENTS[3],
+    mint: AVATAR_GRADIENTS[4],
+    rose: AVATAR_GRADIENTS[5],
+  };
+  return themes[themeId || "violet"] || AVATAR_GRADIENTS[0];
+}
+
 export default function Header() {
   const pathname = usePathname();
   const { user: clerkUser, isSignedIn } = useUser();
@@ -19,7 +51,12 @@ export default function Header() {
     [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ").trim() ||
     clerkUser?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
     user.username;
-  const displayAvatar = clerkUser?.imageUrl || user.avatarUrl;
+  const displayAvatar = user.avatarUrl && !user.avatarUrl.includes("dicebear.com") ? user.avatarUrl : "/default-avatar.svg";
+  
+  const showInitials = user.avatarMode === "initials";
+  const initialsText = getInitials(user.fullName || (clerkUser ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") : "") || displayUsername);
+  const initialsTheme = getThemeById(user.avatarTheme);
+
   // The unique DB username must be used for routing, not the display name (which might have spaces)
   const profileHref = isSignedIn && user?.username && user.username !== "guest" 
     ? `/profile/${user.username}` 
@@ -134,14 +171,20 @@ export default function Header() {
                 aria-label="Open user profile"
               >
                 <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-hover shadow-sm transition-colors group-hover:border-primary/40">
-                  <Image
-                    src={displayAvatar}
-                    alt=""
-                    width={36}
-                    height={36}
-                    className="h-full w-full object-cover"
-                    unoptimized
-                  />
+                  {showInitials ? (
+                    <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${initialsTheme} text-white text-[10px] font-black leading-none`}>
+                      {initialsText}
+                    </div>
+                  ) : (
+                    <Image
+                      src={displayAvatar}
+                      alt=""
+                      width={36}
+                      height={36}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  )}
                 </span>
                 <span className="hidden lg:block text-xs font-medium text-secondary-text group-hover:text-white transition-colors">
                   {displayUsername}

@@ -35,8 +35,21 @@ model User {
   fullName           String
   email              String              @unique
   avatarUrl          String
+  avatarMode         String              @default("image")
+  avatarTheme        String              @default("violet")
   college            String              @default("Connect authentication to set college")
   authProvider       String
+  bio                String              @default("")
+  graduationYear     String              @default("")
+  country            String              @default("")
+  preferredLanguage  String              @default("C++")
+  publicProfile      Boolean             @default(true)
+  showCollege        Boolean             @default(true)
+  showStats          Boolean             @default(true)
+  website            String              @default("")
+  github             String              @default("")
+  linkedin           String              @default("")
+  twitter            String              @default("")
   xp                 Int                 @default(0)
   coins              Int                 @default(0)
   moneyEarnedInr     Int                 @default(0)

@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState, type CSSProperties, type ClipboardEve
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useApp } from "@/context/AppContext";
+import { useUser } from "@clerk/nextjs";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
 import type { SolveRewardResult } from "@/lib/mockData";
 import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
@@ -117,12 +118,31 @@ const formatSolveTime = (seconds: number) => {
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
   const { problems, solveProblem, user, liveReward } = useApp();
+  const { user: clerkUser, isLoaded } = useUser();
 
   const problem = problems.find((p) => p.id === problemId) || problems[0];
   const starterCode = problem.starterCode.javascript;
 
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
   const [code, setCode] = useState(starterCode);
+
+  useEffect(() => {
+    if (!isLoaded || !clerkUser) return;
+    const preferred = clerkUser.unsafeMetadata?.preferredLanguage as string;
+    if (!preferred) return;
+
+    let langKey: JudgeLanguage = "javascript";
+    const normalized = preferred.toLowerCase();
+    if (normalized === "c++" || normalized === "cpp") langKey = "cpp";
+    else if (normalized === "java") langKey = "java";
+    else if (normalized === "python") langKey = "python";
+    else if (normalized === "javascript") langKey = "javascript";
+    else if (normalized === "go") langKey = "go";
+    else if (normalized === "rust") langKey = "rust";
+
+    setLanguage(langKey);
+    setCode(problem.starterCode[langKey] || problem.starterCode.javascript);
+  }, [isLoaded, clerkUser, problem]);
 
   type LeftTab = "description" | "leaderboard" | "editorial" | "solutions" | "discussions" | "testcases";
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
