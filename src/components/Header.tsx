@@ -129,9 +129,9 @@ export default function Header() {
                 Logout
               </button>
               <Link
-                href="/settings"
+                href={profileHref}
                 className="flex items-center gap-2 pl-1 group"
-                aria-label="Open user settings"
+                aria-label="Open user profile"
               >
                 <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-hover shadow-sm transition-colors group-hover:border-primary/40">
                   <Image

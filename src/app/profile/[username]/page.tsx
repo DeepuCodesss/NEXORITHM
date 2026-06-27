@@ -10,6 +10,7 @@ export type ProfilePayload = {
   fullName: string;
   avatarUrl: string;
   xp: number;
+  level: number;
   coins: number;
   currentStreak: number;
   longestStreak: number;
@@ -25,6 +26,7 @@ export type ProfilePayload = {
     problemSlug: string;
     difficulty: string;
     language: string;
+    runtimeMs: number;
     createdAt: string;
     xpEarned: number;
   }>;
@@ -300,11 +302,14 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     },
   ];
 
+  const level = Math.floor(user.xp / 100) + 1;
+
   return {
     username: user.username,
     fullName: user.fullName,
     avatarUrl: user.avatarUrl,
     xp: user.xp,
+    level,
     coins: user.coins,
     currentStreak: user.currentStreak,
     longestStreak: user.longestStreak,
@@ -320,6 +325,7 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
       problemSlug: s.problem.slug,
       difficulty: s.problem.difficulty,
       language: s.language,
+      runtimeMs: s.runtimeMs,
       createdAt: s.createdAt.toISOString(),
       xpEarned: s.status === "Accepted" ? 10 : 5,
     })),
@@ -379,9 +385,9 @@ export default async function ProfilePage({ params }: PageProps) {
   ];
 
   return (
-    <div className="flex bg-[#0F1117]" style={{ height: "calc(100vh - 3.5rem)", overflow: "hidden" }}>
+    <div className="flex bg-[#0F1117] min-h-[calc(100vh-3.5rem)]">
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col w-[196px] shrink-0 border-r border-[#2A3242] py-3 px-2 gap-1 select-none">
+      <aside className="hidden lg:flex flex-col w-[196px] shrink-0 border-r border-[#2A3242] py-3 px-2 gap-1 select-none sticky top-[3.5rem] h-[calc(100vh-3.5rem)]">
         <nav className="flex flex-col gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -393,20 +399,44 @@ export default async function ProfilePage({ params }: PageProps) {
             );
           })}
         </nav>
-        <div className="mt-auto mx-0.5 rounded-xl border border-[#7C3AED]/30 bg-[#7C3AED]/10 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-base">🚀</span>
-            <p className="text-[10px] font-bold text-[#A78BFA]">Upgrade to Pro</p>
+        {profile.hasSolvedToday ? (
+          <div className="mt-auto mx-0.5 rounded-xl border border-[#22C55E]/20 bg-[#22C55E]/5 p-2 transition-all flex flex-col items-center justify-center gap-0.5 text-center">
+             <div className="text-[10px] text-[#22C55E] font-bold flex items-center gap-1">
+               ✓ Mission Complete
+             </div>
+             <span className="text-[9px] text-[#64748B]">Next mission in 16h</span>
           </div>
-          <p className="text-[9px] text-[#64748B] leading-relaxed mb-2">Unlock advanced analytics, custom badges, and more exciting features!</p>
-          <Link href="/pro" className="flex items-center justify-center gap-1 rounded-lg bg-[#7C3AED] px-2 py-1.5 text-[10px] font-bold text-white hover:bg-[#6D28D9] transition-all">
-            Upgrade Now →
-          </Link>
-        </div>
-        <div className="mx-0.5 rounded-xl border border-[#2A3242] bg-[#161B22] p-3 mt-1">
-          <p className="text-[9px] font-bold text-[#94A3B8] mb-1">⚡ Nexorithm is in Beta</p>
-          <p className="text-[9px] text-[#64748B] leading-relaxed mb-2">Your feedback helps us build a better platform for coders.</p>
-          <button className="text-[9px] text-[#7C3AED] hover:underline">Share Feedback →</button>
+        ) : (
+          <div className="mt-auto mx-0.5 rounded-xl border border-[#2A3242] bg-[#12161F] p-3 transition-all hover:border-[#22C55E]/40 group/mission relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-[#22C55E]/5 blur-2xl rounded-full" />
+            <div className="flex items-center justify-between mb-1 relative z-10">
+              <span className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-base">🎯</span> Daily Mission
+              </span>
+            </div>
+            <p className="text-[10px] text-white font-medium mb-2 relative z-10 mt-1.5">Solve 1 problem today</p>
+            <Link href="/problems" className="flex items-center justify-center gap-1 rounded-lg bg-[#22C55E]/10 border border-[#22C55E]/20 px-2 py-1.5 text-[9px] font-bold text-[#22C55E] hover:bg-[#22C55E]/20 transition-all">
+              Start Mission &rarr;
+            </Link>
+          </div>
+        )}
+        
+        <div className="mx-0.5 rounded-xl border border-[#2A3242] bg-[#12161F] p-3 mt-2 transition-all hover:border-[#60A5FA]/40 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-16 h-16 bg-[#60A5FA]/5 blur-2xl rounded-full" />
+          <div className="flex justify-between items-end mb-2 relative z-10">
+            <div>
+              <p className="text-[9px] font-bold text-[#64748B] uppercase tracking-wider mb-0.5">Level Progress</p>
+              <p className="text-[10px] text-white font-bold">Lvl {profile.level || 1} <span className="text-[#64748B] font-normal mx-0.5">&rarr;</span> Lvl {(profile.level || 1) + 1}</p>
+            </div>
+            <p className="text-[9px] font-mono text-[#60A5FA]">{100 - ((profile.xp || 0) % 100)} XP left</p>
+          </div>
+          <div className="flex items-center justify-between text-[8px] text-[#64748B] mb-1 relative z-10">
+            <span>{(profile.xp || 0) % 100} XP</span>
+            <span>100 XP</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-[#1C2230] overflow-hidden border border-[#2A3242] relative z-10">
+            <div className="h-full bg-[#60A5FA] transition-all duration-1000 ease-out" style={{ width: `${(profile.xp || 0) % 100}%` }} />
+          </div>
         </div>
       </aside>
 
