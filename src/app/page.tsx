@@ -140,6 +140,8 @@ function DashboardPreview() {
   const [runCount, setRunCount] = useState(0);
   const [typedLength, setTypedLength] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [isEditorHovered, setIsEditorHovered] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(42 * 60);
 
   const heroProblemId = liveReward?.problemId || problems[0]?.id;
   const typedCode = useMemo(() => codeText.slice(0, typedLength), [typedLength]);
@@ -198,6 +200,16 @@ function DashboardPreview() {
     };
   }, [isMobile]);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setRemainingSeconds((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const handleRunCode = () => {
     const result = heroProblemId ? solveProblem(heroProblemId) : null;
     setRunCount((current) => current + 1);
@@ -226,17 +238,36 @@ function DashboardPreview() {
       initial="hidden"
       animate="visible"
       transition={{ duration: 0.55, delay: 0.15 }}
-      className="dashboard-preview flex flex-col md:flex-row min-w-0 flex-1 overflow-hidden"
+      className="dashboard-preview flex min-w-0 flex-1 flex-row"
+      style={
+        isMobile
+          ? { transform: "none" }
+          : {
+              transform: isEditorHovered
+                ? "perspective(1400px) rotateY(-2deg) rotateX(1deg)"
+                : "perspective(1400px) rotateY(-5deg) rotateX(2deg)",
+              transformOrigin: "left center",
+              transition: "transform 0.5s ease",
+              backfaceVisibility: "hidden" as const,
+              WebkitBackfaceVisibility: "hidden" as React.CSSProperties['WebkitBackfaceVisibility'],
+              willChange: "transform",
+              overflow: "visible",
+              imageRendering: "-webkit-optimize-contrast" as React.CSSProperties['imageRendering'],
+              WebkitFontSmoothing: "antialiased",
+            }
+      }
+      onMouseEnter={() => setIsEditorHovered(true)}
+      onMouseLeave={() => setIsEditorHovered(false)}
     >
-      <div className="dashboard-sidebar hidden md:flex w-16 shrink-0 flex-col items-center gap-5 border-r border-border pt-5 text-muted-foreground" aria-hidden="true">
-        {[Code2, BookOpen, Trophy, Gift, UsersRound].map((Icon, index) => (
-          <span key={index} className={`flex h-9 w-9 items-center justify-center rounded-lg ${index === 0 ? "bg-primary0/10 text-primary" : "hover:text-white transition-colors"}`}>
-            <Icon className="h-4.5 w-4.5" />
-          </span>
-        ))}
-      </div>
+        <div className="dashboard-sidebar hidden md:flex w-16 shrink-0 flex-col items-center gap-5 border-r border-border pt-5 text-muted-foreground" aria-hidden="true">
+          {[Code2, BookOpen, Trophy, Gift, UsersRound].map((Icon, index) => (
+            <span key={index} className={`flex h-9 w-9 items-center justify-center rounded-lg ${index === 0 ? "bg-primary0/10 text-primary" : "hover:text-white transition-colors"}`}>
+              <Icon className="h-4.5 w-4.5" />
+            </span>
+          ))}
+        </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
@@ -257,13 +288,15 @@ function DashboardPreview() {
             </div>
             <div className="mt-1 flex items-baseline justify-between gap-4">
               <div className="text-lg font-black text-primary">{liveReward?.isActive ? `₹${liveReward.rewardMoneyInr} Prize Pool` : "No Live Reward"}</div>
-              <div className="text-[10px] font-medium text-secondary-text">42 min remaining</div>
+              <div className="text-[10px] font-medium text-secondary-text">
+                {`${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid min-h-[280px] grid-cols-1 lg:grid-cols-[1fr_240px]">
-          <div className="code-window p-4 overflow-x-auto">
+        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', minHeight: '280px', borderBottom: 'none' }}>
+          <div style={{ width: isMobile ? '100%' : '65%', overflow: 'hidden' }} className="code-window w-full min-w-0 p-4 overflow-x-auto">
             <style>{`
               @keyframes blink {
                 0%, 100% { opacity: 1; }
@@ -303,15 +336,29 @@ function DashboardPreview() {
               );
             })}
           </div>
-          <div className="trophy-panel flex items-center justify-center p-6 border-t lg:border-t-0 lg:border-l border-border bg-gradient-to-b lg:bg-gradient-to-r from-transparent to-reward/[0.04]">
-            <div className="trophy-illustration relative flex flex-col items-center" aria-hidden="true">
-              <div className="trophy-cup flex h-24 w-28 items-center justify-center rounded-b-3xl border border-border bg-gradient-to-br from-reward to-amber-500 shadow-inner">
-                <Code2 className="h-10 w-10 text-white/90" />
-              </div>
-              <div className="trophy-stem h-6 w-5 bg-gradient-to-b from-reward to-card" />
-              <div className="trophy-base h-3 w-24 rounded bg-card border border-border" />
+          {!isMobile && (
+            <div style={{
+              width: '38%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              minHeight: '300px',
+              overflow: 'visible'
+            }}>
+              <img
+                src="/trophy-cropped.png"
+                alt="trophy"
+                style={{
+                  width: '420px',
+                  height: '420px',
+                  objectFit: 'contain',
+                  margin: '-60px',
+                  filter: 'drop-shadow(0 0 40px rgba(255,160,0,0.6)) drop-shadow(0 0 80px rgba(139,111,255,0.4))'
+                }}
+              />
             </div>
-          </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between bg-black/10">
@@ -340,7 +387,7 @@ function DashboardPreview() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
     </motion.div>
   );
 }
@@ -350,7 +397,7 @@ export default function Home() {
     <div className="landing-shell flex flex-col min-h-screen">
       <LandingHeader />
       <main className="flex-grow">
-        <section className="relative overflow-hidden pt-8 pb-10 lg:pt-12 lg:pb-14">
+        <section className="relative overflow-clip pt-8 pb-10 lg:pt-12 lg:pb-14" style={{ background: 'radial-gradient(ellipse 80% 60% at 60% 40%, rgba(139,111,255,0.12), transparent 70%)' }}>
           <div className="landing-grid-bg" />
           <div className="mx-auto max-w-[1400px] grid grid-cols-1 gap-12 px-6 lg:grid-cols-[0.9fr_1.1fr] items-center relative z-10">
             <motion.div
