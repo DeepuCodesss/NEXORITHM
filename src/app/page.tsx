@@ -394,10 +394,10 @@ function DashboardPreview() {
 
 export default function Home() {
   return (
-    <div className="landing-shell flex flex-col min-h-screen">
+    <div className="landing-shell home-landing-shell flex flex-col min-h-screen">
       <LandingHeader />
       <main className="flex-grow">
-        <section className="relative overflow-clip pt-8 pb-10 lg:pt-12 lg:pb-14" style={{ background: 'radial-gradient(ellipse 80% 60% at 60% 40%, rgba(139,111,255,0.12), transparent 70%)' }}>
+        <section className="relative overflow-clip pt-8 pb-10 lg:pt-12 lg:pb-14">
           <div className="landing-grid-bg" />
           <div className="mx-auto max-w-[1400px] grid grid-cols-1 gap-12 px-6 lg:grid-cols-[0.9fr_1.1fr] items-center relative z-10">
             <motion.div

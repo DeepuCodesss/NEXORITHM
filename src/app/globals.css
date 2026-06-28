@@ -295,6 +295,14 @@ body {
   color: white;
 }
 
+.home-landing-shell {
+  background-image: url('/landing-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 .landing-grid-bg {
   position: absolute;
   inset: 0;
