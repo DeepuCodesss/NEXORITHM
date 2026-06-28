@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -85,13 +85,118 @@ const codeLines = [
   "}",
 ];
 
+const codeText = codeLines.join("\n");
+const keywordPattern = /\b(function|const|for|let|if|return|new)\b/g;
+const bluePattern = /\b(twoSum|Map|has|get|set|length)\b/g;
+
+function isMobileWidth() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.innerWidth < 768;
+}
+
+function highlightCode(text: string) {
+  const tokenPattern = /\b(function|const|for|let|if|return|new|twoSum|Map|has|get|set|length|0)\b/g;
+  const segments: Array<{ key: number; text: string; className?: string }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = tokenPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ key: key++, text: text.slice(lastIndex, match.index) });
+    }
+
+    const token = match[0];
+    let className = "text-primary";
+
+    if (token === "0") {
+      className = "text-amber-400";
+    } else if (keywordPattern.test(token)) {
+      className = "text-violet-400";
+    } else if (bluePattern.test(token)) {
+      className = "text-sky-400";
+    }
+
+    keywordPattern.lastIndex = 0;
+    bluePattern.lastIndex = 0;
+    segments.push({ key: key++, text: token, className });
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ key: key++, text: text.slice(lastIndex) });
+  }
+
+  return segments;
+}
+
 function DashboardPreview() {
   const { problems, liveReward, solveProblem } = useApp();
   const [consoleMessage, setConsoleMessage] = useState("Ready to test sample cases.");
   const [submitMessage, setSubmitMessage] = useState("");
   const [runCount, setRunCount] = useState(0);
+  const [typedLength, setTypedLength] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
 
   const heroProblemId = liveReward?.problemId || problems[0]?.id;
+  const typedCode = useMemo(() => codeText.slice(0, typedLength), [typedLength]);
+  const highlightedCode = useMemo(() => highlightCode(typedCode), [typedCode]);
+
+  useEffect(() => {
+    setIsMobile(isMobileWidth());
+
+    const handleResize = () => {
+      setIsMobile(isMobileWidth());
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) {
+      setTypedLength(codeText.length);
+      return;
+    }
+
+    let timeoutId: number | undefined;
+    let intervalId: number | undefined;
+
+    timeoutId = window.setTimeout(() => {
+      intervalId = window.setInterval(() => {
+        setTypedLength((current) => {
+          if (current >= codeText.length) {
+            if (intervalId !== undefined) {
+              window.clearInterval(intervalId);
+            }
+            return current;
+          }
+
+          const nextLength = current + 1;
+          if (nextLength >= codeText.length && intervalId !== undefined) {
+            window.clearInterval(intervalId);
+          }
+          return nextLength;
+        });
+      }, 30);
+    }, 400);
+
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [isMobile]);
 
   const handleRunCode = () => {
     const result = heroProblemId ? solveProblem(heroProblemId) : null;
@@ -159,12 +264,44 @@ function DashboardPreview() {
 
         <div className="grid min-h-[280px] grid-cols-1 lg:grid-cols-[1fr_240px]">
           <div className="code-window p-4 overflow-x-auto">
-            {codeLines.map((line, index) => (
-              <div key={`${index}-${line}`} className="grid grid-cols-[2rem_1fr] gap-3 font-mono text-xs leading-6">
+            <style>{`
+              @keyframes blink {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0; }
+              }
+              .cursor {
+                display: inline-block;
+                width: 2px;
+                height: 1em;
+                background: #8b6fff;
+                margin-left: 1px;
+                vertical-align: text-bottom;
+                animation: blink 1s step-end infinite;
+              }
+            `}</style>
+            {codeLines.map((_, index) => {
+              const lineStart = codeLines.slice(0, index).reduce((count, line) => count + line.length + 1, 0);
+              const lineEnd = lineStart + codeLines[index].length;
+              const lineText = typedCode.slice(lineStart, Math.min(lineEnd, typedCode.length));
+              const lineSegments = highlightCode(lineText);
+              const showCursor = !isMobile && typedLength >= codeText.length && index === codeLines.length - 1;
+
+              return (
+                <div key={`${index}-${codeLines[index]}`} className="grid grid-cols-[2rem_1fr] gap-3 font-mono text-xs leading-6">
                 <span className="select-none text-right text-muted-foreground">{index + 1}</span>
-                <code className="text-primary">{line}</code>
+                <code className="text-primary whitespace-pre">
+                  {lineSegments.length > 0
+                    ? lineSegments.map((segment) => (
+                        <span key={segment.key} className={segment.className}>
+                          {segment.text}
+                        </span>
+                      ))
+                    : null}
+                  {showCursor ? <span className="cursor" aria-hidden="true" /> : null}
+                </code>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="trophy-panel flex items-center justify-center p-6 border-t lg:border-t-0 lg:border-l border-border bg-gradient-to-b lg:bg-gradient-to-r from-transparent to-reward/[0.04]">
             <div className="trophy-illustration relative flex flex-col items-center" aria-hidden="true">
