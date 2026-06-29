@@ -60,7 +60,7 @@ export default function Header() {
   // The unique DB username must be used for routing, not the display name (which might have spaces)
   const profileHref = isSignedIn && user?.username && user.username !== "guest" 
     ? `/profile/${user.username}` 
-    : `/profile/${clerkUser?.username || user?.username || "guest"}`;
+    : "/profile";
 
 
   const navItems = [

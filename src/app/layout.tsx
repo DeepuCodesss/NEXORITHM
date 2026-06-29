@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppProvider } from "@/context/AppContext";
 import Header from "@/components/Header";
+import MobileDesktopBanner from "@/components/MobileDesktopBanner";
 import { validateEnv } from "@/lib/env";
 import "./globals.css";
 
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
           <AppProvider>
+            <MobileDesktopBanner />
             <Header />
             {children}
           </AppProvider>

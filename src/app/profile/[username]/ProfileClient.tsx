@@ -103,22 +103,13 @@ const HERO_SYMBOLS = [...Array(6)].map((_, i) => ({
   delay: seededRandom(i + 8) * -10,
 }));
 
-const AVATAR_GRADIENTS = [
-  "from-[#F97316] via-[#FB7185] to-[#8B5CF6]",
-  "from-[#8B5CF6] via-[#06B6D4] to-[#22C55E]",
-  "from-[#0EA5E9] via-[#6366F1] to-[#A78BFA]",
-  "from-[#F59E0B] via-[#F97316] to-[#EF4444]",
-  "from-[#22C55E] via-[#14B8A6] to-[#38BDF8]",
-  "from-[#EC4899] via-[#8B5CF6] to-[#06B6D4]",
-];
-
 const AVATAR_THEME_OPTIONS = [
-  { id: "violet", label: "Violet Ember", theme: AVATAR_GRADIENTS[0] },
-  { id: "aurora", label: "Aurora Shift", theme: AVATAR_GRADIENTS[1] },
-  { id: "sky", label: "Sky Bloom", theme: AVATAR_GRADIENTS[2] },
-  { id: "sunset", label: "Sunset Edge", theme: AVATAR_GRADIENTS[3] },
-  { id: "mint", label: "Mint Pulse", theme: AVATAR_GRADIENTS[4] },
-  { id: "rose", label: "Rose Neon", theme: AVATAR_GRADIENTS[5] },
+  { id: "avatar-1", label: "Violet Ember", src: "/avatar/avatar-1.png" },
+  { id: "avatar-2", label: "Aurora Shift", src: "/avatar/avatar-2.png" },
+  { id: "avatar-3", label: "Sky Bloom", src: "/avatar/avatar-3.png" },
+  { id: "avatar-4", label: "Sunset Edge", src: "/avatar/avatar-4.png" },
+  { id: "avatar-5", label: "Mint Pulse", src: "/avatar/avatar-5.png" },
+  { id: "avatar-6", label: "Rose Neon", src: "/avatar/avatar-6.png" },
 ];
 
 function getInitials(name: string) {
@@ -132,13 +123,8 @@ function getInitials(name: string) {
   return initials || "?";
 }
 
-function getAvatarTheme(seed: string) {
-  const hash = seed.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
-}
-
-function getThemeById(themeId?: string) {
-  return AVATAR_THEME_OPTIONS.find((option) => option.id === themeId)?.theme ?? AVATAR_GRADIENTS[0];
+function getAvatarById(themeId?: string) {
+  return AVATAR_THEME_OPTIONS.find((option) => option.id === themeId)?.src ?? AVATAR_THEME_OPTIONS[0].src;
 }
 
 function getProfileBorder(level: number) {
@@ -191,9 +177,8 @@ function ProfileAvatar({
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const initials = getInitials(name);
-  const theme = getThemeById(themeId) || getAvatarTheme(username || name);
+  const avatarSrc = src && !src.includes("dicebear.com") ? src : getAvatarById(themeId);
   const border = getProfileBorder(level);
-  const resolvedSrc = src && !src.includes("dicebear.com") ? src : "/default-avatar.svg";
   const showImage = mode !== "initials" && !imageFailed;
 
   return (
@@ -204,7 +189,7 @@ function ProfileAvatar({
       >
         {showImage ? (
           <Image
-            src={resolvedSrc}
+            src={avatarSrc}
             alt={`${name}'s avatar`}
             width={size}
             height={size}
@@ -213,7 +198,7 @@ function ProfileAvatar({
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${theme} text-white`}>
+          <div className="flex h-full w-full items-center justify-center bg-[#0B0D12] text-white">
             <span className="text-[1.75rem] font-black tracking-tight" style={{ lineHeight: 1 }}>
               {initials}
             </span>
@@ -384,14 +369,19 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
 
   const handleAvatarThemeSelect = async (avatarTheme: string) => {
     try {
+      const selectedAvatar = AVATAR_THEME_OPTIONS.find((option) => option.id === avatarTheme);
+      if (!selectedAvatar) {
+        setCollegeError("Unknown avatar selection");
+        return;
+      }
       const res = await fetch("/api/profile/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarMode: "initials", avatarTheme }),
+        body: JSON.stringify({ avatarUrl: selectedAvatar.src, avatarMode: "image", avatarTheme }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setProfile((prev) => ({ ...prev, avatarMode: "initials", avatarTheme }));
+        setProfile((prev) => ({ ...prev, avatarUrl: selectedAvatar.src, avatarMode: "image", avatarTheme }));
         setAvatarMenuOpen(false);
         window.location.reload();
       } else {
@@ -621,7 +611,7 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                       Upload image
                     </button>
                     <div className="px-4 py-3">
-                      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#64748B]">Gradient initials</p>
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#64748B]">Avatar packs</p>
                       <div className="grid grid-cols-2 gap-2">
                         {AVATAR_THEME_OPTIONS.map((option) => (
                           <button
@@ -629,14 +619,19 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                             type="button"
                             onClick={() => void handleAvatarThemeSelect(option.id)}
                             className={`rounded-xl border px-2 py-2 text-left transition-all hover:-translate-y-[1px] hover:border-[#7C3AED]/50 ${
-                              profile.avatarMode === "initials" && profile.avatarTheme === option.id
+                              profile.avatarMode === "image" && profile.avatarTheme === option.id
                                 ? "border-[#7C3AED]/50 bg-[#7C3AED]/10"
                                 : "border-[#1E2736] bg-[#0B0D12]"
                             }`}
                           >
-                            <div className={`mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${option.theme} text-[12px] font-black text-white`}>
-                              {getInitials(profile.fullName)}
-                            </div>
+                            <Image
+                              src={option.src}
+                              alt={option.label}
+                              width={40}
+                              height={40}
+                              unoptimized
+                              className="mb-2 h-10 w-10 rounded-full border border-white/10 object-cover"
+                            />
                             <p className="text-[11px] font-semibold text-white">{option.label}</p>
                           </button>
                         ))}

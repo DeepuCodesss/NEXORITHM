@@ -48,7 +48,7 @@ export default function LandingHeader() {
   // Use the synced database username if available
   const profileHref = isSignedIn && user?.username && user.username !== "guest" 
     ? `/profile/${user.username}` 
-    : (isSignedIn ? `/profile/${clerkUser?.username || "guest"}` : "/problems");
+    : "/profile";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/75 backdrop-blur-xl">
@@ -92,10 +92,7 @@ export default function LandingHeader() {
           {!isLoaded ? (
             <span className="btn-secondary hidden h-9 px-4 text-xs sm:inline-flex">Loading...</span>
           ) : isSignedIn && clerkUser ? (
-            <Link
-              href={`/profile/${clerkUser.username || displayUsername}`}
-              className="btn-secondary h-9 gap-2 px-3 text-xs"
-            >
+            <Link href={profileHref} className="btn-secondary h-9 gap-2 px-3 text-xs">
               <UserAvatar src={clerkUser.imageUrl} name={displayUsername} />
               <span className="hidden sm:inline">{displayUsername}</span>
             </Link>
@@ -108,7 +105,7 @@ export default function LandingHeader() {
           )}
 
           {isSignedIn && clerkUser ? (
-            <Link href={`/profile/${clerkUser.username || displayUsername}`} className="btn-gradient h-9 gap-2 px-3 text-xs">
+            <Link href={profileHref} className="btn-gradient h-9 gap-2 px-3 text-xs">
               <LogOut className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Open Profile</span>
               <span className="sm:hidden">Profile</span>
