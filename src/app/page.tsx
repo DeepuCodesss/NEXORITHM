@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Target,
   Trophy,
+  User,
   UsersRound,
   WalletCards,
   Zap,
@@ -33,10 +34,10 @@ const fadeUp = {
 };
 
 const featurePills = [
+  { label: "Daily Reward Challenges", icon: Flame },
   { label: "Instant UPI Withdrawals", icon: Zap },
-  { label: "Daily Coding Challenges", icon: Flame },
-  { label: "Streak Rewards", icon: Trophy },
-  { label: "Recruiter Friendly Profiles", icon: BriefcaseBusiness },
+  { label: "Daily Giveaway", icon: Gift },
+  { label: "Completely Free to Start", icon: Rocket },
 ];
 
 const timeline = [
@@ -392,12 +393,298 @@ function DashboardPreview() {
   );
 }
 
+const videoSteps = [
+  { icon: User, title: 'Sign Up', subtitle: 'Create your account in seconds.' },
+  { icon: Code2, title: 'Solve Problems', subtitle: 'Practice coding and sharpen your skills.' },
+  { icon: Gift, title: 'Earn Rewards', subtitle: 'Complete goals and unlock exciting prizes.' },
+  { icon: Trophy, title: 'Climb Rankings', subtitle: 'Compete, improve, and become the best.' },
+];
+
+function VideoGuideSection() {
+  return (
+    <section
+      style={{
+        padding: '80px 5%',
+        position: 'relative',
+        backgroundImage: 'url(/laptop-bg.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Dark overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(5,5,15,0.80)',
+          zIndex: 0,
+        }}
+      />
+
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          maxWidth: '1400px',
+          margin: '0 auto',
+        }}
+      >
+        {/* 3-column grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '20% 55% 25%',
+            gap: '32px',
+            alignItems: 'start',
+          }}
+          className="video-guide-grid"
+        >
+          {/* LEFT COLUMN — Step Tracker */}
+          <div style={{ position: 'relative', paddingTop: '8px' }}>
+            {videoSteps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.title} style={{ display: 'flex', gap: '16px', position: 'relative' }}>
+                  {/* Vertical line + circle */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        background: 'rgba(139,111,255,0.15)',
+                        border: '2px solid rgba(139,111,255,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon style={{ width: '18px', height: '18px', color: '#8b6fff' }} />
+                    </div>
+                    {index < videoSteps.length - 1 && (
+                      <div
+                        style={{
+                          width: '2px',
+                          height: '48px',
+                          borderLeft: '2px dashed rgba(139,111,255,0.4)',
+                        }}
+                      />
+                    )}
+                  </div>
+                  {/* Text */}
+                  <div style={{ paddingTop: '6px', paddingBottom: index < videoSteps.length - 1 ? '28px' : '0' }}>
+                    <p style={{ color: '#fff', fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>
+                      {index + 1}. {step.title}
+                    </p>
+                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+                      {step.subtitle}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* CENTER COLUMN — Video */}
+          <div>
+            {/* Pill badge */}
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 16px',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(139,111,255,0.4)',
+                  background: 'rgba(139,111,255,0.1)',
+                  color: '#c084fc',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.5px',
+                }}
+              >
+                ▶ VIDEO GUIDE
+              </span>
+            </div>
+
+            {/* Heading */}
+            <h2
+              style={{
+                textAlign: 'center',
+                color: '#fff',
+                fontSize: '28px',
+                fontWeight: 800,
+                margin: '0 0 8px',
+                lineHeight: 1.3,
+              }}
+            >
+              How to Get Started on{' '}
+              <span
+                style={{
+                  background: 'linear-gradient(135deg, #8b6fff, #c084fc)',
+                  WebkitBackgroundClip: 'text',
+                  color: 'transparent',
+                }}
+              >
+                NEXORITHM
+              </span>
+            </h2>
+
+            {/* Subtitle */}
+            <p
+              style={{
+                textAlign: 'center',
+                color: 'rgba(255,255,255,0.5)',
+                fontSize: '14px',
+                margin: '0 auto 28px',
+                maxWidth: '480px',
+                lineHeight: 1.6,
+              }}
+            >
+              Watch this step-by-step guide to solve your first problem and start{' '}
+              <span style={{ color: '#c9a227' }}>earning</span> rewards.
+            </p>
+
+            {/* Video iframe */}
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                paddingTop: '56.25%',
+              }}
+            >
+              <iframe
+                src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '8px',
+                  border: 'none',
+                }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="NEXORITHM Video Guide"
+              />
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN — Cards */}
+          <div>
+            {/* Card 1 — What You'll Learn */}
+            <div
+              style={{
+                background: 'rgba(139,111,255,0.08)',
+                border: '1px solid rgba(139,111,255,0.25)',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '16px',
+              }}
+            >
+              <h3 style={{ color: '#fff', fontSize: '16px', fontWeight: 600, marginBottom: '12px', marginTop: 0 }}>
+                What You&apos;ll Learn
+              </h3>
+              {[
+                'Navigating the platform',
+                'Solving your first problem',
+                'Submitting code',
+                'Earning rewards',
+                'Tracking your progress',
+              ].map((item) => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ color: '#8b6fff', fontSize: '14px' }}>✓</span>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Card 2 — CTA */}
+            <div
+              style={{
+                background: 'rgba(201,162,39,0.08)',
+                border: '1px solid rgba(201,162,39,0.25)',
+                borderRadius: '12px',
+                padding: '20px',
+              }}
+            >
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>⭐</div>
+              <p style={{ color: '#fff', fontWeight: 600, fontSize: '15px', margin: '0 0 4px' }}>
+                Start your journey.
+              </p>
+              <p style={{ color: '#c9a227', fontSize: '13px', margin: 0 }}>
+                Code. Earn. Conquer.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM CTA BAR */}
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(139,111,255,0.15)',
+            borderRadius: '12px',
+            padding: '24px 32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: '48px',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '32px' }}>🚀</span>
+            <div>
+              <p style={{ color: '#fff', fontWeight: 600, fontSize: '16px', margin: '0 0 4px' }}>
+                Ready to start your coding journey?
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: 0 }}>
+                Watch the complete guide and take your first step towards becoming a NEXORITHM champion.
+              </p>
+            </div>
+          </div>
+          <a
+            href="/problems"
+            style={{
+              background: '#8b6fff',
+              color: '#fff',
+              padding: '12px 28px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: '15px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Start Solving Now →
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   return (
     <div className="landing-shell home-landing-shell flex flex-col min-h-screen">
       <LandingHeader />
       <main className="flex-grow">
-        <section className="relative overflow-clip pt-8 pb-10 lg:pt-12 lg:pb-14">
+        <section className="relative overflow-clip pt-8 pb-10 lg:pt-12 lg:pb-14 min-h-[100vh]">
+          <div className="hero-section-bg" />
           <div className="landing-grid-bg" />
           <div className="mx-auto max-w-[1400px] grid grid-cols-1 gap-12 px-6 lg:grid-cols-[0.9fr_1.1fr] items-center relative z-10">
             <motion.div
@@ -407,16 +694,16 @@ export default function Home() {
               transition={{ duration: 0.5 }}
               className="flex flex-col justify-center"
             >
-              <div className="badge-soft mb-5 w-fit">💰 Earn rewards for real skills</div>
-              <h1 className="max-w-xl text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Solve Code.
+              <div className="badge-soft mb-5 w-fit flex items-center gap-2"><svg width="20" height="14" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"><rect width="900" height="200" fill="#FF9933"/><rect y="200" width="900" height="200" fill="#fff"/><rect y="400" width="900" height="200" fill="#138808"/><circle cx="450" cy="300" r="60" fill="none" stroke="#000080" strokeWidth="4"/><circle cx="450" cy="300" r="6" fill="#000080"/>{[...Array(24)].map((_, i) => <line key={i} x1="450" y1="300" x2={450 + 55 * Math.cos((i * 15 * Math.PI) / 180)} y2={300 + 55 * Math.sin((i * 15 * Math.PI) / 180)} stroke="#000080" strokeWidth="2" />)}</svg> India&apos;s First Skill-Reward Coding Platform</div>
+              <h1 className="max-w-xl text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-5xl">
+                Become the Best.
                 <br />
-                Build Streaks.
+                Earn Real Money.
                 <br />
-                <span className="reward-gradient">Earn Rewards.</span>
+                <span className="reward-gradient">Compete Internationally.</span>
               </h1>
               <p className="mt-5 max-w-lg text-sm sm:text-base leading-relaxed text-secondary-text">
-                Practice coding daily, improve skills, maintain streaks, and earn real rewards directly to your wallet.
+                Practice coding every day, climb the rankings, build powerful streaks, and earn real money based entirely on your programming skills. Every reward on Nexorithm is won through skill—not luck.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link href="/problems" className="btn-gradient h-11 gap-1.5 px-5 text-xs font-bold">
@@ -447,8 +734,12 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Video Guide Section */}
+        <VideoGuideSection />
+
+        <div className="sections-bg">
         {/* Reward Timeline */}
-        <section id="rewards" className="mx-auto max-w-[1400px] px-6 py-6">
+        <section id="rewards" className="relative z-10 mx-auto max-w-[1400px] px-6 py-6">
           <div className="reward-timeline p-6 sm:p-8 flex flex-col lg:flex-row gap-8 items-center">
             <div className="flex flex-col gap-2 text-center lg:text-left lg:w-64 shrink-0">
               <h2 className="text-lg font-bold tracking-tight text-white">Reward Timeline</h2>
@@ -487,7 +778,7 @@ export default function Home() {
         </section>
 
         {/* How Nexorithm Works */}
-        <section className="mx-auto max-w-[1400px] px-6 py-4">
+        <section className="relative z-10 mx-auto max-w-[1400px] px-6 py-4">
           <div className="landing-panel p-6 sm:p-8">
             <h2 className="text-xl font-bold tracking-tight text-white text-center">How NEXORITHM Works</h2>
             <p className="mt-1.5 text-xs text-secondary-text text-center max-w-md mx-auto">
@@ -525,7 +816,7 @@ export default function Home() {
         </section>
 
         {/* What is Coming Next */}
-        <section className="mx-auto max-w-[1400px] px-6 py-4">
+        <section className="relative z-10 mx-auto max-w-[1400px] px-6 py-4">
           <div className="landing-panel overflow-hidden p-6 sm:p-8">
             <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
               <div className="flex-1 max-w-xl">
@@ -562,7 +853,7 @@ export default function Home() {
         </section>
 
         {/* Trust Bar */}
-        <section className="mx-auto max-w-[1400px] px-6 py-6">
+        <section className="relative z-10 mx-auto max-w-[1400px] px-6 py-6">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {trustBadges.map((badge) => {
               const Icon = badge.icon;
@@ -578,6 +869,7 @@ export default function Home() {
             })}
           </div>
         </section>
+        </div>
       </main>
     </div>
   );
