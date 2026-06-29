@@ -94,6 +94,7 @@ type DbUserSnapshot = {
   twitter?: string;
   avatarMode?: string;
   avatarTheme?: string;
+  showcaseBadges?: string;
 };
 
 const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
@@ -123,6 +124,7 @@ const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
   publicProfile: dbUser.publicProfile !== false,
   showCollege: dbUser.showCollege !== false,
   showStats: dbUser.showStats !== false,
+  showcaseBadges: dbUser.showcaseBadges || "",
   website: dbUser.website || "",
   github: dbUser.github || "",
   linkedin: dbUser.linkedin || "",

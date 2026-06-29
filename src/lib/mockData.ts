@@ -105,6 +105,7 @@ export interface UserState {
   twitter?: string;
   avatarMode?: string;
   avatarTheme?: string;
+  showcaseBadges?: string;
 }
 
 export interface SolveRewardResult {
@@ -681,6 +682,7 @@ export const INITIAL_USER: UserState = {
   solvedProblemIds: [],
   avatarMode: "image",
   avatarTheme: "violet",
+  showcaseBadges: "",
 };
 
 export const MOCK_MISSIONS: Mission[] = [

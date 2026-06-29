@@ -27,7 +27,8 @@ export async function POST(request: Request) {
       website,
       github,
       linkedin,
-      twitter
+      twitter,
+      showcaseBadges
     } = body as {
       college?: unknown;
       avatarUrl?: unknown;
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
       github?: unknown;
       linkedin?: unknown;
       twitter?: unknown;
+      showcaseBadges?: unknown;
     };
 
     const updates: {
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
       github?: string;
       linkedin?: string;
       twitter?: string;
+      showcaseBadges?: string;
     } = {};
 
     if (college !== undefined) {
@@ -159,6 +162,11 @@ export async function POST(request: Request) {
     if (twitter !== undefined) {
       if (typeof twitter !== "string") return apiError("Invalid twitter", 400);
       updates.twitter = twitter.trim().slice(0, 100);
+    }
+
+    if (showcaseBadges !== undefined) {
+      if (typeof showcaseBadges !== "string") return apiError("Invalid showcase badges", 400);
+      updates.showcaseBadges = showcaseBadges.trim();
     }
 
     const prisma = getPrisma();

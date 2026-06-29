@@ -26,6 +26,9 @@ export type ProfilePayload = {
   github: string;
   linkedin: string;
   twitter: string;
+  reputation: number;
+  showcaseBadges: string;
+  earnedBadgeIds: string[];
   recentActivity: Array<{
     id: string;
     status: string;
@@ -97,6 +100,8 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
         github: true,
         linkedin: true,
         twitter: true,
+        reputation: true,
+        showcaseBadges: true,
       },
     });
   } catch (err) {
@@ -324,6 +329,47 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
 
   const level = Math.floor(user.xp / 100) + 1;
 
+  // Evaluate earned badges dynamically
+  const earnedBadgeIds: string[] = [];
+  const solvedCount = solvedProblemIds.length;
+  const maxStreak = user.longestStreak;
+  const currentXp = user.xp;
+  const reputation = user.reputation;
+
+  if (solvedCount >= 1) earnedBadgeIds.push('first_code');
+  if (solvedCount >= 10) earnedBadgeIds.push('getting_started');
+  if (solvedCount >= 50) earnedBadgeIds.push('problem_solver');
+  if (solvedCount >= 100) earnedBadgeIds.push('code_warrior');
+
+  if (maxStreak >= 3) earnedBadgeIds.push('streak_starter');
+  if (maxStreak >= 7) earnedBadgeIds.push('on_fire');
+  if (maxStreak >= 30) earnedBadgeIds.push('blazing_streak');
+
+  if (currentXp >= 100) earnedBadgeIds.push('rising_star');
+  if (currentXp >= 1000) earnedBadgeIds.push('legend');
+
+  if (reputation >= 10) earnedBadgeIds.push('contest_player');
+  if (reputation >= 50) earnedBadgeIds.push('top_performer');
+  if (reputation >= 150) earnedBadgeIds.push('star_performer');
+  if (reputation >= 500) earnedBadgeIds.push('champion');
+
+  const mediumSolvedCount = await prisma.problem.count({
+    where: {
+      id: { in: solvedProblemIds },
+      difficulty: { equals: "Medium", mode: "insensitive" }
+    }
+  });
+  if (mediumSolvedCount >= 100) earnedBadgeIds.push('algorithm_master');
+  if (mediumSolvedCount >= 200) earnedBadgeIds.push('logic_sage');
+  if (mediumSolvedCount >= 500) earnedBadgeIds.push('problem_dominator');
+
+  if (solvedCount >= 10 && reputation >= 20) earnedBadgeIds.push('speed_coder');
+  if (solvedCount >= 50 && reputation >= 100) earnedBadgeIds.push('quick_thinker');
+  if (solvedCount >= 100 && reputation >= 300) earnedBadgeIds.push('accuracy_pro');
+
+  if (maxStreak >= 7) earnedBadgeIds.push('consistent_coder');
+  if (maxStreak >= 30) earnedBadgeIds.push('unstoppable');
+
   return {
     username: user.username,
     fullName: user.fullName,
@@ -345,6 +391,9 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     github: user.github || "",
     linkedin: user.linkedin || "",
     twitter: user.twitter || "",
+    reputation,
+    showcaseBadges: user.showcaseBadges || "",
+    earnedBadgeIds,
     recentActivity: submissions.map((s) => ({
       id: s.id,
       status: s.status,

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Award,
@@ -33,6 +34,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { ProfilePayload } from "./page";
+import { ALL_BADGES } from "@/app/badges/page";
 
 /* Brand SVG icons (not available in lucide-react) */
 const GithubIcon = ({ className }: { className?: string }) => (
@@ -47,12 +49,12 @@ const TwitterIcon = ({ className }: { className?: string }) => (
 
 /* ------------------------- Mock Badges ------------------------- */
 const MOCK_BADGES = [
-  { id: 1, name: "First Blood", description: "Solve your first problem", xp: 50, date: "2023-10-12", rarity: "Common", icon: "🥇", unlocked: true },
-  { id: 2, name: "Algorithm Master", description: "Solve 50 medium problems", xp: 500, date: "2024-01-05", rarity: "Rare", icon: "🧠", unlocked: true },
-  { id: 3, name: "Consistency is Key", description: "7 day streak", xp: 100, date: "2024-03-20", rarity: "Uncommon", icon: "⭐", unlocked: true },
-  { id: 4, name: "Speed Demon", description: "Solve a problem in under 2 minutes", xp: 200, date: null, rarity: "Epic", icon: "⚡", unlocked: false },
-  { id: 5, name: "Bug Hunter", description: "Find 5 edge cases", xp: 300, date: null, rarity: "Rare", icon: "🐛", unlocked: false },
-  { id: 6, name: "Weekend Warrior", description: "Solve 10 problems on weekends", xp: 150, date: null, rarity: "Uncommon", icon: "🛡️", unlocked: false },
+  { id: "first-code", name: "First Code", description: "Solve your first problem", xp: 50, date: "2023-10-12", rarity: "Common", icon: "🥇", unlocked: true },
+  { id: "algorithm-master", name: "Algorithm Master", description: "Solve 50 medium problems", xp: 500, date: "2024-01-05", rarity: "Rare", icon: "🧠", unlocked: true },
+  { id: "consistent-coder", name: "Consistent Coder", description: "7 day streak", xp: 100, date: "2024-03-20", rarity: "Uncommon", icon: "⭐", unlocked: true },
+  { id: "speed-coder", name: "Speed Coder", description: "Solve a problem in under 2 minutes", xp: 200, date: null, rarity: "Epic", icon: "⚡", unlocked: false },
+  { id: "accuracy-pro", name: "Accuracy Pro", description: "Find 5 edge cases", xp: 300, date: null, rarity: "Rare", icon: "🐛", unlocked: false },
+  { id: "on-fire", name: "On Fire", description: "Solve 10 problems on weekends", xp: 150, date: null, rarity: "Uncommon", icon: "🛡️", unlocked: false },
 ];
 
 /* ------------------------- Animated Counter ------------------------- */
@@ -245,6 +247,7 @@ type ProfileClientProps = {
 };
 
 export default function ProfileClient({ profile: initialProfile, isOwner }: ProfileClientProps) {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfilePayload>(initialProfile);
   const [modalType, setModalType] = useState<"college" | "all-activity" | "badges" | "heatmap-day" | "journey" | null>(null);
   const [collegeInput, setCollegeInput] = useState("");
@@ -256,6 +259,59 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
   const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+
+  // Resolve showcased/earned badges dynamically for this profile owner
+  const showcasedIds = profile.showcaseBadges ? profile.showcaseBadges.split(',').filter(Boolean) : [];
+  const validShowcaseIds = showcasedIds.filter(id => profile.earnedBadgeIds.includes(id));
+  
+  const resolvedBadges = [];
+  
+  // 1. Add valid showcased badges first
+  for (const id of validShowcaseIds) {
+    const badgeMeta = ALL_BADGES.find(b => b.id === id);
+    if (badgeMeta) {
+      resolvedBadges.push({
+        ...badgeMeta,
+        unlocked: true,
+        xp: 100,
+        rarity: "Special",
+      });
+    }
+  }
+  
+  // 2. If we have less than 4, fill with other earned badges
+  if (resolvedBadges.length < 4) {
+    const otherEarnedIds = profile.earnedBadgeIds.filter(id => !validShowcaseIds.includes(id));
+    for (const id of otherEarnedIds) {
+      if (resolvedBadges.length >= 4) break;
+      const badgeMeta = ALL_BADGES.find(b => b.id === id);
+      if (badgeMeta) {
+        resolvedBadges.push({
+          ...badgeMeta,
+          unlocked: true,
+          xp: 100,
+          rarity: "Earned",
+        });
+      }
+    }
+  }
+  
+  // 3. If we still have less than 4, fill with locked badges
+  if (resolvedBadges.length < 4) {
+    const lockedIds = ALL_BADGES.filter(b => !profile.earnedBadgeIds.includes(b.id)).map(b => b.id);
+    for (const id of lockedIds) {
+      if (resolvedBadges.length >= 4) break;
+      const badgeMeta = ALL_BADGES.find(b => b.id === id);
+      if (badgeMeta) {
+        resolvedBadges.push({
+          ...badgeMeta,
+          unlocked: false,
+          xp: 0,
+          rarity: "Locked",
+        });
+      }
+    }
+  }
 
   const handleConnectCollege = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1074,37 +1130,38 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
               <span className={CARD_TITLE}><Award className="h-5 w-5 text-[#FBBF24]" /> Badges</span>
             </div>
             <div className="flex-1 flex flex-col gap-2 min-h-0 select-none">
-              <div className="grid grid-cols-2 gap-2 flex-1 content-start">
-                {MOCK_BADGES.filter(b => b.unlocked).slice(0, 3).map((badge) => (
-                  <div key={badge.id} className="relative group flex flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#1C2230] to-[#12161F] border border-[#FBBF24]/20 hover:border-[#FBBF24]/60 min-h-[72px] px-1 py-1.5 hover:shadow-[0_0_12px_rgba(251,191,36,0.12)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
-                    <span className="text-[28px] group-hover:scale-110 transition-transform duration-200 leading-none">{badge.icon}</span>
-                    <span className="text-[9px] font-bold text-white mt-1 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none w-[160px]">
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.1 }}
-                        className="bg-[#1C2230] border border-[#2A3242] px-3 py-2 rounded-lg shadow-2xl w-full flex flex-col gap-0.5"
-                      >
-                        <span className="text-[10px] font-bold text-white border-b border-[#2A3242] pb-1 mb-0.5">{badge.name}</span>
-                        <span className="text-[9px] text-[#94A3B8] leading-snug">{badge.description}</span>
-                        <div className="flex justify-between text-[9px] mt-1 pt-1 border-t border-[#2A3242]">
-                          <span className="text-[#A78BFA] font-bold">+{badge.xp} XP</span>
-                          <span className="text-[#22C55E]">{badge.rarity}</span>
-                        </div>
-                      </motion.div>
-                      <div className="border-[5px] border-transparent border-t-[#1C2230] -mt-px" />
+              <div className="grid grid-cols-2 gap-3 flex-1 content-start">
+                {resolvedBadges.map((badge) => (
+                  badge.unlocked ? (
+                    <div key={badge.id} className="relative group flex flex-col items-center justify-center gap-[6px] rounded-xl bg-gradient-to-b from-[#1C2230] to-[#12161F] border border-[#FBBF24]/20 hover:border-[#FBBF24]/60 px-2 py-3 hover:shadow-[0_0_12px_rgba(251,191,36,0.12)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+                      <img src={badge.img} alt={badge.name} className="w-[72px] h-[72px] object-contain group-hover:scale-110 transition-transform duration-200" onError={(e) => e.currentTarget.src = '/badges/first-code.png'} />
+                      <span className="text-[11px] font-bold text-white/70 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50 pointer-events-none w-[160px]">
+                        <motion.div
+                          initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.1 }}
+                          className="bg-[#1C2230] border border-[#2A3242] px-3 py-2 rounded-lg shadow-2xl w-full flex flex-col gap-0.5"
+                        >
+                          <span className="text-[10px] font-bold text-white border-b border-[#2A3242] pb-1 mb-0.5">{badge.name}</span>
+                          <span className="text-[9px] text-[#94A3B8] leading-snug">{badge.desc}</span>
+                          <div className="flex justify-between text-[9px] mt-1 pt-1 border-t border-[#2A3242]">
+                            <span className="text-[#A78BFA] font-bold">+{badge.xp} XP</span>
+                            <span className="text-[#22C55E]">{badge.rarity}</span>
+                          </div>
+                        </motion.div>
+                        <div className="border-[5px] border-transparent border-t-[#1C2230] -mt-px" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {MOCK_BADGES.filter(b => !b.unlocked).slice(0, 3).map((badge) => (
-                  <div key={badge.id} className="relative group flex flex-col items-center justify-center rounded-xl bg-[#12161F]/10 border border-[#1E2736]/20 min-h-[72px] px-1 py-1.5 opacity-20 hover:opacity-40 transition-all duration-200 cursor-pointer">
-                    <span className="text-[28px] grayscale leading-none">{badge.icon}</span>
-                    <span className="text-[9px] font-bold text-[#64748B] mt-1 text-center leading-tight w-full line-clamp-2">{badge.name}</span>
-                  </div>
+                  ) : (
+                    <div key={badge.id} className="relative group flex flex-col items-center justify-center gap-[6px] rounded-xl bg-[#12161F]/10 border border-[#1E2736]/20 px-2 py-3 opacity-20 hover:opacity-40 transition-all duration-200 cursor-pointer">
+                      <img src={badge.img} alt={badge.name} className="w-[72px] h-[72px] object-contain grayscale" onError={(e) => e.currentTarget.src = '/badges/first-code.png'} />
+                      <span className="text-[11px] font-bold text-[#64748B] text-center leading-tight w-full line-clamp-2">{badge.name}</span>
+                    </div>
+                  )
                 ))}
               </div>
               <button
-                onClick={() => setModalType("badges")}
+                onClick={() => router.push("/badges")}
                 className="shrink-0 w-full py-1.5 rounded-lg border border-[#1E2736] bg-[#0B0D12] text-[10px] font-bold text-[#64748B] hover:text-white hover:border-[#FBBF24]/30 hover:bg-[#111827] transition-all duration-[180ms] ease-out flex items-center justify-center gap-1 focus:outline-none"
               >
                 View All <ChevronRight className="h-3 w-3" />
