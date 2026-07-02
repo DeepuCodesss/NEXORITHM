@@ -86,14 +86,13 @@ model RewardTransaction {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
-  @@index([type, createdAt])
 }
 
 model Withdrawal {
   id         String   @id @default(cuid())
   userId     String
   coins      Int
-  cashAmount Float
+  cashAmount Float    @db.Real
   upiId      String
   status     String
   createdAt  DateTime @default(now())
@@ -120,7 +119,7 @@ model WithdrawalRequest {
 model LiveReward {
   id                 String    @id @default(cuid())
   problemId          String    @unique
-  rewardMoney        Float
+  rewardMoney        Float     @db.Real
   startsAt           DateTime
   endsAt             DateTime
   isActive           Boolean   @default(true)
@@ -129,7 +128,7 @@ model LiveReward {
   paidAt             DateTime?
   createdAt          DateTime  @default(now())
 
-  @@index([problemId, isActive, startsAt, endsAt])
+  @@index([isActive, startsAt, endsAt])
 }
 
 model ProblemBoardConfig {
@@ -153,7 +152,7 @@ model Submission {
   output      Json
   createdAt   DateTime @default(now())
   problem     Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
-  user        User?    @relation(fields: [userId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id], onDelete: NoAction)
 
   @@index([problemId, createdAt])
   @@index([userId, createdAt])

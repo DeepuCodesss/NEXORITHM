@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS "RewardTransaction" (
   "type" TEXT NOT NULL,
   "source" TEXT NOT NULL,
   "amount" INTEGER NOT NULL,
-  "metadata" JSON,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "metadata" JSONB,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "RewardTransaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS "Withdrawal" (
   "cashAmount" REAL NOT NULL,
   "upiId" TEXT NOT NULL,
   "status" TEXT NOT NULL,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "Withdrawal_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -29,13 +29,13 @@ CREATE TABLE IF NOT EXISTS "LiveReward" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "problemId" TEXT NOT NULL UNIQUE,
   "rewardMoney" REAL NOT NULL,
-  "startsAt" DATETIME NOT NULL,
-  "endsAt" DATETIME NOT NULL,
-  "isActive" BOOLEAN NOT NULL DEFAULT 1,
+  "startsAt" TIMESTAMP(3) NOT NULL,
+  "endsAt" TIMESTAMP(3) NOT NULL,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
   "winnerUserId" TEXT,
   "winnerSubmissionId" TEXT,
-  "paidAt" DATETIME,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  "paidAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS "LiveReward_isActive_startsAt_endsAt_idx" ON "LiveReward"("isActive", "startsAt", "endsAt");
