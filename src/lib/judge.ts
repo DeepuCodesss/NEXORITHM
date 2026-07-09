@@ -329,12 +329,12 @@ const writeLanguageFiles = async (
   config: LanguageConfig,
 ) => {
   if (language === "javascript") {
-    await writeFile(path.join(workdir, config.filename), `${code}\n${jsRunner(`solve${problem.level}`)}`, "utf8");
+    await writeFile(path.join(workdir, config.filename), `${code}\n${jsRunner("solve")}`, "utf8");
     return;
   }
 
   if (language === "python") {
-    await writeFile(path.join(workdir, config.filename), `${code}\n${pythonRunner(`solve${problem.level}`)}`, "utf8");
+    await writeFile(path.join(workdir, config.filename), `${code}\n${pythonRunner("solve")}`, "utf8");
     return;
   }
 
@@ -650,8 +650,8 @@ const makeSelfTestProblem = (): Problem => ({
   optimizedSolutions: [],
   judge: { kind: "sum" },
   starterCode: {
-    javascript: "function solve1(input) { return input.trim(); }",
-    python: "def solve1(input):\n    return input.strip()\n",
+    javascript: "function solve(input) { return input.trim(); }",
+    python: "def solve(input):\n    return input.strip()\n",
     cpp: "#include <bits/stdc++.h>\nusing namespace std;\nint main(){ios::sync_with_stdio(false);cin.tie(nullptr);string s; if(!(cin>>s)) return 0; cout<<s; return 0;}",
     c: "#include <stdio.h>\nint main(void){char s[64]; if(scanf(\"%63s\", s)!=1) return 0; printf(\"%s\", s); return 0;}",
     java: "import java.io.*;\npublic class Main { public static void main(String[] args) throws Exception { BufferedReader br = new BufferedReader(new InputStreamReader(System.in)); String s = br.readLine(); if (s != null) System.out.print(s.trim()); } }",

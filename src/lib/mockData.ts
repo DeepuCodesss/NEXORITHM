@@ -122,9 +122,9 @@ export interface SolveRewardResult {
   unlockedTitle?: string;
 }
 
-const starterCode = (functionName: string): Record<JudgeLanguage, string> => ({
-  javascript: `function ${functionName}(input) {\n  // Write your solution here\n}\n`,
-  python: `def ${functionName}(input):\n    # Write your solution here\n    pass\n`,
+const starterCode = (): Record<JudgeLanguage, string> => ({
+  javascript: `function solve(input) {\n  // Write your solution here\n}\n`,
+  python: `def solve(input):\n    # Write your solution here\n    pass\n`,
   cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n  ios::sync_with_stdio(false);\n  cin.tie(nullptr);\n\n  // Read from stdin and print the answer.\n  return 0;\n}\n`,
   c: `#include <stdio.h>\n\nint main(void) {\n  // Read from stdin and print the answer.\n  return 0;\n}\n`,
   java: `import java.io.*;\nimport java.util.*;\n\npublic class Main {\n  public static void main(String[] args) throws Exception {\n    // Read from stdin and print the answer.\n  }\n}\n`,
@@ -630,7 +630,6 @@ const generateProblem = (level: number): Problem => {
   const kind = judgeKinds[(level - 1) % judgeKinds.length];
   const title = `${pattern}: ${taskCopy[kind].title}`;
   const slug = slugify(`${track.topic}-${pattern}-${level}`);
-  const functionName = `solve${level}`;
   const testCases = buildTestCases(kind, level);
 
   return {
@@ -648,7 +647,7 @@ const generateProblem = (level: number): Problem => {
     editorial: buildEditorial(kind, difficulty, track.topic, pattern),
     optimizedSolutions: buildOptimizedSolutions(kind),
     judge: { kind },
-    starterCode: starterCode(functionName),
+    starterCode: starterCode(),
     testCases,
   };
 };
