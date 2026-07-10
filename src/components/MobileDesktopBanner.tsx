@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 
 const STORAGE_KEY = "nexorithm.mobile-banner-dismissed";
@@ -11,12 +11,11 @@ function isMobileOrTablet() {
 }
 
 export default function MobileDesktopBanner() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === "undefined") return false;
     const dismissed = window.sessionStorage.getItem(STORAGE_KEY) === "1";
-    setVisible(!dismissed && isMobileOrTablet());
-  }, []);
+    return !dismissed && isMobileOrTablet();
+  });
 
   if (!visible) return null;
 

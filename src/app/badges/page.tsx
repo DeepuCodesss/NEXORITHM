@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useApp } from "@/context/AppContext";
 
 function BadgeTooltip({ badge, earned }: { badge: { name: string; desc: string }; earned: boolean }) {
@@ -86,13 +86,9 @@ export const ALL_BADGES = [
 export default function BadgesPage() {
   const { user, problems } = useApp();
   const [hoveredBadge, setHoveredBadge] = useState<string | null>(null);
-  const [showcasedIds, setShowcasedIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (user && user.showcaseBadges) {
-      setShowcasedIds(user.showcaseBadges.split(',').filter(Boolean));
-    }
-  }, [user]);
+  const [showcasedIds, setShowcasedIds] = useState<string[]>(() =>
+    user?.showcaseBadges ? user.showcaseBadges.split(",").filter(Boolean) : [],
+  );
 
   const toggleShowcase = async (badgeId: string) => {
     let nextShowcase = [...showcasedIds];
@@ -115,9 +111,7 @@ export default function BadgesPage() {
         body: JSON.stringify({ showcaseBadges: nextShowcase.join(',') }),
       });
       if (res.ok) {
-        if (user) {
-          user.showcaseBadges = nextShowcase.join(',');
-        }
+        setShowcasedIds(nextShowcase);
       }
     } catch (err) {
       console.error("Failed to update showcase badges:", err);

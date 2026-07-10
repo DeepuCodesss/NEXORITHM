@@ -127,24 +127,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
   const [code, setCode] = useState(starterCode);
 
-  useEffect(() => {
-    if (!isLoaded || !clerkUser) return;
-    const preferred = clerkUser.unsafeMetadata?.preferredLanguage as string;
-    if (!preferred) return;
-
-    let langKey: JudgeLanguage = "javascript";
-    const normalized = preferred.toLowerCase();
-    if (normalized === "c++" || normalized === "cpp") langKey = "cpp";
-    else if (normalized === "java") langKey = "java";
-    else if (normalized === "python") langKey = "python";
-    else if (normalized === "javascript") langKey = "javascript";
-    else if (normalized === "go") langKey = "go";
-    else if (normalized === "rust") langKey = "rust";
-
-    setLanguage(langKey);
-    setCode(problem.starterCode[langKey] || problem.starterCode.javascript);
-  }, [isLoaded, clerkUser, problem]);
-
   type LeftTab = "description" | "leaderboard" | "editorial" | "solutions" | "discussions" | "testcases";
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
 
@@ -195,32 +177,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     new Date(liveReward.endsAt).getTime() > now
       ? liveReward.rewardMoneyInr
       : 0;
-
-  if (isLoaded && isGuest) {
-    return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-[#0F1117] px-4 py-12">
-        <div className="w-full max-w-xl rounded-3xl border border-[#1E2736] bg-[#111827] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#7C3AED]/20 bg-[#7C3AED]/10 text-[#C084FC]">
-            <BookOpenCheck className="h-7 w-7" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight text-white">Sign in to open problems</h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#94A3B8]">
-            You can still browse the problem list, but solving a question requires a Nexorithm account.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <SignInButton mode="modal">
-              <button type="button" className="btn-primary h-11 px-5 text-sm font-bold">
-                Sign In to Continue
-              </button>
-            </SignInButton>
-            <Link href="/problems" className="btn-secondary h-11 px-5 text-sm font-bold">
-              Back to Problems
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -578,6 +534,32 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     setConsoleLogs(formatJudgeResponse(result, reward));
     return { result, reward };
   };
+
+  if (isLoaded && isGuest) {
+    return (
+      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-[#0F1117] px-4 py-12">
+        <div className="w-full max-w-xl rounded-3xl border border-[#1E2736] bg-[#111827] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#7C3AED]/20 bg-[#7C3AED]/10 text-[#C084FC]">
+            <BookOpenCheck className="h-7 w-7" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-white">Sign in to open problems</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#94A3B8]">
+            You can still browse the problem list, but solving a question requires a Nexorithm account.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <SignInButton mode="modal">
+              <button type="button" className="btn-primary h-11 px-5 text-sm font-bold">
+                Sign In to Continue
+              </button>
+            </SignInButton>
+            <Link href="/problems" className="btn-secondary h-11 px-5 text-sm font-bold">
+              Back to Problems
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const leftTabs: Array<{ id: LeftTab; label: string; icon: ElementType }> = [
     { id: "description", label: "Description", icon: FileText },
