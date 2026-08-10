@@ -121,7 +121,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const { user: clerkUser, isLoaded } = useUser();
   const isGuest = isLoaded && !clerkUser;
 
-  const problem = problems.find((p) => p.id === problemId) || problems[0];
+  const matchedProblem = problems.find((p) => p.id === problemId);
+  const problem = matchedProblem ?? problems[0];
+  const invalidProblemId = !matchedProblem;
   const starterCode = problem.starterCode.javascript;
 
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
@@ -229,6 +231,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   useEffect(() => {
     const sync = async () => {
+      if (invalidProblemId) return;
       setLeadersLoading(true);
       const response = await fetch(`/api/problems/${problem.id}/leaderboard?pageSize=10`, { cache: "no-store" });
       if (!response.ok) {
@@ -243,7 +246,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       setLeadersLoading(false);
     };
     void sync();
-  }, [problem.id]);
+  }, [invalidProblemId, problem.id]);
 
   const handleLanguageChange = (nextLanguage: JudgeLanguage) => {
     setLanguage(nextLanguage);
@@ -820,6 +823,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
     finishResize(handlePointerMove, "row-resize");
   };
+
+  if (invalidProblemId) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Problem not found</h1>
+          <p className="mt-2 text-secondary-text">This problem link is no longer available.</p>
+          <Link href="/problems" className="btn-primary mt-5 inline-flex h-10 items-center px-4 text-sm">
+            Back to Problems
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="fixed inset-x-0 bottom-0 top-14 flex flex-col overflow-hidden bg-background">

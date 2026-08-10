@@ -1,11 +1,16 @@
 import { getPrisma } from "@/lib/db";
-import { apiSuccess } from "@/lib/apiResponse";
+import { apiError, apiSuccess } from "@/lib/apiResponse";
 import { calculatePasteContribution } from "@/lib/replay";
+import { MOCK_PROBLEMS } from "@/lib/mockData";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request, { params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = await params;
+  if (!MOCK_PROBLEMS.some((problem) => problem.id === problemId)) {
+    return apiError("Problem not found.", 404);
+  }
+
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const pageSize = Math.min(50, Math.max(10, Number(searchParams.get("pageSize") ?? 10)));
