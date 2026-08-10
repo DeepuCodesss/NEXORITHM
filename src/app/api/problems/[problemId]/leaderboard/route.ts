@@ -17,10 +17,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ prob
   const skip = (page - 1) * pageSize;
 
   const prisma = getPrisma();
+  const reward = await prisma.liveReward.findUnique({
+    where: { problemId },
+    select: { startsAt: true },
+  });
+  const replayWhere = {
+    problemId,
+    ...(reward ? { createdAt: { gte: reward.startsAt } } : {}),
+  };
   const [total, replays] = await Promise.all([
-    prisma.solutionReplay.count({ where: { problemId } }),
+    prisma.solutionReplay.count({ where: replayWhere }),
     prisma.solutionReplay.findMany({
-      where: { problemId },
+      where: replayWhere,
       orderBy: [{ solveTimeSeconds: "asc" }, { createdAt: "asc" }],
       skip,
       take: pageSize,

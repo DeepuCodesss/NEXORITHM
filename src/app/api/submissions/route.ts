@@ -242,7 +242,7 @@ export async function POST(request: Request) {
     submissionId = submissionResult.createdSubmission.id;
     saved = true;
     if (result.status === "Accepted" && replayPayload?.events && Array.isArray(replayPayload.events) && replayPayload.stats) {
-      void (async () => {
+      await (async () => {
         try {
           const prisma = getPrisma();
           const compactEvents = normalizeReplayEvents(replayPayload.events).slice(0, 60);

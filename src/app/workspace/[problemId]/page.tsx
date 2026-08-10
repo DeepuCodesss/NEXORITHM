@@ -400,6 +400,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   const buildToast = (status: SubmissionStatus, result: JudgeResponse["data"], reward?: SolveRewardResult): SubmissionToastData => {
     if (status === "Accepted") {
+      if (result?.saved === false) {
+        return {
+          title: "Accepted, but not saved",
+          message: result.databaseError || "Your code passed, but the submission could not be stored. No rewards were added.",
+          tone: "error",
+        };
+      }
       const rewardBits = [];
       const streak = reward?.currentStreak ?? 0;
       if (reward?.xpGained) rewardBits.push(`+${reward.xpGained} XP`);
@@ -535,6 +542,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       submittedAt: new Date().toISOString(),
     });
     setConsoleLogs(formatJudgeResponse(result, reward));
+
+    if (endpoint === "/api/submissions" && result.status === "Accepted" && result.saved) {
+      const leadersResponse = await fetch(`/api/problems/${problem.id}/leaderboard?pageSize=10`, { cache: "no-store" });
+      if (leadersResponse.ok) {
+        const leadersPayload = (await leadersResponse.json()) as ProblemLeaderboardResponse;
+        setLeaders(Array.isArray(leadersPayload.data?.leaders) ? leadersPayload.data.leaders : []);
+        setLeadersTotal(leadersPayload.data?.pagination?.total ?? 0);
+      }
+    }
+
     return { result, reward };
   };
 
