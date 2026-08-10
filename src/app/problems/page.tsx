@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Bookmark, Check, Clock, Coins, Flame, Gift, IndianRupee, Layers, List, Search, Trophy, Zap } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import type { Difficulty, Problem } from "@/lib/mockData";
+import type { Difficulty, ProblemSummary } from "@/lib/mockData";
 
 const formatTimeLeft = (endsAt: string) => {
   const totalSeconds = Math.max(0, Math.floor((new Date(endsAt).getTime() - Date.now()) / 1000));
@@ -13,7 +13,7 @@ const formatTimeLeft = (endsAt: string) => {
   return { minutes, seconds, expired: totalSeconds <= 0 };
 };
 
-const cleanDescription = (problem?: Problem) => problem?.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() ?? "";
+const cleanDescription = (problem?: ProblemSummary) => problem ? `${problem.topic} practice focused on ${problem.pattern}.` : "";
 
 type AnnouncementLeader = {
   rank: number;
@@ -39,7 +39,7 @@ export default function ProblemsPage() {
   const [leadersLoading, setLeadersLoading] = useState(false);
 
   useEffect(() => {
-    const id = window.setInterval(() => setTick((v) => v + 1), 1000);
+    const id = window.setInterval(() => setTick((v) => v + 1), 30000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -51,7 +51,7 @@ export default function ProblemsPage() {
   const upcomingProblems = problemBoardConfig.showUpcomingRewards
     ? problemBoardConfig.upcomingRewardItems
       .map((item) => problems.find((problem) => problem.id === item.problemId))
-      .filter((problem): problem is Problem => Boolean(problem))
+      .filter((problem): problem is ProblemSummary => Boolean(problem))
       .slice(0, 3)
     : [];
 
@@ -116,7 +116,7 @@ export default function ProblemsPage() {
   const safePage = Math.min(page, totalPages);
   const visibleProblems = filteredProblems.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const solveProblems = problems.filter((problem) => isProblemSolved(problem.id));
+  const solveProblems = useMemo(() => problems.filter((problem) => isProblemSolved(problem.id)), [isProblemSolved, problems]);
   const easySolvedCount = solveProblems.filter((problem) => problem.difficulty === "Easy").length;
 
   const milestoneItems = [
@@ -139,7 +139,7 @@ export default function ProblemsPage() {
     return "text-primary bg-primary0/10";
   };
 
-  const problemStatus = (problem: Problem) => {
+  const problemStatus = (problem: ProblemSummary) => {
     if (problem.id === liveReward?.problemId && liveRewardAnnounced) return "Results Announced";
     if (problem.id === liveReward?.problemId && liveRewardActive) return "Live Reward";
     if (upcomingProblems.some((item) => item.id === problem.id)) return "Upcoming";

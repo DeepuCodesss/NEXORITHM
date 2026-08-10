@@ -49,6 +49,8 @@ export interface Problem {
   }[];
 }
 
+export type ProblemSummary = Pick<Problem, "id" | "title" | "slug" | "difficulty" | "level" | "topic" | "pattern" | "xpReward" | "coinReward">;
+
 export interface Mission {
   id: string;
   title: string;
@@ -1885,51 +1887,3 @@ export const DAILY_PRIZE_PROBLEMS = MOCK_PROBLEMS.slice(0, 3).map((problem, inde
   difficulty: (["Easy", "Medium", "Hard"] as const)[index],
   prizeMoneyInr: undefined,
 }));
-
-export const INITIAL_USER: UserState = {
-  fullName: "",
-  username: "guest",
-  email: "",
-  avatarUrl: "/default-avatar.svg",
-  authProvider: "guest",
-  xp: 0,
-  coins: 0,
-  moneyEarnedInr: 0,
-  reputation: 0,
-  devRank: 0,
-  currentStreak: 0,
-  longestStreak: 0,
-  lastSolvedAt: null,
-  streakShields: 0,
-  isPro: false,
-  college: "",
-  solvedProblemIds: [],
-  avatarMode: "image",
-  avatarTheme: "violet",
-  showcaseBadges: "",
-};
-
-export const MOCK_MISSIONS: Mission[] = [
-  {
-    id: "m1",
-    title: "First Real Submission",
-    description: "Connect the judge API, then complete your first verified submission.",
-    xpReward: 100,
-    coinReward: 20,
-    targetCount: 1,
-    currentCount: 0,
-    type: "Daily",
-  },
-  {
-    id: "m2",
-    title: "Profile Setup",
-    description: "Connect Clerk and complete the developer profile fields.",
-    xpReward: 50,
-    coinReward: 10,
-    targetCount: 1,
-    currentCount: 0,
-    type: "Weekly",
-  },
-];
-
-export const MOCK_LEADERBOARD: LeaderboardEntry[] = [];

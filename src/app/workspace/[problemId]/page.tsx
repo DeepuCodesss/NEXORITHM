@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useApp } from "@/context/AppContext";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
-import type { SolveRewardResult } from "@/lib/mockData";
+import type { Problem, ProblemSummary, SolveRewardResult } from "@/lib/mockData";
 import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
 import { calculateTrustScore, createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
 import {
@@ -115,6 +115,17 @@ const formatSolveTime = (seconds: number) => {
   return `${minutes}m ${String(remaining).padStart(2, "0")}s`;
 };
 
+const createProblemPlaceholder = (summary: ProblemSummary): Problem => ({
+  ...summary,
+  description: "",
+  discussions: [],
+  editorial: { overview: "", approach: [], complexity: { time: "O(1)", space: "O(1)" } },
+  optimizedSolutions: [],
+  judge: { kind: "sum" },
+  starterCode: { javascript: "function solve(input) {\n  // Loading problem...\n}\n" } as Problem["starterCode"],
+  testCases: [],
+});
+
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
   const { problems, solveProblem, user, liveReward } = useApp();
@@ -122,8 +133,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const isGuest = isLoaded && !clerkUser;
 
   const matchedProblem = problems.find((p) => p.id === problemId);
-  const problem = matchedProblem ?? problems[0];
-  const invalidProblemId = !matchedProblem;
+  const [fullProblem, setFullProblem] = useState<Problem | null>(null);
+  const [problemNotFoundId, setProblemNotFoundId] = useState<string | null>(null);
+  const problemMatchesRoute = fullProblem?.id === problemId;
+  const problem = problemMatchesRoute && fullProblem ? fullProblem : createProblemPlaceholder(matchedProblem ?? {
+    id: problemId,
+    title: "Problem",
+    slug: problemId,
+    difficulty: "Very Easy",
+    level: 0,
+    topic: "",
+    pattern: "",
+    xpReward: 0,
+    coinReward: 0,
+  });
+  const invalidProblemId = problemNotFoundId === problemId;
   const starterCode = problem.starterCode.javascript;
 
   const [language, setLanguage] = useState<JudgeLanguage>("javascript");
@@ -169,6 +193,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const snapshotTimerRef = useRef<number | null>(null);
   const lastSnapshotCodeRef = useRef(starterCode);
 
+  useEffect(() => {
+
+    const loadProblem = async () => {
+      const response = await fetch(`/api/problems/${problemId}`, { cache: "force-cache" });
+      if (!response.ok) {
+        setProblemNotFoundId(problemId);
+        return;
+      }
+      const payload = (await response.json()) as { data?: { problem?: Problem } };
+      if (payload.data?.problem) setFullProblem(payload.data.problem);
+    };
+
+    void loadProblem();
+  }, [matchedProblem, problemId]);
+
   const currentProblemIndex = Math.max(0, problems.findIndex((item) => item.id === problem.id));
   const nextProblemHref = `/workspace/${problems[(currentProblemIndex + 1) % problems.length]?.id ?? problem.id}`;
   const activeLiveCash =
@@ -206,7 +245,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   }, [levelToast]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
     const replayTimer = window.setInterval(() => {
       replayClockRef.current += 1;
     }, 1000);
@@ -231,7 +270,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
   useEffect(() => {
     const sync = async () => {
-      if (invalidProblemId) return;
+      if (invalidProblemId || !fullProblem) return;
       setLeadersLoading(true);
       const response = await fetch(`/api/problems/${problem.id}/leaderboard?pageSize=10`, { cache: "no-store" });
       if (!response.ok) {
@@ -246,7 +285,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       setLeadersLoading(false);
     };
     void sync();
-  }, [invalidProblemId, problem.id]);
+  }, [fullProblem, invalidProblemId, problem.id]);
 
   const handleLanguageChange = (nextLanguage: JudgeLanguage) => {
     setLanguage(nextLanguage);
@@ -850,6 +889,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
           <Link href="/problems" className="btn-primary mt-5 inline-flex h-10 items-center px-4 text-sm">
             Back to Problems
           </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (!problemMatchesRoute) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-center">
+        <div>
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="mt-4 text-sm text-secondary-text">Loading problem...</p>
         </div>
       </main>
     );

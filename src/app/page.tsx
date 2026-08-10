@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
   BookOpen,
-  BriefcaseBusiness,
   CalendarCheck2,
   Check,
   Code2,
@@ -27,11 +26,6 @@ import {
 } from "lucide-react";
 import LandingHeader from "@/components/LandingHeader";
 import { useApp } from "@/context/AppContext";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0 },
-};
 
 const featurePills = [
   { label: "Daily Reward Challenges", icon: Flame },
@@ -134,23 +128,32 @@ function highlightCode(text: string) {
   return segments;
 }
 
+function RewardCountdown({ active }: { active: boolean }) {
+  const [remainingSeconds, setRemainingSeconds] = useState(42 * 60);
+
+  useEffect(() => {
+    if (!active) return;
+    const intervalId = window.setInterval(() => {
+      setRemainingSeconds((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [active]);
+
+  return <span>{`${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`}</span>;
+}
+
 function DashboardPreview() {
   const { problems, liveReward, solveProblem } = useApp();
   const [consoleMessage, setConsoleMessage] = useState("Ready to test sample cases.");
   const [submitMessage, setSubmitMessage] = useState("");
   const [runCount, setRunCount] = useState(0);
-  const [typedLength, setTypedLength] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(isMobileWidth);
   const [isEditorHovered, setIsEditorHovered] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(42 * 60);
 
   const heroProblemId = liveReward?.problemId || problems[0]?.id;
-  const typedCode = useMemo(() => codeText.slice(0, typedLength), [typedLength]);
-  const highlightedCode = useMemo(() => highlightCode(typedCode), [typedCode]);
+  const typedCode = codeText;
 
   useEffect(() => {
-    setIsMobile(isMobileWidth());
-
     const handleResize = () => {
       setIsMobile(isMobileWidth());
     };
@@ -159,55 +162,6 @@ function DashboardPreview() {
 
     return () => {
       window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isMobile) {
-      setTypedLength(codeText.length);
-      return;
-    }
-
-    let timeoutId: number | undefined;
-    let intervalId: number | undefined;
-
-    timeoutId = window.setTimeout(() => {
-      intervalId = window.setInterval(() => {
-        setTypedLength((current) => {
-          if (current >= codeText.length) {
-            if (intervalId !== undefined) {
-              window.clearInterval(intervalId);
-            }
-            return current;
-          }
-
-          const nextLength = current + 1;
-          if (nextLength >= codeText.length && intervalId !== undefined) {
-            window.clearInterval(intervalId);
-          }
-          return nextLength;
-        });
-      }, 30);
-    }, 400);
-
-    return () => {
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-
-      if (intervalId !== undefined) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, [isMobile]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setRemainingSeconds((current) => (current > 0 ? current - 1 : 0));
-    }, 1000);
-
-    return () => {
-      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -234,11 +188,7 @@ function DashboardPreview() {
   };
 
   return (
-    <motion.div
-      variants={fadeUp}
-      initial="hidden"
-      animate="visible"
-      transition={{ duration: 0.55, delay: 0.15 }}
+    <div
       className="dashboard-preview flex min-w-0 flex-1 flex-row"
       style={
         isMobile
@@ -290,7 +240,7 @@ function DashboardPreview() {
             <div className="mt-1 flex items-baseline justify-between gap-4">
               <div className="text-lg font-black text-primary">{liveReward?.isActive ? `₹${liveReward.rewardMoneyInr} Prize Pool` : "No Live Reward"}</div>
               <div className="text-[10px] font-medium text-secondary-text">
-                {`${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`}
+                <RewardCountdown active={Boolean(liveReward?.isActive)} />
               </div>
             </div>
           </div>
@@ -316,9 +266,8 @@ function DashboardPreview() {
             {codeLines.map((_, index) => {
               const lineStart = codeLines.slice(0, index).reduce((count, line) => count + line.length + 1, 0);
               const lineEnd = lineStart + codeLines[index].length;
-              const lineText = typedCode.slice(lineStart, Math.min(lineEnd, typedCode.length));
+              const lineText = typedCode.slice(lineStart, lineEnd);
               const lineSegments = highlightCode(lineText);
-              const showCursor = !isMobile && typedLength >= codeText.length && index === codeLines.length - 1;
 
               return (
                 <div key={`${index}-${codeLines[index]}`} className="grid grid-cols-[2rem_1fr] gap-3 font-mono text-xs leading-6">
@@ -331,7 +280,6 @@ function DashboardPreview() {
                         </span>
                       ))
                     : null}
-                  {showCursor ? <span className="cursor" aria-hidden="true" /> : null}
                 </code>
               </div>
               );
@@ -347,9 +295,12 @@ function DashboardPreview() {
               minHeight: '300px',
               overflow: 'visible'
             }}>
-              <img
+              <Image
                 src="/trophy-cropped.png"
                 alt="trophy"
+                width={420}
+                height={420}
+                loading="lazy"
                 style={{
                   width: '420px',
                   height: '420px',
@@ -389,7 +340,7 @@ function DashboardPreview() {
           </div>
         </div>
         </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -687,11 +638,7 @@ export default function Home() {
           <div className="hero-section-bg" />
           <div className="landing-grid-bg" />
           <div className="mx-auto max-w-[1400px] grid grid-cols-1 gap-12 px-6 lg:grid-cols-[0.9fr_1.1fr] items-center relative z-10">
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              transition={{ duration: 0.5 }}
+            <div
               className="flex flex-col justify-center"
             >
               <div className="badge-soft mb-5 w-fit flex items-center gap-2"><svg width="20" height="14" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"><rect width="900" height="200" fill="#FF9933"/><rect y="200" width="900" height="200" fill="#fff"/><rect y="400" width="900" height="200" fill="#138808"/><circle cx="450" cy="300" r="60" fill="none" stroke="#000080" strokeWidth="4"/><circle cx="450" cy="300" r="6" fill="#000080"/>{[...Array(24)].map((_, i) => <line key={i} x1="450" y1="300" x2={450 + 55 * Math.cos((i * 15 * Math.PI) / 180)} y2={300 + 55 * Math.sin((i * 15 * Math.PI) / 180)} stroke="#000080" strokeWidth="2" />)}</svg> India&apos;s First Skill-Reward Coding Platform</div>
@@ -726,7 +673,7 @@ export default function Home() {
                   );
                 })}
               </div>
-            </motion.div>
+            </div>
 
             <div className="w-full">
               <DashboardPreview />
@@ -789,9 +736,8 @@ export default function Home() {
               {steps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <motion.div 
+                  <div 
                     key={step.title} 
-                    whileHover={{ y: -4 }} 
                     className="premium-card flex flex-col justify-between h-full p-5 border border-border bg-card hover:border-border hover:bg-card transition-all duration-200"
                   >
                     <div>
@@ -808,7 +754,7 @@ export default function Home() {
                       <span className="text-[10px] font-mono font-bold text-muted-foreground">STEP 0{index + 1}</span>
                       <div className="h-1 w-1 rounded-full bg-primary" />
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>

@@ -2,17 +2,14 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import {
+import { usePathname } from "next/navigation";
+import type {
   UserState,
-  INITIAL_USER,
-  Problem,
-  MOCK_PROBLEMS,
+  ProblemSummary,
   Mission,
-  MOCK_MISSIONS,
-  LeaderboardEntry,
-  MOCK_LEADERBOARD,
   SolveRewardResult,
 } from "@/lib/mockData";
+import { INITIAL_USER, MOCK_MISSIONS } from "@/lib/appData";
 import { nextStreakValue } from "@/lib/streak";
 
 export interface LiveRewardConfig {
@@ -37,18 +34,13 @@ export interface ProblemBoardConfig {
 
 const createDefaultProblemBoardConfig = (): ProblemBoardConfig => ({
   showUpcomingRewards: true,
-  upcomingRewardItems: [
-    { problemId: MOCK_PROBLEMS[1]?.id ?? "" },
-    { problemId: MOCK_PROBLEMS[2]?.id ?? "" },
-    { problemId: MOCK_PROBLEMS[3]?.id ?? "" },
-  ],
+  upcomingRewardItems: [],
 });
 
 interface AppContextType {
   user: UserState;
-  problems: Problem[];
+  problems: ProblemSummary[];
   missions: Mission[];
-  leaderboard: LeaderboardEntry[];
   liveReward: LiveRewardConfig | null;
   problemBoardConfig: ProblemBoardConfig;
   isPro: boolean;
@@ -151,14 +143,27 @@ const emptyReward = (): SolveRewardResult => ({
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const pathname = usePathname();
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [isUserSynced, setIsUserSynced] = useState(false);
   const [liveReward, setLiveReward] = useState<LiveRewardConfig | null>(null);
   const [problemBoardConfig, setProblemBoardConfig] = useState<ProblemBoardConfig>(() => createDefaultProblemBoardConfig());
 
-  const [problems] = useState<Problem[]>(MOCK_PROBLEMS);
+  const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [missions] = useState<Mission[]>(MOCK_MISSIONS);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
+
+  const catalogSize = pathname === "/problems" ? 4500 : pathname.startsWith("/admin") || pathname === "/rewards" || pathname === "/badges" ? 80 : 1;
+
+  useEffect(() => {
+    const syncProblems = async () => {
+      const response = await fetch(`/api/problems?page=1&pageSize=${catalogSize}`, { cache: "force-cache" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { data?: { problems?: ProblemSummary[] } };
+      if (Array.isArray(payload.data?.problems)) setProblems(payload.data.problems);
+    };
+
+    void syncProblems();
+  }, [catalogSize]);
 
   useEffect(() => {
   const syncLiveReward = async () => {
@@ -172,6 +177,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!pathname.startsWith("/problems") && !pathname.startsWith("/admin")) return;
+
     const syncProblemBoardConfig = async () => {
       const response = await fetch("/api/problem-board-config", { cache: "no-store" });
       if (!response.ok) return;
@@ -182,20 +189,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     void syncProblemBoardConfig();
-  }, []);
-
-  useEffect(() => {
-    const syncLeaderboard = async () => {
-      const response = await fetch("/api/leaderboard", { cache: "no-store" });
-      if (!response.ok) return;
-      const payload = (await response.json()) as { success?: boolean; data?: { leaderboard?: LeaderboardEntry[] } };
-      if (Array.isArray(payload.data?.leaderboard)) {
-        setLeaderboard(payload.data.leaderboard);
-      }
-    };
-
-    void syncLeaderboard();
-  }, [user.xp, user.currentStreak, user.solvedProblemIds.length]);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -353,7 +347,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         user,
         problems,
         missions,
-        leaderboard,
         liveReward,
         problemBoardConfig,
         isPro: user.isPro,
