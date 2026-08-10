@@ -101,6 +101,19 @@
   border-color: var(--border);
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
 body {
   min-height: 100vh;
   background:
@@ -1106,6 +1119,37 @@ textarea:focus-visible,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .workspace-shell {
+    position: relative;
+    top: auto;
+    bottom: auto;
+    min-height: calc(100vh - 3.5rem);
+    overflow: visible;
+  }
+
+  .workspace-main {
+    flex: none;
+    overflow: visible;
+  }
+
+  .workspace-description {
+    height: min(52vh, 30rem);
+    flex: none;
+  }
+
+  .workspace-editor {
+    min-height: min(68vh, 42rem);
+    flex: none;
   }
 }
 

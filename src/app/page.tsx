@@ -637,12 +637,12 @@ export default function Home() {
         <section className="relative overflow-clip pt-8 pb-10 lg:pt-12 lg:pb-14 min-h-[100vh]">
           <div className="hero-section-bg" />
           <div className="landing-grid-bg" />
-          <div className="mx-auto max-w-[1400px] grid grid-cols-1 gap-12 px-6 lg:grid-cols-[0.9fr_1.1fr] items-center relative z-10">
+          <div className="relative z-10 mx-auto grid max-w-[1400px] grid-cols-1 items-center gap-12 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr]">
             <div
-              className="flex flex-col justify-center"
+              className="flex min-w-0 flex-col justify-center"
             >
               <div className="badge-soft mb-5 w-fit flex items-center gap-2"><svg width="20" height="14" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"><rect width="900" height="200" fill="#FF9933"/><rect y="200" width="900" height="200" fill="#fff"/><rect y="400" width="900" height="200" fill="#138808"/><circle cx="450" cy="300" r="60" fill="none" stroke="#000080" strokeWidth="4"/><circle cx="450" cy="300" r="6" fill="#000080"/>{[...Array(24)].map((_, i) => <line key={i} x1="450" y1="300" x2={450 + 55 * Math.cos((i * 15 * Math.PI) / 180)} y2={300 + 55 * Math.sin((i * 15 * Math.PI) / 180)} stroke="#000080" strokeWidth="2" />)}</svg> India&apos;s First Skill-Reward Coding Platform</div>
-              <h1 className="max-w-xl text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-5xl">
+              <h1 className="max-w-xl break-words text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-5xl">
                 Become the Best.
                 <br />
                 Earn Real Money.
@@ -686,7 +686,7 @@ export default function Home() {
 
         <div className="sections-bg">
         {/* Reward Timeline */}
-        <section id="rewards" className="relative z-10 mx-auto max-w-[1400px] px-6 py-6">
+        <section id="rewards" className="relative z-10 mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
           <div className="reward-timeline p-6 sm:p-8 flex flex-col lg:flex-row gap-8 items-center">
             <div className="flex flex-col gap-2 text-center lg:text-left lg:w-64 shrink-0">
               <h2 className="text-lg font-bold tracking-tight text-white">Reward Timeline</h2>
@@ -725,7 +725,7 @@ export default function Home() {
         </section>
 
         {/* How Nexorithm Works */}
-        <section className="relative z-10 mx-auto max-w-[1400px] px-6 py-4">
+        <section className="relative z-10 mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <div className="landing-panel p-6 sm:p-8">
             <h2 className="text-xl font-bold tracking-tight text-white text-center">How NEXORITHM Works</h2>
             <p className="mt-1.5 text-xs text-secondary-text text-center max-w-md mx-auto">
@@ -762,7 +762,7 @@ export default function Home() {
         </section>
 
         {/* What is Coming Next */}
-        <section className="relative z-10 mx-auto max-w-[1400px] px-6 py-4">
+        <section className="relative z-10 mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <div className="landing-panel overflow-hidden p-6 sm:p-8">
             <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
               <div className="flex-1 max-w-xl">
@@ -799,7 +799,7 @@ export default function Home() {
         </section>
 
         {/* Trust Bar */}
-        <section className="relative z-10 mx-auto max-w-[1400px] px-6 py-6">
+        <section className="relative z-10 mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {trustBadges.map((badge) => {
               const Icon = badge.icon;

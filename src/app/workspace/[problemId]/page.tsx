@@ -222,11 +222,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
     const previousBodyOverflow = document.body.style.overflow;
+    const desktopQuery = window.matchMedia("(min-width: 768px)");
 
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
+    const updateViewportLock = () => {
+      document.documentElement.style.overflow = desktopQuery.matches ? "hidden" : previousHtmlOverflow;
+      document.body.style.overflow = desktopQuery.matches ? "hidden" : previousBodyOverflow;
+    };
+
+    updateViewportLock();
+    desktopQuery.addEventListener("change", updateViewportLock);
 
     return () => {
+      desktopQuery.removeEventListener("change", updateViewportLock);
       document.documentElement.style.overflow = previousHtmlOverflow;
       document.body.style.overflow = previousBodyOverflow;
     };
@@ -906,7 +913,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 top-14 flex flex-col overflow-hidden bg-background">
+    <div className="workspace-shell fixed inset-x-0 bottom-0 top-14 flex flex-col overflow-hidden bg-background">
       <SubmissionCelebrations
         toast={toast}
         onToastDismiss={() => setToast(null)}
@@ -914,18 +921,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
         onCelebrationClose={() => setCelebration(null)}
       />
       {streakToast && (
-        <div className="pointer-events-none fixed bottom-24 right-6 z-40 rounded-full border border-reward/30 bg-reward/10 px-4 py-2 text-sm font-bold text-reward shadow-[0_15px_30px_rgba(245,158,11,0.14)] xp-pop">
+        <div className="pointer-events-none fixed bottom-24 right-4 z-40 max-w-[calc(100vw-2rem)] rounded-full border border-reward/30 bg-reward/10 px-4 py-2 text-sm font-bold text-reward shadow-[0_15px_30px_rgba(245,158,11,0.14)] xp-pop sm:right-6">
           {streakToast}
         </div>
       )}
       {levelToast && (
-        <div className="pointer-events-none fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-sm font-bold text-success shadow-[0_15px_30px_rgba(34,197,94,0.14)] rank-up">
+        <div className="pointer-events-none fixed left-1/2 top-16 z-40 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-center text-sm font-bold text-success shadow-[0_15px_30px_rgba(34,197,94,0.14)] rank-up">
           ⭐ LEVEL UP! Level {levelToast.from} → Level {levelToast.to}
         </div>
       )}
       {/* Workbench Header */}
-      <div className="flex h-11 items-center justify-between border-b border-border bg-hover px-4 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+      <div className="flex h-11 items-center justify-between gap-2 border-b border-border bg-hover px-3 sm:px-4 backdrop-blur-xl">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link
             href={backHref}
             className="flex items-center gap-1 text-xs text-secondary-text hover:text-white transition-colors"
@@ -934,11 +941,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
             Back
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-xs font-semibold text-secondary-text">{problem.title}</span>
+          <span className="truncate text-xs font-semibold text-secondary-text">{problem.title}</span>
         </div>
 
         {/* Action Options */}
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {/* Language Selector */}
           <select
             value={language}
@@ -964,10 +971,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       </div>
 
       {/* Main split workarea */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+      <div className="workspace-main flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
         {/* Left Side Panel: Description & Test Cases */}
         <div
-          className="flex min-h-0 w-full min-w-0 flex-col bg-background/80 md:w-auto md:[flex-basis:var(--left-panel-width)]"
+          className="workspace-description flex min-h-0 w-full min-w-0 flex-col bg-background/80 md:w-auto md:[flex-basis:var(--left-panel-width)]"
           style={leftPanelStyle}
         >
           <div className="flex overflow-x-auto border-b border-border bg-hover px-2">
@@ -1245,7 +1252,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
 
         {/* Right Side Panel: Editor & Code Execution Console */}
         <div
-          className="relative flex min-h-0 w-full min-w-0 flex-col overflow-hidden bg-[#1e1e1e] md:w-auto md:[flex-basis:var(--right-panel-width)]"
+          className="workspace-editor relative flex min-h-0 w-full min-w-0 flex-col overflow-hidden bg-[#1e1e1e] md:w-auto md:[flex-basis:var(--right-panel-width)]"
           style={rightPanelStyle}
         >
           <div className="min-h-[180px] flex-1 overflow-hidden" onPaste={onPaste}>

@@ -14,7 +14,7 @@ import {
 
 export default function ContestsPage() {
   return (
-    <div className="app-shell relative h-screen overflow-hidden bg-[#0a0216] font-sans">
+    <div className="app-shell relative min-h-screen overflow-x-hidden bg-[#0a0216] font-sans lg:h-screen lg:overflow-hidden">
       <div className="absolute inset-0">
         <Image
           src="/contest-bg-new.jpg"
@@ -27,7 +27,7 @@ export default function ContestsPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(139,92,246,0.25),transparent_40%),radial-gradient(circle_at_30%_50%,rgba(139,92,246,0.15),transparent_40%)]" />
       </div>
 
-      <main className="relative mx-auto flex h-[calc(100vh-72px)] max-w-[1500px] flex-col px-4 pt-6 sm:px-6 lg:px-10 pb-6">
+      <main className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-[1500px] flex-col px-4 pt-6 pb-6 sm:px-6 lg:h-[calc(100vh-72px)] lg:px-10">
         
         <div className="relative flex flex-1 flex-col justify-center lg:flex-row lg:justify-start lg:items-center">
           
@@ -47,7 +47,7 @@ export default function ContestsPage() {
             </div>
 
             {/* Main Title */}
-            <h1 className="font-[Impact,Arial_Black,sans-serif] text-[5rem] leading-[0.85] tracking-wide sm:text-[6.5rem] md:text-[7.5rem] lg:text-[8rem]">
+            <h1 className="font-[Impact,Arial_Black,sans-serif] text-[clamp(3.5rem,18vw,5rem)] leading-[0.85] tracking-wide sm:text-[6.5rem] md:text-[7.5rem] lg:text-[8rem]">
               <span className="bg-gradient-to-b from-white via-[#e0c4ff] to-[#8b31ff] bg-clip-text text-transparent drop-shadow-[0_0_40px_rgba(168,85,247,0.6)]">
                 CONTESTS
               </span>
@@ -81,20 +81,20 @@ export default function ContestsPage() {
             </div>
 
             {/* Giant Prize Pool Box */}
-            <div className="relative mt-4 inline-flex flex-col items-center justify-center overflow-hidden rounded-[24px] border-2 border-purple-500 bg-[#0b041a] px-12 py-6 shadow-[0_0_50px_rgba(168,85,247,0.6),inset_0_0_30px_rgba(168,85,247,0.4)] backdrop-blur-xl transition-all hover:scale-[1.02] hover:shadow-[0_0_80px_rgba(168,85,247,0.9),inset_0_0_40px_rgba(168,85,247,0.6)] cursor-default">
+            <div className="relative mt-4 flex w-full max-w-lg flex-col items-center justify-center overflow-hidden rounded-[24px] border-2 border-purple-500 bg-[#0b041a] px-4 py-6 shadow-[0_0_50px_rgba(168,85,247,0.6),inset_0_0_30px_rgba(168,85,247,0.4)] backdrop-blur-xl transition-all hover:scale-[1.02] hover:shadow-[0_0_80px_rgba(168,85,247,0.9),inset_0_0_40px_rgba(168,85,247,0.6)] sm:inline-flex sm:w-auto sm:px-12 cursor-default">
               <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:250%_250%] animate-[shimmer_3s_linear_infinite]" />
               
-              <div className="relative z-10 mb-2 flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.4em] text-purple-300">
+              <div className="relative z-10 mb-2 flex items-center gap-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-purple-300 sm:gap-3 sm:tracking-[0.4em]">
                 <span className="opacity-60">&rarr;</span> TOTAL PRIZE POOL <span className="opacity-60">&larr;</span>
               </div>
               
-              <div className="relative z-10 font-[Impact,Arial_Black,sans-serif] text-[4.5rem] leading-none tracking-wide sm:text-[5rem]">
+              <div className="relative z-10 font-[Impact,Arial_Black,sans-serif] text-[clamp(3rem,14vw,4.5rem)] leading-none tracking-wide sm:text-[5rem]">
                 <span className="bg-gradient-to-b from-[#fff7d1] via-[#ffd700] to-[#b8860b] bg-clip-text text-transparent drop-shadow-[0_5px_15px_rgba(255,215,0,0.4)]">
                   ₹10,00,000
                 </span>
               </div>
 
-              <div className="relative z-10 mt-3 text-[11px] font-black uppercase tracking-[0.3em] text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <div className="relative z-10 mt-3 text-center text-[10px] font-black uppercase tracking-[0.16em] text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] sm:text-[11px] sm:tracking-[0.3em]">
                 Compete. Perform. Win Big.
               </div>
             </div>

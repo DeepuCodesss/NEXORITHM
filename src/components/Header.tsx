@@ -80,8 +80,8 @@ export default function Header() {
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left Side: Brand Logo */}
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-6">
+          <Link href="/" className="flex shrink-0 items-center gap-2">
             <span className="font-mono text-lg font-bold tracking-tight text-white">
               NEXO<span className="text-primary">RITHM</span>
             </span>
@@ -161,7 +161,7 @@ export default function Header() {
                   signOut();
                   await clerkSignOut({ redirectUrl: "/" });
                 }}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-bold text-secondary-text transition-colors hover:bg-hover hover:text-white"
+                className="btn-secondary h-9 px-3 text-xs"
               >
                 Logout
               </button>
@@ -196,7 +196,7 @@ export default function Header() {
           {/* Mobile Navigation Trigger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-md p-1.5 text-secondary-text hover:bg-hover hover:text-white md:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-secondary-text transition-colors hover:bg-hover hover:text-white md:hidden"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -207,7 +207,7 @@ export default function Header() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-border bg-background/95 px-4 py-4 space-y-4 backdrop-blur-xl">
-          <div className="grid grid-cols-3 gap-2 text-[11px] font-mono mb-2">
+          <div className="mb-2 grid grid-cols-2 gap-2 text-[11px] font-mono sm:grid-cols-4">
             <div className="flex flex-col items-center justify-center rounded-md border border-primary/20 bg-primary/10 p-2 text-primary">
               <Flame className="w-4 h-4 mb-1 fill-primary0 stroke-primary" />
               <span className="font-bold">{user.currentStreak} Days</span>
