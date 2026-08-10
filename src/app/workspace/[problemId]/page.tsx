@@ -913,11 +913,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
               <div className="prose prose-invert max-w-none text-secondary-text text-sm">
                 <h1 className="text-lg font-bold text-white mb-2">{problem.title}</h1>
                 <div className="flex items-center gap-3 mb-6 text-xs font-mono">
-                  <span className={`px-2 py-0.5 rounded border ${problem.difficulty === "Easy"
-                      ? "text-success border-success bg-success/20"
-                      : problem.difficulty === "Medium"
-                        ? "text-primary0 border-primary bg-primary/20"
-                        : "text-destructive border-destructive bg-destructive/20"
+                  <span className={`px-2 py-0.5 rounded border ${problem.difficulty === "Very Easy"
+                      ? "text-emerald-300 border-emerald-500 bg-emerald-500/20"
+                      : problem.difficulty === "Easy"
+                        ? "text-success border-success bg-success/20"
+                        : problem.difficulty === "Medium"
+                          ? "text-primary0 border-primary bg-primary/20"
+                          : "text-destructive border-destructive bg-destructive/20"
                     }`}>
                     {problem.difficulty}
                   </span>

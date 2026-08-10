@@ -65,7 +65,56 @@ export async function POST(request: Request) {
           startsAt: new Date(row[0].startsAt).toISOString(),
           endsAt: new Date(row[0].endsAt).toISOString(),
           isActive: row[0].isActive,
+          paidAt: null,
+          winnerUserId: null,
+          winnerSubmissionId: null,
         }
       : null,
+  });
+}
+
+export async function PATCH(request: Request) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) {
+    logger.warn("auth.failure", { route: "/api/admin/live-reward", reason: "missing_user" });
+    return apiError("Admin access required.", 403);
+  }
+  if (!isAdmin(clerkUser)) {
+    logger.warn("auth.failure", { route: "/api/admin/live-reward", reason: "non_admin" });
+    return apiError("Admin access required.", 403);
+  }
+
+  const body = await request.json().catch(() => null);
+  if (!body?.announceResultsNow) {
+    return apiError("Invalid live reward action.", 400);
+  }
+
+  const prisma = getPrisma();
+  const latest = await prisma.liveReward.findFirst({ orderBy: { createdAt: "desc" } });
+  if (!latest) {
+    return apiError("No live reward configured.", 404);
+  }
+
+  const updated = await prisma.liveReward.update({
+    where: { id: latest.id },
+    data: {
+      isActive: false,
+      paidAt: new Date(),
+    },
+  });
+
+  logger.info("admin.live_reward.announced", { adminId: clerkUser.id, problemId: updated.problemId });
+
+  return apiSuccess({
+    liveReward: {
+      problemId: updated.problemId,
+      rewardMoneyInr: Number(updated.rewardMoney),
+      startsAt: updated.startsAt.toISOString(),
+      endsAt: updated.endsAt.toISOString(),
+      isActive: updated.isActive,
+      paidAt: updated.paidAt?.toISOString() ?? null,
+      winnerUserId: updated.winnerUserId ?? null,
+      winnerSubmissionId: updated.winnerSubmissionId ?? null,
+    },
   });
 }

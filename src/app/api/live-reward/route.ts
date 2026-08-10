@@ -23,6 +23,9 @@ export async function GET() {
         startsAt: new Date(row[0].startsAt).toISOString(),
         endsAt: new Date(row[0].endsAt).toISOString(),
         isActive: row[0].isActive,
+        paidAt: null,
+        winnerUserId: null,
+        winnerSubmissionId: null,
       }
     : null;
 

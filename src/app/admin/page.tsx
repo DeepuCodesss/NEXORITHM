@@ -19,7 +19,7 @@ const fromDatetimeLocal = (value: string) => new Date(value).toISOString();
 export default function AdminPage() {
   const router = useRouter();
   const { user: clerkUser, isLoaded } = useUser();
-  const { problems, liveReward, problemBoardConfig, saveLiveReward, saveProblemBoardConfig } = useApp();
+  const { problems, liveReward, problemBoardConfig, saveLiveReward, saveProblemBoardConfig, announceLiveRewardResults } = useApp();
   const [query, setQuery] = useState("");
   const [problemId, setProblemId] = useState(liveReward?.problemId ?? "");
   const [rewardMoneyInr, setRewardMoneyInr] = useState(String(liveReward?.rewardMoneyInr ?? 0));
@@ -29,12 +29,12 @@ export default function AdminPage() {
   const [showUpcomingRewards, setShowUpcomingRewards] = useState(problemBoardConfig.showUpcomingRewards);
   const [upcomingRewardItems, setUpcomingRewardItems] = useState(problemBoardConfig.upcomingRewardItems);
   const [saved, setSaved] = useState(false);
+  const [customDurationMinutes, setCustomDurationMinutes] = useState("1");
+  const [customDurationSeconds, setCustomDurationSeconds] = useState("0");
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (clerkUser?.publicMetadata?.role !== "admin") {
-      router.replace("/");
-    }
+    if (clerkUser?.publicMetadata?.role !== "admin") router.replace("/");
   }, [clerkUser?.publicMetadata?.role, isLoaded, router]);
 
   useEffect(() => {
@@ -61,13 +61,9 @@ export default function AdminPage() {
     return problems
       .filter((problem) => {
         if (!normalized) return true;
-        return (
-          problem.title.toLowerCase().includes(normalized) ||
-          problem.topic.toLowerCase().includes(normalized) ||
-          problem.pattern.toLowerCase().includes(normalized)
-        );
+        return problem.title.toLowerCase().includes(normalized) || problem.topic.toLowerCase().includes(normalized) || problem.pattern.toLowerCase().includes(normalized);
       })
-      .slice(0, 40);
+      .slice(0, 80);
   }, [problems, query]);
 
   const setDuration = (minutes: number) => {
@@ -75,21 +71,27 @@ export default function AdminPage() {
     const end = new Date(start.getTime() + minutes * 60 * 1000);
     setStartsAt(toDatetimeLocal(start.toISOString()));
     setEndsAt(toDatetimeLocal(end.toISOString()));
+    setCustomDurationMinutes(String(minutes));
+    setCustomDurationSeconds("0");
+  };
+
+  const setCustomDuration = (minutesValue: string, secondsValue: string) => {
+    const minutes = Math.max(0, Number(minutesValue) || 0);
+    const seconds = Math.max(0, Number(secondsValue) || 0);
+    const start = new Date();
+    const end = new Date(start.getTime() + (minutes * 60 + seconds) * 1000);
+    setStartsAt(toDatetimeLocal(start.toISOString()));
+    setEndsAt(toDatetimeLocal(end.toISOString()));
+    setCustomDurationMinutes(String(minutes));
+    setCustomDurationSeconds(String(seconds));
   };
 
   const updateUpcomingItem = (index: number, problemIdValue: string) => {
-    setUpcomingRewardItems((current) =>
-      current.map((item, itemIndex) => (itemIndex === index ? { problemId: problemIdValue } : item)),
-    );
+    setUpcomingRewardItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { problemId: problemIdValue } : item)));
   };
 
-  const addUpcomingItem = () => {
-    setUpcomingRewardItems((current) => [...current, { problemId: "" }].slice(0, 3));
-  };
-
-  const removeUpcomingItem = (index: number) => {
-    setUpcomingRewardItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
-  };
+  const addUpcomingItem = () => setUpcomingRewardItems((current) => [...current, { problemId: "" }].slice(0, 3));
+  const removeUpcomingItem = (index: number) => setUpcomingRewardItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
 
   const handleSave = () => {
     saveLiveReward({
@@ -99,10 +101,7 @@ export default function AdminPage() {
       endsAt: fromDatetimeLocal(endsAt),
       isActive,
     });
-    saveProblemBoardConfig({
-      showUpcomingRewards,
-      upcomingRewardItems,
-    });
+    saveProblemBoardConfig({ showUpcomingRewards, upcomingRewardItems });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
   };
@@ -117,9 +116,7 @@ export default function AdminPage() {
               Reward Admin
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Live Reward Control</h1>
-            <p className="mt-1 text-sm text-secondary-text">
-              Pick the active problem, set prize money, and manage the upcoming reward strip on Problems.
-            </p>
+            <p className="mt-1 text-sm text-secondary-text">Pick the active problem, set prize money, and manage the upcoming reward strip on Problems.</p>
           </div>
           <Link href="/problems" className="btn-secondary h-10 gap-2 px-4 text-sm">
             View Problems
@@ -138,95 +135,59 @@ export default function AdminPage() {
                 Reward Money
                 <div className="mt-2 flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
                   <Coins className="h-4 w-4 text-primary" />
-                  <input
-                    value={rewardMoneyInr}
-                    onChange={(event) => setRewardMoneyInr(event.target.value)}
-                    type="number"
-                    min="1"
-                    className="w-full bg-transparent text-sm font-bold text-white outline-none"
-                  />
+                  <input value={rewardMoneyInr} onChange={(e) => setRewardMoneyInr(e.target.value)} type="number" min="1" className="w-full bg-transparent text-sm font-bold text-white outline-none" />
                 </div>
               </label>
-
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Status
-                <button
-                  type="button"
-                  onClick={() => setIsActive((current) => !current)}
-                  className={`mt-2 flex h-11 w-full items-center justify-between rounded-xl border px-3 text-sm font-bold ${isActive
-                      ? "border-success0/20 bg-success0/10 text-success"
-                      : "border-border bg-card text-secondary-text"
-                    }`}
-                >
+                <button type="button" onClick={() => setIsActive((current) => !current)} className={`mt-2 flex h-11 w-full items-center justify-between rounded-xl border px-3 text-sm font-bold ${isActive ? "border-success0/20 bg-success0/10 text-success" : "border-border bg-card text-secondary-text"}`}>
                   {isActive ? "Live Now" : "Paused"}
                   <span className={`h-2.5 w-2.5 rounded-full ${isActive ? "bg-success" : "bg-muted-foreground"}`} />
                 </button>
               </label>
-
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Starts At
-                <input
-                  value={startsAt}
-                  onChange={(event) => setStartsAt(event.target.value)}
-                  type="datetime-local"
-                  className="subtle-input mt-2 h-11 w-full rounded-xl px-3 text-sm"
-                />
+                <input value={startsAt} onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" className="subtle-input mt-2 h-11 w-full rounded-xl px-3 text-sm" />
               </label>
-
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Ends At
-                <input
-                  value={endsAt}
-                  onChange={(event) => setEndsAt(event.target.value)}
-                  type="datetime-local"
-                  className="subtle-input mt-2 h-11 w-full rounded-xl px-3 text-sm"
-                />
+                <input value={endsAt} onChange={(e) => setEndsAt(e.target.value)} type="datetime-local" className="subtle-input mt-2 h-11 w-full rounded-xl px-3 text-sm" />
               </label>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {[30, 45, 60, 120].map((minutes) => (
-                <button
-                  key={minutes}
-                  type="button"
-                  onClick={() => setDuration(minutes)}
-                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-secondary-text hover:text-white"
-                >
+              {[1, 30, 45, 60, 120].map((minutes) => (
+                <button key={minutes} type="button" onClick={() => setDuration(minutes)} className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-secondary-text hover:text-white">
                   {minutes} min
                 </button>
               ))}
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Custom Minutes
+                <input value={customDurationMinutes} onChange={(e) => setCustomDuration(e.target.value, customDurationSeconds)} type="number" min="0" step="1" className="subtle-input mt-2 h-11 w-full rounded-xl px-3 text-sm" />
+              </label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Custom Seconds
+                <input value={customDurationSeconds} onChange={(e) => setCustomDuration(customDurationMinutes, e.target.value)} type="number" min="0" max="59" step="1" className="subtle-input mt-2 h-11 w-full rounded-xl px-3 text-sm" />
+              </label>
             </div>
 
             <div className="mt-6">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Problem</label>
               <div className="relative mt-2">
                 <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search by title, topic, or pattern..."
-                  className="subtle-input h-11 w-full rounded-xl py-2 pl-10 pr-3 text-sm"
-                />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by title, topic, or pattern..." className="subtle-input h-11 w-full rounded-xl py-2 pl-10 pr-3 text-sm" />
               </div>
-
               <div className="mt-3 max-h-[380px] overflow-auto rounded-xl border border-border">
                 {visibleProblems.map((problem) => (
-                  <button
-                    key={problem.id}
-                    type="button"
-                    onClick={() => setProblemId(problem.id)}
-                    className={`flex w-full items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-3 text-left last:border-b-0 ${problemId === problem.id ? "bg-primary0/10" : "hover:bg-hover"
-                      }`}
-                  >
+                  <button key={problem.id} type="button" onClick={() => setProblemId(problem.id)} className={`flex w-full items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-3 text-left last:border-b-0 ${problemId === problem.id ? "bg-primary0/10" : "hover:bg-hover"}`}>
                     <span>
                       <span className="block text-sm font-bold text-white">{problem.title}</span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {problem.topic} / {problem.pattern}
-                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{problem.topic} / {problem.pattern}</span>
                     </span>
-                    <span className="rounded border border-success0/10 bg-success0/10 px-2 py-0.5 text-[10px] font-bold text-success">
-                      {problem.difficulty}
-                    </span>
+                    <span className="rounded border border-success0/10 bg-success0/10 px-2 py-0.5 text-[10px] font-bold text-success">{problem.difficulty}</span>
                   </button>
                 ))}
               </div>
@@ -238,14 +199,7 @@ export default function AdminPage() {
                   <div className="text-sm font-bold text-white">Upcoming Rewards</div>
                   <p className="mt-1 text-xs text-muted-foreground">Turn this off to show no upcoming problems on the board.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowUpcomingRewards((current) => !current)}
-                  className={`flex h-10 items-center rounded-xl border px-3 text-xs font-bold ${showUpcomingRewards
-                      ? "border-success0/20 bg-success0/10 text-success"
-                      : "border-border bg-card text-secondary-text"
-                    }`}
-                >
+                <button type="button" onClick={() => setShowUpcomingRewards((current) => !current)} className={`flex h-10 items-center rounded-xl border px-3 text-xs font-bold ${showUpcomingRewards ? "border-success0/20 bg-success0/10 text-success" : "border-border bg-card text-secondary-text"}`}>
                   {showUpcomingRewards ? "Enabled" : "Disabled"}
                 </button>
               </div>
@@ -253,11 +207,7 @@ export default function AdminPage() {
               <div className="mt-4 space-y-3">
                 {upcomingRewardItems.map((item, index) => (
                   <div key={`${index}-${item.problemId}`} className="flex items-center gap-2">
-                    <select
-                      value={item.problemId}
-                      onChange={(event) => updateUpcomingItem(index, event.target.value)}
-                      className="subtle-input h-10 min-w-0 flex-1 rounded-lg px-3 text-sm"
-                    >
+                    <select value={item.problemId} onChange={(e) => updateUpcomingItem(index, e.target.value)} className="subtle-input h-10 min-w-0 flex-1 rounded-lg px-3 text-sm">
                       <option value="">No upcoming problem</option>
                       {problems.slice(0, 80).map((problem) => (
                         <option key={problem.id} value={problem.id}>
@@ -265,22 +215,14 @@ export default function AdminPage() {
                         </option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => removeUpcomingItem(index)}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-secondary-text hover:text-white"
-                    >
+                    <button type="button" onClick={() => removeUpcomingItem(index)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-secondary-text hover:text-white">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
               </div>
 
-              <button
-                type="button"
-                onClick={addUpcomingItem}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-secondary-text hover:text-white"
-              >
+              <button type="button" onClick={addUpcomingItem} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-secondary-text hover:text-white">
                 <Plus className="h-4 w-4" />
                 Add Slot
               </button>
@@ -290,31 +232,56 @@ export default function AdminPage() {
               <Save className="h-4 w-4" />
               {saved ? "Saved Live Reward" : "Save Live Reward"}
             </button>
+
+            <button type="button" onClick={announceLiveRewardResults} className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary0/20 bg-primary0/10 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary0/15">
+              Announce Results Now
+            </button>
           </div>
 
-          <aside className="rounded-2xl border border-primary0/20 bg-primary0/[0.01] p-5 shadow-[0_0_40px_rgba(99,102,241,0.12)]">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-2 rounded-full border border-primary0/15 bg-primary/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                <span className="live-dot" />
-                Preview
-              </span>
-              <span className="flex items-center gap-1.5 text-xs font-bold text-success">
-                <Clock className="h-3.5 w-3.5" />
-                Scheduled
-              </span>
-            </div>
-            <h2 className="mt-5 text-2xl font-black text-white">{selectedProblem?.title}</h2>
-            <p className="mt-2 text-sm text-secondary-text">
-              {selectedProblem?.topic} / {selectedProblem?.pattern}
-            </p>
-            <div className="mt-6 border-t border-border pt-5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reward</div>
-              <div className="mt-2 flex items-center gap-2 text-[36px] font-black leading-none text-primary">
-                <Coins className="h-6 w-6 text-primary" />
-                {Math.max(0, Math.round(Number(rewardMoneyInr) || 0)) > 0
-                  ? `₹${Math.max(0, Math.round(Number(rewardMoneyInr) || 0))}`
-                  : "No cash reward"}
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-primary0/20 bg-primary0/[0.01] p-5 shadow-[0_0_40px_rgba(99,102,241,0.12)]">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary0/15 bg-primary/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <span className="live-dot" />
+                  Preview
+                </span>
+                <span className="flex items-center gap-1.5 text-xs font-bold text-success">
+                  <Clock className="h-3.5 w-3.5" />
+                  Scheduled
+                </span>
               </div>
+              <h2 className="mt-5 text-2xl font-black text-white">{selectedProblem?.title}</h2>
+              <p className="mt-2 text-sm text-secondary-text">{selectedProblem?.topic} / {selectedProblem?.pattern}</p>
+              <div className="mt-6 border-t border-border pt-5">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reward</div>
+                <div className="mt-2 flex items-center gap-2 text-[36px] font-black leading-none text-primary">
+                  <Coins className="h-6 w-6 text-primary" />
+                  {Math.max(0, Math.round(Number(rewardMoneyInr) || 0)) > 0 ? `₹${Math.max(0, Math.round(Number(rewardMoneyInr) || 0))}` : "No cash reward"}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <div className="text-sm font-bold text-white">Admin Shortcuts</div>
+              <div className="mt-3 grid gap-2">
+                <Link href="/admin/withdrawals" className="btn-secondary h-10 justify-between px-4 text-sm">
+                  Withdrawals
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href="/admin/replays" className="btn-secondary h-10 justify-between px-4 text-sm">
+                  Replays
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href="/admin/judge-health" className="btn-secondary h-10 justify-between px-4 text-sm">
+                  Judge Health
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href="/admin/judge-diagnostics" className="btn-secondary h-10 justify-between px-4 text-sm">
+                  Judge Diagnostics
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">Full user-wide monitoring needs a dedicated admin users API. This panel now gives you the key operational links and live reward controls.</p>
             </div>
           </aside>
         </section>

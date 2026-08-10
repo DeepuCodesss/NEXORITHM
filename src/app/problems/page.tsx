@@ -15,16 +15,28 @@ const formatTimeLeft = (endsAt: string) => {
 
 const cleanDescription = (problem?: Problem) => problem?.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() ?? "";
 
+type AnnouncementLeader = {
+  rank: number;
+  user: string;
+  username: string;
+  avatarUrl: string;
+  solveTime: number;
+  language: string;
+  replayId: string;
+};
+
 export default function ProblemsPage() {
   const { user, problems, liveReward, problemBoardConfig, isProblemSolved, solvedCount } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDifficulty, setSelectedDifficulty] = useState<"All" | Difficulty>("All");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<"All" | Difficulty>("Easy");
   const [selectedStatus, setSelectedStatus] = useState<"All" | "Unsolved" | "Solved" | "Bookmarked">("All");
   const [selectedTopic, setSelectedTopic] = useState("All Topics");
   const [sortBy, setSortBy] = useState("Most Recent");
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [, setTick] = useState(0);
+  const [announcementLeaders, setAnnouncementLeaders] = useState<AnnouncementLeader[]>([]);
+  const [leadersLoading, setLeadersLoading] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((v) => v + 1), 1000);
@@ -35,6 +47,7 @@ export default function ProblemsPage() {
   const liveRewardProblem = problems.find((problem) => problem.id === liveReward?.problemId) ?? problems[0];
   const liveTimeLeft = liveReward ? formatTimeLeft(liveReward.endsAt) : { minutes: 0, seconds: "00", expired: true };
   const liveRewardActive = !!liveReward && liveReward.isActive && !liveTimeLeft.expired;
+  const liveRewardAnnounced = !!liveReward?.paidAt;
   const upcomingProblems = problemBoardConfig.showUpcomingRewards
     ? problemBoardConfig.upcomingRewardItems
       .map((item) => problems.find((problem) => problem.id === item.problemId))
@@ -42,18 +55,44 @@ export default function ProblemsPage() {
       .slice(0, 3)
     : [];
 
+  useEffect(() => {
+    const loadAnnouncementLeaders = async () => {
+      if (!liveReward?.problemId || liveRewardActive || !liveRewardAnnounced) {
+        setAnnouncementLeaders([]);
+        return;
+      }
+
+      setLeadersLoading(true);
+      const response = await fetch(`/api/problems/${liveReward.problemId}/leaderboard?page=1&pageSize=10`, { cache: "no-store" });
+      if (!response.ok) {
+        setAnnouncementLeaders([]);
+        setLeadersLoading(false);
+        return;
+      }
+
+      const payload = (await response.json()) as { data?: { leaders?: AnnouncementLeader[] } };
+      setAnnouncementLeaders(Array.isArray(payload.data?.leaders) ? payload.data!.leaders : []);
+      setLeadersLoading(false);
+    };
+
+    void loadAnnouncementLeaders();
+  }, [liveReward?.problemId, liveRewardActive, liveRewardAnnounced]);
+
   const filteredProblems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const difficultyRank: Record<Difficulty, number> = { Easy: 1, Medium: 2, Hard: 3, "Very Hard": 4 };
+    const difficultyRank: Record<Difficulty, number> = { "Very Easy": 1, Easy: 2, Medium: 3, Hard: 4, "Very Hard": 5 };
     return problems
       .filter((problem) => {
+        const isVeryEasy = problem.difficulty === "Very Easy";
         const matchesSearch =
           !query ||
           problem.title.toLowerCase().includes(query) ||
           problem.topic.toLowerCase().includes(query) ||
           problem.pattern.toLowerCase().includes(query);
         const solved = isProblemSolved(problem.id);
-        const matchesDifficulty = selectedDifficulty === "All" || problem.difficulty === selectedDifficulty;
+        const matchesDifficulty =
+          (selectedDifficulty === "All" ? !isVeryEasy : problem.difficulty === selectedDifficulty) &&
+          (selectedDifficulty === "Very Easy" ? isVeryEasy : !isVeryEasy);
         const matchesStatus =
           selectedStatus === "All" ||
           (selectedStatus === "Solved" && solved) ||
@@ -94,12 +133,14 @@ export default function ProblemsPage() {
   ];
 
   const difficultyClass = (difficulty: Difficulty) => {
+    if (difficulty === "Very Easy") return "text-emerald-300 bg-emerald-500/10";
     if (difficulty === "Easy") return "text-success bg-success0/10";
     if (difficulty === "Medium") return "text-primary bg-primary0/10";
     return "text-primary bg-primary0/10";
   };
 
   const problemStatus = (problem: Problem) => {
+    if (problem.id === liveReward?.problemId && liveRewardAnnounced) return "Results Announced";
     if (problem.id === liveReward?.problemId && liveRewardActive) return "Live Reward";
     if (upcomingProblems.some((item) => item.id === problem.id)) return "Upcoming";
     if (isProblemSolved(problem.id)) return "Solved";
@@ -181,8 +222,60 @@ export default function ProblemsPage() {
                   </span>
                 </div>
 
-                {liveRewardActive ? (
-                  <>
+              {liveRewardAnnounced ? (
+                <div className="mt-4 space-y-4">
+                  <div className="rounded-xl border border-success0/20 bg-success0/5 p-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-success">
+                      <Trophy className="h-4 w-4" />
+                      Winning has been announced
+                    </div>
+                    <div className="mt-1 text-xs text-secondary-text">
+                      This round is closed. Check the recent leaderboard below for the top solvers.
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-white">Recent Question Leaderboard</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">Top 10 players for {liveRewardProblem?.title}</div>
+                      </div>
+                      <Link href={`/problems/${liveReward?.problemId}/leaderboard`} className="btn-secondary h-9 px-3 text-xs">
+                        See Leaderboard
+                      </Link>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {leadersLoading ? (
+                        <div className="space-y-2">
+                          {Array.from({ length: 3 }, (_, index) => (
+                            <div key={index} className="h-12 animate-pulse rounded-lg bg-hover/60" />
+                          ))}
+                        </div>
+                      ) : announcementLeaders.length ? (
+                        announcementLeaders.slice(0, 3).map((leader) => (
+                          <div key={leader.replayId} className="flex items-center justify-between rounded-lg border border-border bg-background/60 px-3 py-2">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-xs font-black text-white">
+                                #{leader.rank}
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-white">{leader.user}</div>
+                                <div className="text-xs text-muted-foreground">{leader.language}</div>
+                              </div>
+                            </div>
+                            <div className="text-sm font-black text-primary">{leader.solveTime}s</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                          No leaderboard submissions yet for this round.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : liveRewardActive ? (
+                <>
                     <h2 className="mt-3.5 text-xl font-black text-white">{liveRewardProblem?.title}</h2>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="rounded-md bg-success0/10 px-2 py-1 text-xs font-bold text-success">
@@ -218,11 +311,11 @@ export default function ProblemsPage() {
                     </Link>
                   </>
                 ) : (
-                  <div className="mt-6 rounded-xl border border-dashed border-border px-4 py-5 text-center">
-                    <div className="text-sm font-semibold text-secondary-text">Paused</div>
-                    <div className="mt-1 text-xs text-muted-foreground">Enable a live reward in Admin to feature a problem here.</div>
-                  </div>
-                )}
+                <div className="mt-6 rounded-xl border border-dashed border-border px-4 py-5 text-center">
+                  <div className="text-sm font-semibold text-secondary-text">No active problem</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Enable a live reward in Admin to feature a problem here.</div>
+                </div>
+              )}
               </div>
             </div>
 
@@ -240,6 +333,13 @@ export default function ProblemsPage() {
                         {diff}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDifficulty("Very Easy")}
+                      className={`h-8 rounded-lg px-3 text-xs font-bold ${selectedDifficulty === "Very Easy" ? "bg-emerald-500 text-white" : "bg-card text-secondary-text hover:text-white"}`}
+                    >
+                      Starter Path
+                    </button>
                   </div>
                 </div>
 

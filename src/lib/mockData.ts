@@ -1,6 +1,6 @@
 import type { JudgeLanguage } from "@/lib/languages";
 
-export type Difficulty = "Easy" | "Medium" | "Hard" | "Very Hard";
+export type Difficulty = "Very Easy" | "Easy" | "Medium" | "Hard" | "Very Hard";
 
 export interface Problem {
   id: string;
@@ -192,6 +192,7 @@ const tracks = [
 ];
 
 const difficultyForLevel = (level: number): Difficulty => {
+  if (level <= 200) return "Very Easy";
   if (level <= 1200) return "Easy";
   if (level <= 2700) return "Medium";
   if (level <= 3900) return "Hard";
@@ -199,6 +200,7 @@ const difficultyForLevel = (level: number): Difficulty => {
 };
 
 const rewardForDifficulty = (difficulty: Difficulty) => {
+  if (difficulty === "Very Easy") return { xpReward: 20, coinReward: 2 };
   if (difficulty === "Easy") return { xpReward: 50, coinReward: 5 };
   if (difficulty === "Medium") return { xpReward: 150, coinReward: 15 };
   if (difficulty === "Hard") return { xpReward: 300, coinReward: 30 };
@@ -266,6 +268,904 @@ const taskCopy: Record<JudgeKind, { title: string; body: string }> = {
     body: "Given n integers and one 1-indexed inclusive range l r, return the sum from l through r.",
   },
 };
+
+type VeryEasyTemplate = {
+  title: string;
+  topic: string;
+  pattern: string;
+  description: string;
+  inputFormat: string[];
+  outputFormat: string;
+  constraints: string[];
+  explanation: (testCase: Problem["testCases"][number]) => string[];
+  generateInput: (seed: number) => string;
+  solve: (input: string) => string;
+  editorial: Problem["editorial"];
+  optimized: Problem["optimizedSolutions"];
+};
+
+type EasyTemplate = {
+  title: string;
+  topic: string;
+  pattern: string;
+  judge: JudgeKind;
+  description: string;
+  inputFormat: string[];
+  outputFormat: string;
+  constraints: string[];
+  explanation: (testCase: Problem["testCases"][number]) => string[];
+  generateInput: (seed: number) => string;
+  solve: (input: string) => string;
+  editorial: Problem["editorial"];
+  optimized: Problem["optimizedSolutions"];
+};
+
+const parseInts = (input: string) => input.match(/-?\d+/g)?.map(Number) ?? [];
+
+type CompactVeryEasyTemplate = {
+  title: string;
+  topic: string;
+  pattern: string;
+  description: string;
+  inputFormat: string[];
+  outputFormat: string;
+  constraints?: string[];
+  generateInput: (seed: number) => string;
+  solve: (input: string) => string;
+};
+
+const buildCompactVeryEasyTemplate = (template: CompactVeryEasyTemplate): VeryEasyTemplate => ({
+  title: template.title,
+  topic: template.topic,
+  pattern: template.pattern,
+  description: template.description,
+  inputFormat: template.inputFormat,
+  outputFormat: template.outputFormat,
+  constraints: template.constraints ?? ["-10^9 <= value <= 10^9"],
+  explanation: (testCase) => {
+    const compactInput = testCase.input.trim().replace(/\s+/g, " ");
+    return [`For input ${compactInput}, the required output is ${testCase.expected}.`];
+  },
+  generateInput: template.generateInput,
+  solve: template.solve,
+  editorial: {
+    overview: template.description,
+    approach: ["Read the input values.", "Apply the direct beginner rule from the statement.", "Return only the required answer."],
+    complexity: { time: "O(1)", space: "O(1) extra space" },
+  },
+  optimized: [
+    {
+      language: "javascript",
+      label: "JavaScript",
+      code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g)?.map(Number) ?? [];\n  // Apply the direct beginner rule from the statement.\n  return String(nums[0] ?? 0);\n}`,
+      explanation: "Parse the small input and return the required value from the statement.",
+    },
+    {
+      language: "python",
+      label: "Python",
+      code: `def solve(input):\n    nums = list(map(int, input.split()))\n    # Apply the direct beginner rule from the statement.\n    return str(nums[0] if nums else 0)`,
+      explanation: "Parse the small input and return the required value from the statement.",
+    },
+  ],
+});
+
+const baseVeryEasyTemplates: VeryEasyTemplate[] = [
+  {
+    title: "Add Two Integers",
+    topic: "Programming Basics",
+    pattern: "Input Parsing",
+    description: "Given two integers a and b, return their sum.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: a + b.",
+    constraints: ["-10^9 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const [a, b] = parseInts(testCase.input);
+      return [`The numbers are ${a} and ${b}.`, `Their sum is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed - 97} ${97 - seed}`,
+    solve: (input) => String(parseInts(input).slice(0, 2).reduce((sum, value) => sum + value, 0)),
+    editorial: {
+      overview: "Parse two integers, add them, and return the result.",
+      approach: ["Read the two integers from input.", "Add them together.", "Return the sum as a string."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g).map(Number);\n  return String(nums[0] + nums[1]);\n}`,
+        explanation: "Direct integer addition with the same raw-input style used by the judge.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    a, b = map(int, input.split())\n    return str(a + b)`,
+        explanation: "Direct integer addition with minimal parsing.",
+      },
+    ],
+  },
+  {
+    title: "Sum Three Numbers",
+    topic: "Programming Basics",
+    pattern: "Input Parsing",
+    description: "Given three integers, return their sum.",
+    inputFormat: ["The input contains three integers a, b, and c."],
+    outputFormat: "Return one integer: a + b + c.",
+    constraints: ["-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const [a, b, c] = parseInts(testCase.input);
+      return [`The numbers are ${a}, ${b}, and ${c}.`, `Their sum is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed} ${seed + 1} ${seed + 2}`,
+    solve: (input) => String(parseInts(input).slice(0, 3).reduce((sum, value) => sum + value, 0)),
+    editorial: {
+      overview: "Read three integers and return their sum.",
+      approach: ["Read the three integers.", "Add them in one pass.", "Return the total as a string."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g).map(Number);\n  return String(nums[0] + nums[1] + nums[2]);\n}`,
+        explanation: "Direct addition of three integers.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    a, b, c = map(int, input.split())\n    return str(a + b + c)`,
+        explanation: "Simple integer addition.",
+      },
+    ],
+  },
+  {
+    title: "Subtract Two Integers",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given two integers a and b, return a - b.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: a - b.",
+    constraints: ["-10^9 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const [a, b] = parseInts(testCase.input);
+      return [`The numbers are ${a} and ${b}.`, `Their difference is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed + 10} ${seed}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return String((a ?? 0) - (b ?? 0));
+    },
+    editorial: {
+      overview: "Read two integers and subtract the second from the first.",
+      approach: ["Parse both values.", "Compute a - b.", "Return the result as text."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g).map(Number);\n  return String(nums[0] - nums[1]);\n}`,
+        explanation: "Direct subtraction with no extra state.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    a, b = map(int, input.split())\n    return str(a - b)`,
+        explanation: "Direct subtraction with minimal parsing.",
+      },
+    ],
+  },
+  {
+    title: "Multiply Two Numbers",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given two integers, return their product.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: a * b.",
+    constraints: ["-10^9 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const [a, b] = parseInts(testCase.input);
+      return [`The numbers are ${a} and ${b}.`, `Their product is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed % 11} ${(seed % 7) + 2}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return String((a ?? 0) * (b ?? 0));
+    },
+    editorial: {
+      overview: "Read two integers and multiply them.",
+      approach: ["Parse the two values.", "Multiply them.", "Return the product as a string."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g).map(Number);\n  return String(nums[0] * nums[1]);\n}`,
+        explanation: "Direct multiplication with the same raw-input style used by the judge.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    a, b = map(int, input.split())\n    return str(a * b)`,
+        explanation: "Direct multiplication with minimal parsing.",
+      },
+    ],
+  },
+  {
+    title: "Compare Two Numbers",
+    topic: "Math Foundations",
+    pattern: "Conditionals",
+    description: "Given two integers, return the larger one.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: max(a, b).",
+    constraints: ["-10^9 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const [a, b] = parseInts(testCase.input);
+      return [`The numbers are ${a} and ${b}.`, `The larger one is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed - 5} ${seed + 5}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return String(Math.max(a ?? 0, b ?? 0));
+    },
+    editorial: {
+      overview: "Read two integers and return the larger one.",
+      approach: ["Parse both values.", "Compare them.", "Return the greater value as a string."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g).map(Number);\n  return String(Math.max(nums[0], nums[1]));\n}`,
+        explanation: "Direct maximum of two integers.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    a, b = map(int, input.split())\n    return str(max(a, b))`,
+        explanation: "Direct maximum of two integers.",
+      },
+    ],
+  },
+  {
+    title: "Even or Odd",
+    topic: "Math Foundations",
+    pattern: "Parity",
+    description: "Given one integer, determine whether it is even.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return YES if n is even, otherwise NO.",
+    constraints: ["-10^9 <= n <= 10^9"],
+    explanation: (testCase) => {
+      const [n] = parseInts(testCase.input);
+      return [`The number is ${n}.`, `The answer is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => {
+      const [n] = parseInts(input);
+      return String((n ?? 0) % 2 === 0 ? "YES" : "NO");
+    },
+    editorial: {
+      overview: "Check the number modulo 2 and return YES or NO.",
+      approach: ["Read one integer.", "Check whether it is divisible by 2.", "Return YES for even and NO for odd."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const n = Number(input.trim());\n  return n % 2 === 0 ? "YES" : "NO";\n}`,
+        explanation: "Uses one parity check.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    n = int(input.strip())\n    return "YES" if n % 2 == 0 else "NO"`,
+        explanation: "Uses one parity check.",
+      },
+    ],
+  },
+  {
+    title: "Absolute Difference",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given two integers, return their absolute difference.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: |a - b|.",
+    constraints: ["-10^9 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const [a, b] = parseInts(testCase.input);
+      return [`The numbers are ${a} and ${b}.`, `Their absolute difference is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => `${seed + 9} ${seed - 3}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return String(Math.abs((a ?? 0) - (b ?? 0)));
+    },
+    editorial: {
+      overview: "Read two integers and return the absolute difference.",
+      approach: ["Parse both values.", "Subtract and take the absolute value.", "Return the result as a string."],
+      complexity: { time: "O(1)", space: "O(1) extra space" },
+    },
+    optimized: [
+      {
+        language: "javascript",
+        label: "JavaScript",
+        code: `function solve(input) {\n  const nums = input.match(/-?\\d+/g).map(Number);\n  return String(Math.abs(nums[0] - nums[1]));\n}`,
+        explanation: "Uses one subtraction and Math.abs.",
+      },
+      {
+        language: "python",
+        label: "Python",
+        code: `def solve(input):\n    a, b = map(int, input.split())\n    return str(abs(a - b))`,
+        explanation: "Uses one subtraction and abs.",
+      },
+    ],
+  },
+];
+
+const extraVeryEasyTemplateConfigs: CompactVeryEasyTemplate[] = [
+  {
+    title: "Add One",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return n + 1.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: n + 1.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) + 1),
+  },
+  {
+    title: "Subtract One",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return n - 1.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: n - 1.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) - 1),
+  },
+  {
+    title: "Double the Number",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return 2 * n.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: 2 * n.",
+    generateInput: (seed) => `${seed % 100}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) * 2),
+  },
+  {
+    title: "Triple the Number",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return 3 * n.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: 3 * n.",
+    generateInput: (seed) => `${seed % 100}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) * 3),
+  },
+  {
+    title: "Square a Number",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return n squared.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: n * n.",
+    constraints: ["-1000 <= n <= 1000"],
+    generateInput: (seed) => `${(seed % 41) - 20}`,
+    solve: (input) => {
+      const n = parseInts(input)[0] ?? 0;
+      return String(n * n);
+    },
+  },
+  {
+    title: "Last Digit",
+    topic: "Math Foundations",
+    pattern: "Modulo",
+    description: "Given one non-negative integer n, return its last digit.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: n % 10.",
+    constraints: ["0 <= n <= 10^9"],
+    generateInput: (seed) => `${seed * 37}`,
+    solve: (input) => String(Math.abs(parseInts(input)[0] ?? 0) % 10),
+  },
+  {
+    title: "Remainder by Two",
+    topic: "Math Foundations",
+    pattern: "Modulo",
+    description: "Given one integer n, return n % 2.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: the remainder after dividing n by 2.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => String(Math.abs(parseInts(input)[0] ?? 0) % 2),
+  },
+  {
+    title: "Remainder by Five",
+    topic: "Math Foundations",
+    pattern: "Modulo",
+    description: "Given one integer n, return n % 5.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: the remainder after dividing n by 5.",
+    generateInput: (seed) => `${seed * 9}`,
+    solve: (input) => String(Math.abs(parseInts(input)[0] ?? 0) % 5),
+  },
+  {
+    title: "Quotient by Two",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given an even integer n, return n / 2.",
+    inputFormat: ["The input contains one even integer n."],
+    outputFormat: "Return one integer: n / 2.",
+    generateInput: (seed) => `${seed * 2}`,
+    solve: (input) => String(Math.trunc((parseInts(input)[0] ?? 0) / 2)),
+  },
+  {
+    title: "Quotient by Ten",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given an integer n that is divisible by 10, return n / 10.",
+    inputFormat: ["The input contains one integer n divisible by 10."],
+    outputFormat: "Return one integer: n / 10.",
+    generateInput: (seed) => `${seed * 10}`,
+    solve: (input) => String(Math.trunc((parseInts(input)[0] ?? 0) / 10)),
+  },
+  {
+    title: "Minimum of Two",
+    topic: "Math Foundations",
+    pattern: "Conditionals",
+    description: "Given two integers, return the smaller one.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: min(a, b).",
+    generateInput: (seed) => `${seed + 4} ${seed - 6}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return String(Math.min(a ?? 0, b ?? 0));
+    },
+  },
+  {
+    title: "Equal Numbers",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given two integers, return YES if they are equal, otherwise NO.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return YES if a equals b, otherwise NO.",
+    generateInput: (seed) => `${seed} ${seed + (seed % 2)}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return a === b ? "YES" : "NO";
+    },
+  },
+  {
+    title: "Positive Number",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given one integer n, return POSITIVE if n is greater than 0, otherwise NOT POSITIVE.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return POSITIVE or NOT POSITIVE.",
+    generateInput: (seed) => `${seed % 2 === 0 ? seed : -seed}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) > 0 ? "POSITIVE" : "NOT POSITIVE"),
+  },
+  {
+    title: "Negative Number",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given one integer n, return NEGATIVE if n is less than 0, otherwise NOT NEGATIVE.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return NEGATIVE or NOT NEGATIVE.",
+    generateInput: (seed) => `${seed % 2 === 0 ? -seed : seed}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) < 0 ? "NEGATIVE" : "NOT NEGATIVE"),
+  },
+  {
+    title: "Zero Check",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given one integer n, return ZERO if n is 0, otherwise NONZERO.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return ZERO or NONZERO.",
+    generateInput: (seed) => `${seed % 3 === 0 ? 0 : seed}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) === 0 ? "ZERO" : "NONZERO"),
+  },
+  {
+    title: "Pass or Fail",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given marks m, return PASS if m is at least 35, otherwise FAIL.",
+    inputFormat: ["The input contains one integer m."],
+    outputFormat: "Return PASS or FAIL.",
+    constraints: ["0 <= m <= 100"],
+    generateInput: (seed) => `${seed % 101}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) >= 35 ? "PASS" : "FAIL"),
+  },
+  {
+    title: "Adult Check",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given age, return ADULT if age is at least 18, otherwise CHILD.",
+    inputFormat: ["The input contains one integer age."],
+    outputFormat: "Return ADULT or CHILD.",
+    constraints: ["0 <= age <= 120"],
+    generateInput: (seed) => `${seed % 80}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) >= 18 ? "ADULT" : "CHILD"),
+  },
+  {
+    title: "Greater Than Ten",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given one integer n, return YES if n is greater than 10, otherwise NO.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return YES or NO.",
+    generateInput: (seed) => `${seed % 25}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) > 10 ? "YES" : "NO"),
+  },
+  {
+    title: "Less Than Hundred",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given one integer n, return YES if n is less than 100, otherwise NO.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return YES or NO.",
+    generateInput: (seed) => `${seed * 3}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) < 100 ? "YES" : "NO"),
+  },
+  {
+    title: "Divisible by Three",
+    topic: "Math Foundations",
+    pattern: "Divisibility",
+    description: "Given one integer n, return YES if n is divisible by 3, otherwise NO.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return YES or NO.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) % 3 === 0 ? "YES" : "NO"),
+  },
+  {
+    title: "Divisible by Five",
+    topic: "Math Foundations",
+    pattern: "Divisibility",
+    description: "Given one integer n, return YES if n is divisible by 5, otherwise NO.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return YES or NO.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) % 5 === 0 ? "YES" : "NO"),
+  },
+  {
+    title: "Divisible by Ten",
+    topic: "Math Foundations",
+    pattern: "Divisibility",
+    description: "Given one integer n, return YES if n is divisible by 10, otherwise NO.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return YES or NO.",
+    generateInput: (seed) => `${seed * 2}`,
+    solve: (input) => ((parseInts(input)[0] ?? 0) % 10 === 0 ? "YES" : "NO"),
+  },
+  {
+    title: "Smallest of Three",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given three integers, return the smallest one.",
+    inputFormat: ["The input contains three integers a, b, and c."],
+    outputFormat: "Return one integer: min(a, b, c).",
+    generateInput: (seed) => `${seed + 3} ${seed - 5} ${seed + 9}`,
+    solve: (input) => String(Math.min(...parseInts(input).slice(0, 3))),
+  },
+  {
+    title: "Largest of Three",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given three integers, return the largest one.",
+    inputFormat: ["The input contains three integers a, b, and c."],
+    outputFormat: "Return one integer: max(a, b, c).",
+    generateInput: (seed) => `${seed + 3} ${seed - 5} ${seed + 9}`,
+    solve: (input) => String(Math.max(...parseInts(input).slice(0, 3))),
+  },
+  {
+    title: "Middle Number",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given three integers, return the middle value after sorting them.",
+    inputFormat: ["The input contains three integers a, b, and c."],
+    outputFormat: "Return the middle integer.",
+    generateInput: (seed) => `${seed + 3} ${seed - 5} ${seed + 9}`,
+    solve: (input) => String(parseInts(input).slice(0, 3).sort((a, b) => a - b)[1] ?? 0),
+  },
+  {
+    title: "Perimeter of Square",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given the side length of a square, return its perimeter.",
+    inputFormat: ["The input contains one integer side."],
+    outputFormat: "Return one integer: 4 * side.",
+    constraints: ["1 <= side <= 10^9"],
+    generateInput: (seed) => `${(seed % 100) + 1}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) * 4),
+  },
+  {
+    title: "Area of Rectangle",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given length and width, return the area of the rectangle.",
+    inputFormat: ["The input contains two integers length and width."],
+    outputFormat: "Return one integer: length * width.",
+    constraints: ["1 <= length, width <= 10^9"],
+    generateInput: (seed) => `${(seed % 50) + 1} ${(seed % 30) + 1}`,
+    solve: (input) => {
+      const [length, width] = parseInts(input);
+      return String((length ?? 0) * (width ?? 0));
+    },
+  },
+  {
+    title: "Perimeter of Rectangle",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given length and width, return the perimeter of the rectangle.",
+    inputFormat: ["The input contains two integers length and width."],
+    outputFormat: "Return one integer: 2 * (length + width).",
+    constraints: ["1 <= length, width <= 10^9"],
+    generateInput: (seed) => `${(seed % 50) + 1} ${(seed % 30) + 1}`,
+    solve: (input) => {
+      const [length, width] = parseInts(input);
+      return String(2 * ((length ?? 0) + (width ?? 0)));
+    },
+  },
+  {
+    title: "Celsius to Fahrenheit",
+    topic: "Math Foundations",
+    pattern: "Formula",
+    description: "Given Celsius c, return Fahrenheit using c * 9 / 5 + 32. Inputs always make an integer answer.",
+    inputFormat: ["The input contains one integer c."],
+    outputFormat: "Return one integer Fahrenheit value.",
+    generateInput: (seed) => `${((seed % 20) - 10) * 5}`,
+    solve: (input) => String(((parseInts(input)[0] ?? 0) * 9) / 5 + 32),
+  },
+  {
+    title: "Minutes to Seconds",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given minutes m, return the number of seconds.",
+    inputFormat: ["The input contains one integer m."],
+    outputFormat: "Return one integer: m * 60.",
+    constraints: ["0 <= m <= 10^9"],
+    generateInput: (seed) => `${seed % 1000}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) * 60),
+  },
+  {
+    title: "Hours to Minutes",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given hours h, return the number of minutes.",
+    inputFormat: ["The input contains one integer h."],
+    outputFormat: "Return one integer: h * 60.",
+    constraints: ["0 <= h <= 10^9"],
+    generateInput: (seed) => `${seed % 1000}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) * 60),
+  },
+  {
+    title: "Days to Hours",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given days d, return the number of hours.",
+    inputFormat: ["The input contains one integer d."],
+    outputFormat: "Return one integer: d * 24.",
+    constraints: ["0 <= d <= 10^9"],
+    generateInput: (seed) => `${seed % 1000}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) * 24),
+  },
+  {
+    title: "First Number",
+    topic: "Programming Basics",
+    pattern: "Input Parsing",
+    description: "Given two integers, return the first one.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: a.",
+    generateInput: (seed) => `${seed} ${seed + 10}`,
+    solve: (input) => String(parseInts(input)[0] ?? 0),
+  },
+  {
+    title: "Second Number",
+    topic: "Programming Basics",
+    pattern: "Input Parsing",
+    description: "Given two integers, return the second one.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return one integer: b.",
+    generateInput: (seed) => `${seed} ${seed + 10}`,
+    solve: (input) => String(parseInts(input)[1] ?? 0),
+  },
+  {
+    title: "Swap Two Numbers",
+    topic: "Programming Basics",
+    pattern: "Print and Input",
+    description: "Given two integers a and b, return b and a separated by one space.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return b followed by a.",
+    generateInput: (seed) => `${seed} ${seed + 10}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return `${b ?? 0} ${a ?? 0}`;
+    },
+  },
+  {
+    title: "Repeat Number Twice",
+    topic: "Programming Basics",
+    pattern: "Print and Input",
+    description: "Given one integer n, return it twice separated by one space.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return n n.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => {
+      const n = parseInts(input)[0] ?? 0;
+      return `${n} ${n}`;
+    },
+  },
+  {
+    title: "Sum of Digits Two",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given a two-digit number n, return the sum of its digits.",
+    inputFormat: ["The input contains one two-digit integer n."],
+    outputFormat: "Return one integer: tens digit + ones digit.",
+    constraints: ["10 <= n <= 99"],
+    generateInput: (seed) => `${10 + (seed % 90)}`,
+    solve: (input) => {
+      const n = Math.abs(parseInts(input)[0] ?? 0);
+      return String(Math.floor(n / 10) + (n % 10));
+    },
+  },
+  {
+    title: "Reverse Two Digits",
+    topic: "Math Foundations",
+    pattern: "Arithmetic",
+    description: "Given a two-digit number n, return the number with its digits reversed.",
+    inputFormat: ["The input contains one two-digit integer n."],
+    outputFormat: "Return the reversed two-digit number.",
+    constraints: ["10 <= n <= 99"],
+    generateInput: (seed) => `${10 + (seed % 90)}`,
+    solve: (input) => {
+      const n = Math.abs(parseInts(input)[0] ?? 0);
+      return String((n % 10) * 10 + Math.floor(n / 10));
+    },
+  },
+  {
+    title: "Count Two Evens",
+    topic: "Math Foundations",
+    pattern: "Parity",
+    description: "Given two integers, return how many of them are even.",
+    inputFormat: ["The input contains two integers a and b."],
+    outputFormat: "Return 0, 1, or 2.",
+    generateInput: (seed) => `${seed} ${seed + 1}`,
+    solve: (input) => String(parseInts(input).slice(0, 2).filter((value) => value % 2 === 0).length),
+  },
+  {
+    title: "Count Three Positives",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given three integers, return how many are positive.",
+    inputFormat: ["The input contains three integers a, b, and c."],
+    outputFormat: "Return 0, 1, 2, or 3.",
+    generateInput: (seed) => `${seed - 50} ${seed % 7} ${50 - seed}`,
+    solve: (input) => String(parseInts(input).slice(0, 3).filter((value) => value > 0).length),
+  },
+  {
+    title: "Traffic Light",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given 1, 2, or 3, return RED for 1, YELLOW for 2, and GREEN for 3.",
+    inputFormat: ["The input contains one integer x."],
+    outputFormat: "Return RED, YELLOW, or GREEN.",
+    constraints: ["1 <= x <= 3"],
+    generateInput: (seed) => `${(seed % 3) + 1}`,
+    solve: (input) => ["RED", "YELLOW", "GREEN"][(parseInts(input)[0] ?? 1) - 1] ?? "RED",
+  },
+  {
+    title: "Day Type",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given a day number from 1 to 7, return WEEKEND for 6 or 7, otherwise WEEKDAY.",
+    inputFormat: ["The input contains one integer day."],
+    outputFormat: "Return WEEKDAY or WEEKEND.",
+    constraints: ["1 <= day <= 7"],
+    generateInput: (seed) => `${(seed % 7) + 1}`,
+    solve: (input) => {
+      const day = parseInts(input)[0] ?? 1;
+      return day >= 6 ? "WEEKEND" : "WEEKDAY";
+    },
+  },
+  {
+    title: "Character Is A",
+    topic: "Strings",
+    pattern: "Conditionals",
+    description: "Given one lowercase character, return YES if it is a, otherwise NO.",
+    inputFormat: ["The input contains one lowercase character."],
+    outputFormat: "Return YES or NO.",
+    constraints: ["The character is a lowercase English letter."],
+    generateInput: (seed) => String.fromCharCode(97 + (seed % 26)),
+    solve: (input) => (input.trim() === "a" ? "YES" : "NO"),
+  },
+  {
+    title: "Word Length",
+    topic: "Strings",
+    pattern: "Input Parsing",
+    description: "Given one lowercase word, return its length.",
+    inputFormat: ["The input contains one lowercase word."],
+    outputFormat: "Return one integer: the word length.",
+    constraints: ["1 <= word length <= 20"],
+    generateInput: (seed) => ["code", "hi", "nexo", "logic", "admin"][seed % 5],
+    solve: (input) => String(input.trim().length),
+  },
+  {
+    title: "First Character",
+    topic: "Strings",
+    pattern: "Input Parsing",
+    description: "Given one lowercase word, return its first character.",
+    inputFormat: ["The input contains one lowercase word."],
+    outputFormat: "Return one lowercase character.",
+    constraints: ["1 <= word length <= 20"],
+    generateInput: (seed) => ["code", "hi", "nexo", "logic", "admin"][seed % 5],
+    solve: (input) => input.trim()[0] ?? "",
+  },
+  {
+    title: "Last Character",
+    topic: "Strings",
+    pattern: "Input Parsing",
+    description: "Given one lowercase word, return its last character.",
+    inputFormat: ["The input contains one lowercase word."],
+    outputFormat: "Return one lowercase character.",
+    constraints: ["1 <= word length <= 20"],
+    generateInput: (seed) => ["code", "hi", "nexo", "logic", "admin"][seed % 5],
+    solve: (input) => {
+      const word = input.trim();
+      return word[word.length - 1] ?? "";
+    },
+  },
+  {
+    title: "Add Ten",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return n + 10.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: n + 10.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) + 10),
+  },
+  {
+    title: "Minus Ten",
+    topic: "Programming Basics",
+    pattern: "Arithmetic",
+    description: "Given one integer n, return n - 10.",
+    inputFormat: ["The input contains one integer n."],
+    outputFormat: "Return one integer: n - 10.",
+    generateInput: (seed) => `${seed}`,
+    solve: (input) => String((parseInts(input)[0] ?? 0) - 10),
+  },
+  {
+    title: "Same Sign",
+    topic: "Programming Basics",
+    pattern: "Conditionals",
+    description: "Given two non-zero integers, return YES if both have the same sign, otherwise NO.",
+    inputFormat: ["The input contains two non-zero integers a and b."],
+    outputFormat: "Return YES or NO.",
+    generateInput: (seed) => `${seed + 1} ${seed % 2 === 0 ? seed + 2 : -seed - 2}`,
+    solve: (input) => {
+      const [a, b] = parseInts(input);
+      return ((a ?? 0) > 0) === ((b ?? 0) > 0) ? "YES" : "NO";
+    },
+  },
+  {
+    title: "Vowel A Check",
+    topic: "Strings",
+    pattern: "Conditionals",
+    description: "Given one lowercase character, return VOWEL if it is a, otherwise CONSONANT.",
+    inputFormat: ["The input contains one lowercase character."],
+    outputFormat: "Return VOWEL or CONSONANT.",
+    constraints: ["The character is a lowercase English letter."],
+    generateInput: (seed) => String.fromCharCode(97 + (seed % 26)),
+    solve: (input) => (input.trim() === "a" ? "VOWEL" : "CONSONANT"),
+  },
+];
+
+const extraVeryEasyTemplates: VeryEasyTemplate[] = extraVeryEasyTemplateConfigs.map(buildCompactVeryEasyTemplate);
+
+const veryEasyTemplates: VeryEasyTemplate[] = [...baseVeryEasyTemplates, ...extraVeryEasyTemplates];
 
 const formatHtmlBlock = (value: string) => value.trim().replace(/\n/g, "<br />");
 
@@ -407,6 +1307,8 @@ const buildInput = (kind: JudgeKind, seed: number) => {
   return `${count}\n${values.join(" ")}`;
 };
 
+const veryEasyTemplateForLevel = (level: number) => veryEasyTemplates[(level - 1) % veryEasyTemplates.length];
+
 const buildTestCases = (kind: JudgeKind, level: number) =>
   [level, level + 137, level + 911].map((seed, index) => {
     const input = buildInput(kind, seed);
@@ -416,6 +1318,18 @@ const buildTestCases = (kind: JudgeKind, level: number) =>
       expected: solveReference(kind, input),
     };
   });
+
+const buildVeryEasyTestCases = (level: number) => {
+  const template = veryEasyTemplateForLevel(level);
+  return [level, level + 137, level + 911].map((seed, index) => {
+    const input = template.generateInput(seed + index * 17);
+    return {
+      id: index + 1,
+      input,
+      expected: template.solve(input),
+    };
+  });
+};
 
 const buildDescription = (
   kind: JudgeKind,
@@ -514,6 +1428,43 @@ const buildEditorial = (
   };
 };
 
+const buildVeryEasyDescription = (template: VeryEasyTemplate, testCases: Problem["testCases"], difficulty: Difficulty) => {
+  const sample = testCases[0];
+  const sampleExplanation = template.explanation(sample);
+  return `
+<p>${template.description}</p>
+<p>This starter problem is part of <strong>Very Easy</strong> practice and focuses on the <strong>${template.pattern}</strong> pattern.</p>
+
+<h3 class="mt-7 text-base font-bold text-white">Input Format</h3>
+<ul class="mt-3 list-disc space-y-1 pl-5 text-secondary-text">
+  ${template.inputFormat.map((line) => `<li>${line}</li>`).join("")}
+</ul>
+
+<h3 class="mt-7 text-base font-bold text-white">Output Format</h3>
+<p>${template.outputFormat}</p>
+
+<h3 class="mt-7 text-base font-bold text-white">Example 1</h3>
+<div class="mt-3 border-l-2 border-border pl-4">
+  <p class="font-semibold text-foreground">Input:</p>
+  <pre class="mt-2 overflow-x-auto rounded border border-border bg-hover p-3 font-mono text-xs leading-5 text-foreground">${formatHtmlBlock(sample.input)}</pre>
+  <p class="mt-4 font-semibold text-foreground">Output:</p>
+  <pre class="mt-2 overflow-x-auto rounded border border-border bg-hover p-3 font-mono text-xs leading-5 text-foreground">${sample.expected}</pre>
+  <p class="mt-4 font-semibold text-foreground">Explanation:</p>
+  <ul class="mt-2 list-disc space-y-1 pl-5 text-secondary-text">
+    ${sampleExplanation.map((line) => `<li>${line}</li>`).join("")}
+  </ul>
+</div>
+
+<h3 class="mt-7 text-base font-bold text-white">Constraints</h3>
+<ul class="mt-3 list-disc space-y-1 pl-5 text-secondary-text">
+  ${template.constraints.map((line) => `<li><code>${line}</code></li>`).join("")}
+</ul>
+
+<h3 class="mt-7 text-base font-bold text-white">Return Requirement</h3>
+<p>Implement the starter function for this <strong>${difficulty}</strong> problem. Return only the required answer.</p>
+  `;
+};
+
 const buildOptimizedSolutions = (kind: JudgeKind): Problem["optimizedSolutions"] => {
   const javascript: Record<JudgeKind, string> = {
     sum: `function solve(input) {
@@ -598,6 +1549,230 @@ const buildOptimizedSolutions = (kind: JudgeKind): Problem["optimizedSolutions"]
   ];
 };
 
+const easyTemplates: EasyTemplate[] = [
+  {
+    title: "Print and Input: Array Total",
+    topic: "Programming Basics",
+    pattern: "Print and Input",
+    judge: "sum",
+    description: "Given a list of integers, return their total sum.",
+    inputFormat: ["The first line contains an integer n, the number of values.", "The second line contains n space-separated integers."],
+    outputFormat: "Return one integer: the sum of the given values.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      return [`The values are ${nums.slice(1).join(", ")}.`, `Adding them gives ${testCase.expected}.`];
+    },
+    generateInput: (seed) => {
+      const count = 5 + (seed % 5);
+      return `${count}\n${buildNumbers(seed, count).join(" ")}`;
+    },
+    solve: (input) => String((input.match(/-?\d+/g)?.map(Number).slice(1) ?? []).reduce((sum, value) => sum + value, 0)),
+    editorial: {
+      overview: "Read the numbers and add them in one pass.",
+      approach: ["Parse the count and list of values.", "Accumulate the total.", "Return the sum as text."],
+      complexity: { time: "O(n)", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("sum"),
+  },
+  {
+    title: "Parity: Largest Value",
+    topic: "Math Foundations",
+    pattern: "Parity",
+    judge: "max",
+    description: "Given a list of integers, return the largest value present in the list.",
+    inputFormat: ["The first line contains an integer n, the number of values.", "The second line contains n space-separated integers."],
+    outputFormat: "Return one integer: the maximum value in the list.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      return [`Scanning all values, the largest one is ${testCase.expected}.`, "No other value in the list is greater than it."];
+    },
+    generateInput: (seed) => {
+      const count = 5 + (seed % 5);
+      return `${count}\n${buildNumbers(seed + 3, count).join(" ")}`;
+    },
+    solve: (input) => String(Math.max(...(input.match(/-?\d+/g)?.map(Number).slice(1) ?? [0]))),
+    editorial: {
+      overview: "Read the values and track the largest one while scanning once.",
+      approach: ["Parse the values.", "Track the current maximum.", "Return the maximum as text."],
+      complexity: { time: "O(n)", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("max"),
+  },
+  {
+    title: "Traversal: Even Counter",
+    topic: "Arrays",
+    pattern: "Traversal",
+    judge: "count-even",
+    description: "Given a list of integers, count how many of them are even.",
+    inputFormat: ["The first line contains an integer n, the number of values.", "The second line contains n space-separated integers."],
+    outputFormat: "Return one integer: the number of even values.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number).slice(1) ?? [];
+      const evens = nums.filter((value) => value % 2 === 0);
+      return [`The even values are ${evens.join(", ")}.`, `There are ${testCase.expected} even values, so the answer is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => {
+      const count = 5 + (seed % 5);
+      return `${count}\n${buildNumbers(seed + 7, count).join(" ")}`;
+    },
+    solve: (input) => String((input.match(/-?\d+/g)?.map(Number).slice(1) ?? []).filter((value) => value % 2 === 0).length),
+    editorial: {
+      overview: "Scan the values once and count the even ones.",
+      approach: ["Parse the values.", "Increment a counter whenever value % 2 === 0.", "Return the final count as text."],
+      complexity: { time: "O(n)", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("count-even"),
+  },
+  {
+    title: "Character Counting: Reverse Words",
+    topic: "Strings",
+    pattern: "Character Counting",
+    judge: "reverse-words",
+    description: "Given a sequence of words, return the same words in reverse order.",
+    inputFormat: ["The first line contains an integer n, the number of words.", "The remaining input contains n lowercase words."],
+    outputFormat: "Return one line containing the words in reverse order.",
+    constraints: ["1 <= n <= 10^5", "Each word contains only lowercase English letters."],
+    explanation: (testCase) => {
+      const words = testCase.input.trim().split(/\s+/).slice(1);
+      return [`The original order is ${words.join(" -> ")}.`, `After reversing, the order becomes ${testCase.expected}.`];
+    },
+    generateInput: (seed) => {
+      const words = ["alpha", "bravo", "code", "delta", "logic", "matrix", "nexo", "query"];
+      const count = 3 + (seed % 4);
+      return `${count}\n${Array.from({ length: count }, (_, index) => words[(seed + index * 2) % words.length]).join(" ")}`;
+    },
+    solve: (input) => input.trim().split(/\r?\n/).slice(1).join(" ").trim().split(/\s+/).reverse().join(" "),
+    editorial: {
+      overview: "Read the words, reverse their order, and join them with a single space.",
+      approach: ["Skip the count line after parsing the input.", "Split the remaining text into words.", "Reverse and join with one space."],
+      complexity: { time: "O(n)", space: "O(n)" },
+    },
+    optimized: buildOptimizedSolutions("reverse-words"),
+  },
+  {
+    title: "Frequency Map: Common Divisor",
+    topic: "Hashing",
+    pattern: "Frequency Map",
+    judge: "gcd",
+    description: "Given two positive integers, return their greatest common divisor.",
+    inputFormat: ["The input contains two positive integers a and b."],
+    outputFormat: "Return one integer: gcd(a, b).",
+    constraints: ["1 <= a, b <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      return [`For ${nums[0]} and ${nums[1]}, the largest shared divisor is ${testCase.expected}.`, `Therefore, gcd(${nums[0]}, ${nums[1]}) = ${testCase.expected}.`];
+    },
+    generateInput: (seed) => {
+      const first = 24 + (seed % 23) * 6;
+      const second = 36 + (seed % 19) * 9;
+      return `${first} ${second}`;
+    },
+    solve: (input) => {
+      let [a, b] = input.match(/-?\d+/g)?.map(Number) ?? [0, 0];
+      while (b !== 0) {
+        [a, b] = [b, a % b];
+      }
+      return String(Math.abs(a));
+    },
+    editorial: {
+      overview: "Use Euclid's algorithm to find the greatest common divisor.",
+      approach: ["Parse the two numbers.", "Repeatedly replace a, b with b, a % b.", "Return the final non-zero value."],
+      complexity: { time: "O(log min(a, b))", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("gcd"),
+  },
+  {
+    title: "Custom Sort: Range Sum",
+    topic: "Sorting and Searching",
+    pattern: "Custom Sort",
+    judge: "range-sum",
+    description: "Given an array and one inclusive 1-indexed range, compute the sum of the values inside that range.",
+    inputFormat: ["The first line contains an integer n, the number of values.", "The second line contains n space-separated integers.", "The third line contains two integers l and r, the inclusive 1-indexed range."],
+    outputFormat: "Return one integer: the sum of values from index l through index r.",
+    constraints: ["1 <= n <= 10^5", "1 <= l <= r <= n", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      const n = nums[0];
+      const values = nums.slice(1, n + 1);
+      const left = nums[n + 1];
+      const right = nums[n + 2];
+      return [`The requested range is from position ${left} to ${right}.`, `The selected values are ${values.slice(left - 1, right).join(", ")}, and their sum is ${testCase.expected}.`];
+    },
+    generateInput: (seed) => {
+      const count = 5 + (seed % 5);
+      const values = buildNumbers(seed + 11, count);
+      const left = 1 + (seed % Math.max(1, count - 2));
+      const right = Math.min(count, left + 2 + (seed % 2));
+      return `${count}\n${values.join(" ")}\n${left} ${right}`;
+    },
+    solve: (input) => {
+      const nums = input.match(/-?\d+/g)?.map(Number) ?? [];
+      const n = nums[0] ?? 0;
+      const values = nums.slice(1, n + 1);
+      const left = nums[n + 1] ?? 1;
+      const right = nums[n + 2] ?? n;
+      return String(values.slice(left - 1, right).reduce((sum, value) => sum + value, 0));
+    },
+    editorial: {
+      overview: "Read the array and sum the values inside the requested range.",
+      approach: ["Parse n, the values, and l r.", "Slice the requested range.", "Return the sum of the slice."],
+      complexity: { time: "O(n)", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("range-sum"),
+  },
+  {
+    title: "Monotonic Stack: Array Total",
+    topic: "Stacks and Queues",
+    pattern: "Monotonic Stack",
+    judge: "sum",
+    description: "Given a list of integers, return their total sum.",
+    inputFormat: ["The first line contains an integer n, the number of values.", "The second line contains n space-separated integers."],
+    outputFormat: "Return one integer: the sum of the given values.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      const nums = testCase.input.match(/-?\d+/g)?.map(Number) ?? [];
+      return [`The values are ${nums.slice(1).join(", ")}.`, `Adding them gives ${testCase.expected}.`];
+    },
+    generateInput: (seed) => {
+      const count = 5 + (seed % 5);
+      return `${count}\n${buildNumbers(seed + 13, count).join(" ")}`;
+    },
+    solve: (input) => String((input.match(/-?\d+/g)?.map(Number).slice(1) ?? []).reduce((sum, value) => sum + value, 0)),
+    editorial: {
+      overview: "Read the numbers and sum them in one pass.",
+      approach: ["Parse the values.", "Accumulate the total.", "Return the sum as text."],
+      complexity: { time: "O(n)", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("sum"),
+  },
+  {
+    title: "Pointer Basics: Largest Value",
+    topic: "Linked Lists",
+    pattern: "Pointer Basics",
+    judge: "max",
+    description: "Given a list of integers, return the largest value present in the list.",
+    inputFormat: ["The first line contains an integer n, the number of values.", "The second line contains n space-separated integers."],
+    outputFormat: "Return one integer: the maximum value in the list.",
+    constraints: ["1 <= n <= 10^5", "-10^9 <= value <= 10^9"],
+    explanation: (testCase) => {
+      return [`Scanning all values, the largest one is ${testCase.expected}.`, "No other value in the list is greater than it."];
+    },
+    generateInput: (seed) => {
+      const count = 5 + (seed % 5);
+      return `${count}\n${buildNumbers(seed + 17, count).join(" ")}`;
+    },
+    solve: (input) => String(Math.max(...(input.match(/-?\d+/g)?.map(Number).slice(1) ?? [0]))),
+    editorial: {
+      overview: "Read the list and keep the largest number seen so far.",
+      approach: ["Parse the values.", "Track the current maximum.", "Return the largest value as text."],
+      complexity: { time: "O(n)", space: "O(1) extra space" },
+    },
+    optimized: buildOptimizedSolutions("max"),
+  },
+];
+
 const buildDiscussions = (level: number, kind: JudgeKind, topic: string, pattern: string): Problem["discussions"] => [
   {
     id: `d-${level}-1`,
@@ -627,14 +1802,62 @@ const generateProblem = (level: number): Problem => {
   const track = tracks[(level - 1) % tracks.length];
   const pattern = track.patterns[Math.floor((level - 1) / tracks.length) % track.patterns.length];
   const difficulty = difficultyForLevel(level);
-  const kind = judgeKinds[(level - 1) % judgeKinds.length];
-  const title = `${pattern}: ${taskCopy[kind].title}`;
+  const veryEasyKind: JudgeKind = "sum";
   const slug = slugify(`${track.topic}-${pattern}-${level}`);
+
+  if (level <= 200) {
+    const template = veryEasyTemplateForLevel(level);
+    const testCases = buildVeryEasyTestCases(level);
+    return {
+      id: slug,
+      title: template.title,
+      slug,
+      difficulty,
+      level,
+      topic: template.topic,
+      pattern: template.pattern,
+      ...rewardForDifficulty(difficulty),
+      prizeMoneyInr: undefined,
+      description: buildVeryEasyDescription(template, testCases, difficulty),
+      discussions: buildDiscussions(level, veryEasyKind, template.topic, template.pattern),
+      editorial: template.editorial,
+      optimizedSolutions: template.optimized,
+      judge: { kind: veryEasyKind },
+      starterCode: starterCode(),
+      testCases,
+    };
+  }
+
+  if (level <= 1200) {
+    const template = easyTemplates[(level - 201) % easyTemplates.length];
+    const kind = template.judge;
+    const testCases = buildTestCases(kind, level);
+    return {
+      id: slug,
+      title: template.title,
+      slug,
+      difficulty,
+      level,
+      topic: template.topic,
+      pattern: template.pattern,
+      ...rewardForDifficulty(difficulty),
+      prizeMoneyInr: undefined,
+      description: buildDescription(kind, difficulty, template.topic, template.pattern, testCases),
+      discussions: buildDiscussions(level, kind, template.topic, template.pattern),
+      editorial: template.editorial,
+      optimizedSolutions: template.optimized,
+      judge: { kind },
+      starterCode: starterCode(),
+      testCases,
+    };
+  }
+
+  const kind = judgeKinds[(level - 1) % judgeKinds.length];
   const testCases = buildTestCases(kind, level);
 
   return {
     id: slug,
-    title,
+    title: `${pattern}: ${taskCopy[kind].title}`,
     slug,
     difficulty,
     level,

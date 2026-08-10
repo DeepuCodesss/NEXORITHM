@@ -20,6 +20,9 @@ export interface LiveRewardConfig {
   startsAt: string;
   endsAt: string;
   isActive: boolean;
+  paidAt?: string | null;
+  winnerUserId?: string | null;
+  winnerSubmissionId?: string | null;
 }
 
 export interface UpcomingRewardItem {
@@ -56,6 +59,7 @@ interface AppContextType {
   upgradeToPro: () => void;
   solveProblem: (problemId: string) => SolveRewardResult;
   saveLiveReward: (config: LiveRewardConfig) => void;
+  announceLiveRewardResults: () => void;
   saveProblemBoardConfig: (config: ProblemBoardConfig) => void;
   signOut: () => void;
 }
@@ -154,7 +158,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
 
   useEffect(() => {
-    const syncLiveReward = async () => {
+  const syncLiveReward = async () => {
       const response = await fetch("/api/live-reward", { cache: "no-store" });
       if (!response.ok) return;
       const payload = (await response.json()) as { success?: boolean; data?: { liveReward?: LiveRewardConfig | null } };
@@ -306,6 +310,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })();
   };
 
+  const announceLiveRewardResults = () => {
+    void (async () => {
+      const response = await fetch("/api/admin/live-reward", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ announceResultsNow: true }),
+      });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { success?: boolean; data?: { liveReward?: LiveRewardConfig | null } };
+      setLiveReward(payload.data?.liveReward ?? null);
+    })();
+  };
+
   const saveProblemBoardConfig = (config: ProblemBoardConfig) => {
     void (async () => {
       const response = await fetch("/api/admin/problem-board-config", {
@@ -344,6 +361,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         upgradeToPro,
         solveProblem,
         saveLiveReward,
+        announceLiveRewardResults,
         saveProblemBoardConfig,
         signOut,
       }}
