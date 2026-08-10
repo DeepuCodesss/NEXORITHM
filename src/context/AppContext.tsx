@@ -13,6 +13,7 @@ import {
   MOCK_LEADERBOARD,
   SolveRewardResult,
 } from "@/lib/mockData";
+import { nextStreakValue } from "@/lib/streak";
 
 export interface LiveRewardConfig {
   problemId: string;
@@ -82,6 +83,7 @@ type DbUserSnapshot = {
   devRank: number;
   currentStreak: number;
   longestStreak: number;
+  lastSolvedAt?: string | null;
   streakShields: number;
   isPro: boolean;
   solvedProblemIds: unknown;
@@ -116,6 +118,7 @@ const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
   devRank: dbUser.devRank ?? INITIAL_USER.devRank,
   currentStreak: dbUser.currentStreak ?? INITIAL_USER.currentStreak,
   longestStreak: dbUser.longestStreak ?? INITIAL_USER.longestStreak,
+  lastSolvedAt: dbUser.lastSolvedAt ?? null,
   streakShields: dbUser.streakShields ?? INITIAL_USER.streakShields,
   isPro: dbUser.isPro ?? INITIAL_USER.isPro,
   solvedProblemIds: Array.isArray(dbUser.solvedProblemIds)
@@ -263,7 +266,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const moneyGainedInr = liveRewardActive ? liveReward.rewardMoneyInr : 0;
     const reputationGained = Math.max(5, Math.floor(xpGained / 10));
     const nextXp = user.xp + xpGained;
-    const nextStreak = Math.max(user.currentStreak, 1);
+    const nextStreak = nextStreakValue(user.currentStreak, user.lastSolvedAt ? new Date(user.lastSolvedAt) : null);
     const nextLevel = Math.max(1, Math.floor(nextXp / 200) + 1);
     const currentLevel = Math.max(1, Math.floor(user.xp / 200) + 1);
 
@@ -276,6 +279,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       devRank: Math.floor((current.xp + xpGained) / 200),
       currentStreak: nextStreak,
       longestStreak: Math.max(current.longestStreak, nextStreak),
+      lastSolvedAt: new Date().toISOString(),
       solvedProblemIds: [...current.solvedProblemIds, problemId],
     }));
 

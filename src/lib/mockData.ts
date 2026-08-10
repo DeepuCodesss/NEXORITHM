@@ -88,6 +88,7 @@ export interface UserState {
   devRank: number;
   currentStreak: number;
   longestStreak: number;
+  lastSolvedAt?: string | null;
   streakShields: number;
   isPro: boolean;
   college: string;
@@ -1898,6 +1899,7 @@ export const INITIAL_USER: UserState = {
   devRank: 0,
   currentStreak: 0,
   longestStreak: 0,
+  lastSolvedAt: null,
   streakShields: 0,
   isPro: false,
   college: "",

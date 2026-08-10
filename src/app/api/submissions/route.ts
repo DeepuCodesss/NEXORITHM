@@ -12,18 +12,9 @@ import { apiSuccess } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
 import { calculateTrustScore, normalizeReplayEvents, type ReplayPayload } from "@/lib/replay";
 import { ensureJudgeBootstrapLogged } from "@/lib/judgeBootstrap";
+import { nextStreakValue } from "@/lib/streak";
 
 export const runtime = "nodejs";
-
-const IST_TIME_ZONE = "Asia/Kolkata";
-
-const getDateKeyInTimeZone = (value: Date, timeZone: string) =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
 
 const getStreakReward = (streakDay: number) => {
   if (streakDay <= 0) return { coins: 0, cash: 0 };
@@ -169,20 +160,7 @@ export async function POST(request: Request) {
       }
 
       const lastSolvedAt = lockedUser.lastSolvedAt ? new Date(lockedUser.lastSolvedAt) : null;
-      const currentDayKey = getDateKeyInTimeZone(now, IST_TIME_ZONE);
-      const lastDayKey = lastSolvedAt ? getDateKeyInTimeZone(lastSolvedAt, IST_TIME_ZONE) : null;
-      const previousDay = lastSolvedAt ? new Date(lastSolvedAt) : null;
-      if (previousDay) {
-        previousDay.setDate(previousDay.getDate() + 1);
-      }
-      const previousDayKey = previousDay ? getDateKeyInTimeZone(previousDay, IST_TIME_ZONE) : null;
-
-      const nextStreak =
-        !lastDayKey || lastDayKey === currentDayKey
-          ? Math.max(lockedUser.currentStreak, 1)
-          : lastDayKey === previousDayKey
-            ? lockedUser.currentStreak + 1
-            : 1;
+      const nextStreak = nextStreakValue(lockedUser.currentStreak, lastSolvedAt, now);
       const streakReward = getStreakReward(nextStreak);
       const xpReward = problem.xpReward;
       const coinReward = problem.coinReward;
@@ -251,13 +229,6 @@ export async function POST(request: Request) {
           VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"streak_reward"}, ${streakReward.cash}, ${JSON.stringify({ streakDay: nextStreak, problemId: problem.id })}, ${now})`,
         );
       }
-      if (cashReward > 0) {
-        await tx.$executeRaw(
-          Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")
-          VALUES (${randomUUID()}, ${user.id}, ${"cash"}, ${"problem_cash_reward"}, ${cashReward}, ${JSON.stringify({ problemId: problem.id, submissionId: createdSubmission.id })}, ${now})`,
-        );
-      }
-
       if (liveReward) {
         await tx.$executeRaw(
           Prisma.sql`INSERT INTO "RewardTransaction" ("id", "userId", "type", "source", "amount", "metadata", "createdAt")

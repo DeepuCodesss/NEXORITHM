@@ -480,7 +480,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     }
 
     let reward: SolveRewardResult | undefined;
-    if (endpoint === "/api/submissions" && result.status === "Accepted") {
+    if (endpoint === "/api/submissions" && result.status === "Accepted" && result.saved) {
       const beforeStreak = user.currentStreak;
       const beforeXp = user.xp;
       reward = solveProblem(problem.id);

@@ -52,7 +52,7 @@ export default function WithdrawPage() {
       setMessage(payload?.error || payload?.message || "Unable to create withdrawal request.");
       return;
     }
-    setMessage("Withdrawal request submitted.");
+    setMessage("Withdrawal requested. Your money will be transferred to your bank under 10 minutes.");
     setAmount("");
     setUpiId("");
     const refreshResponse = await fetch("/api/withdrawals", { cache: "no-store" });
