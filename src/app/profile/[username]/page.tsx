@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BookOpen, Gift, Home, Target, Trophy, Zap, Calendar, Globe } from "lucide-react";
 import { getPrisma } from "@/lib/db";
 import { currentUser } from "@clerk/nextjs/server";
+import { calendarDaysBetween, getDateKeyInTimeZone, getEffectiveCurrentStreak } from "@/lib/streak";
 import ProfileClient from "./ProfileClient";
 
 export type ProfilePayload = {
@@ -63,7 +64,12 @@ export type ProfilePayload = {
   };
   streakCalendar: Array<{ dayName: string; solved: boolean; dateStr: string }>;
   hasSolvedToday: boolean;
-  weeklyGoal: { solvedDays: number; targetDays: number };
+  weeklyGoal: {
+    solvedProblems: number;
+    targetProblems: number;
+    remainingProblems: number;
+    daysLeft: number;
+  };
   journeyTimeline: Array<{
     id: string;
     title: string;
@@ -92,6 +98,7 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
         coins: true,
         currentStreak: true,
         longestStreak: true,
+        lastSolvedAt: true,
         solvedProblemIds: true,
         college: true,
         createdAt: true,
@@ -111,6 +118,38 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
   }
 
   if (!user) return null;
+
+  const effectiveCurrentStreak = getEffectiveCurrentStreak(user.currentStreak, user.lastSolvedAt);
+  if (effectiveCurrentStreak !== user.currentStreak) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { currentStreak: effectiveCurrentStreak },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        avatarUrl: true,
+        avatarMode: true,
+        avatarTheme: true,
+        xp: true,
+        coins: true,
+        currentStreak: true,
+        longestStreak: true,
+        lastSolvedAt: true,
+        solvedProblemIds: true,
+        college: true,
+        createdAt: true,
+        isPro: true,
+        bio: true,
+        website: true,
+        github: true,
+        linkedin: true,
+        twitter: true,
+        reputation: true,
+        showcaseBadges: true,
+      },
+    });
+  }
 
   // 1. Fetch user's submissions
   const dbSubmissions = await prisma.submission.findMany({
@@ -256,20 +295,29 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     (s) => s.createdAt.toISOString().slice(0, 10) === todayStr
   );
 
-  // Calculate Weekly Goal (days solved this week, assuming week starts on Monday)
-  let solvedDaysThisWeek = 0;
-  const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  // Weekly quest: count unique accepted problems from Monday through Sunday.
+  // Date keys are calculated in the product timezone so server timezone does not affect progress.
+  const todayKey = getDateKeyInTimeZone(now);
+  const todayAtMidnight = new Date(`${todayKey}T00:00:00Z`);
+  const currentDayOfWeek = todayAtMidnight.getUTCDay();
   const daysSinceMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - daysSinceMonday);
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const uniqueDaysSolvedThisWeek = new Set(
+  const weekStart = new Date(todayAtMidnight);
+  weekStart.setUTCDate(weekStart.getUTCDate() - daysSinceMonday);
+  const weekStartKey = weekStart.toISOString().slice(0, 10);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  const weekEndKey = weekEnd.toISOString().slice(0, 10);
+  const weeklySolvedProblems = new Set(
     acceptedSubmissions
-      .filter((s) => s.createdAt >= startOfWeek)
-      .map((s) => s.createdAt.toISOString().slice(0, 10))
+      .filter((submission) => {
+        const dateKey = getDateKeyInTimeZone(submission.createdAt);
+        return dateKey >= weekStartKey && dateKey <= weekEndKey;
+      })
+      .map((submission) => submission.problem.slug),
   );
-  solvedDaysThisWeek = uniqueDaysSolvedThisWeek.size;
+  const weeklyTarget = 7;
+  const weeklySolved = weeklySolvedProblems.size;
+  const weeklyDaysLeft = Math.max(0, calendarDaysBetween(weekEndKey, todayKey));
 
   // 8. Journey Timeline
   const firstAccepted = [...acceptedSubmissions].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
@@ -429,8 +477,10 @@ const buildProfile = async (username: string): Promise<ProfilePayload | null> =>
     streakCalendar,
     hasSolvedToday,
     weeklyGoal: {
-      solvedDays: solvedDaysThisWeek,
-      targetDays: 7,
+      solvedProblems: weeklySolved,
+      targetProblems: weeklyTarget,
+      remainingProblems: Math.max(0, weeklyTarget - weeklySolved),
+      daysLeft: weeklyDaysLeft,
     },
     journeyTimeline,
   };

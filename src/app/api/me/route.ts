@@ -3,7 +3,7 @@ import { upsertClerkUser } from "@/lib/userSync";
 import { getPrisma } from "@/lib/db";
 import { apiSuccess } from "@/lib/apiResponse";
 import { getUserCashBalanceInr } from "@/lib/rewards";
-import { calendarDaysBetween, getDateKeyInTimeZone } from "@/lib/streak";
+import { getEffectiveCurrentStreak } from "@/lib/streak";
 
 export const runtime = "nodejs";
 
@@ -15,17 +15,12 @@ export async function GET() {
   }
 
   let user = await upsertClerkUser(clerkUser);
-  if (user.currentStreak > 0 && user.lastSolvedAt) {
-    const daysSinceLastSolve = calendarDaysBetween(
-      getDateKeyInTimeZone(new Date()),
-      getDateKeyInTimeZone(new Date(user.lastSolvedAt)),
-    );
-    if (daysSinceLastSolve > 1) {
-      user = await getPrisma().user.update({
-        where: { id: user.id },
-        data: { currentStreak: 0 },
-      });
-    }
+  const effectiveStreak = getEffectiveCurrentStreak(user.currentStreak, user.lastSolvedAt);
+  if (effectiveStreak !== user.currentStreak) {
+    user = await getPrisma().user.update({
+      where: { id: user.id },
+      data: { currentStreak: effectiveStreak },
+    });
   }
   const moneyEarnedInr = await getUserCashBalanceInr(user.id);
   return apiSuccess({

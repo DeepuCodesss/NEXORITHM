@@ -1,5 +1,6 @@
 import { getPrisma } from "@/lib/db";
 import { apiSuccess } from "@/lib/apiResponse";
+import { getEffectiveCurrentStreak } from "@/lib/streak";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ const buildLeaderboard = (users: Array<{
       avatarUrl: user.avatarUrl,
       xp: user.xp,
       college: user.college,
-      streak: user.currentStreak,
+      streak: getEffectiveCurrentStreak(user.currentStreak, user.lastSolvedAt),
       solvedCount: Array.isArray(user.solvedProblemIds) ? user.solvedProblemIds.length : 0,
       isPro: user.isPro,
       devRank: user.devRank || Math.floor(user.xp / 200),

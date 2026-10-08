@@ -60,7 +60,7 @@ const GUEST_PROFILE: ProfilePayload = {
     { dayName: "Sun", solved: false, dateStr: "2026-06-28" },
   ],
   hasSolvedToday: false,
-  weeklyGoal: { solvedDays: 0, targetDays: 7 },
+  weeklyGoal: { solvedProblems: 0, targetProblems: 7, remainingProblems: 7, daysLeft: 0 },
   journeyTimeline: [
     { id: "joined", title: "Joined Nexorithm", unlocked: true, date: null, icon: "UserPlus" },
     { id: "first_solve", title: "First Accepted Solution", unlocked: false, date: null, icon: "CheckCircle" },

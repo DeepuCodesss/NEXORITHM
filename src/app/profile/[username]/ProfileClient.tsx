@@ -1295,23 +1295,30 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
         >
           <div className="absolute -right-4 -top-4 h-20 w-20 bg-[#F59E0B]/8 blur-3xl rounded-full group-hover/reward:bg-[#F59E0B]/12 transition-all duration-500" aria-hidden="true" />
           <div className="flex flex-col gap-2.5 relative z-10">
+            {(() => {
+              const weeklySolved = Math.min(profile.weeklyGoal.solvedProblems, profile.weeklyGoal.targetProblems);
+              const weeklyTarget = profile.weeklyGoal.targetProblems;
+              const weeklyRemaining = profile.weeklyGoal.remainingProblems;
+              const weeklyComplete = weeklyRemaining === 0;
+              return (
+                <>
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <span className={CARD_TITLE}><Target className="h-5 w-5 text-[#F59E0B] group-hover/reward:scale-110 transition-transform" /> Weekly Quest</span>
-                <span className="text-[11px] font-black text-[#F59E0B] bg-[#F59E0B]/10 px-2 py-0.5 rounded-lg border border-[#F59E0B]/20 select-none">In Progress</span>
+                <span className="text-[11px] font-black text-[#F59E0B] bg-[#F59E0B]/10 px-2 py-0.5 rounded-lg border border-[#F59E0B]/20 select-none">{weeklyComplete ? "Complete" : "In Progress"}</span>
               </div>
-              <span className="text-[13px] text-[#64748B] font-mono">~2 days left</span>
+              <span className="text-[13px] text-[#64748B] font-mono">{profile.weeklyGoal.daysLeft} days left</span>
             </div>
             <div>
               <div className="flex justify-between items-end mb-1.5">
-                <p className="text-[13px] font-medium text-[#94A3B8]">Solve <span className="text-white font-bold">3 more problems</span> this week</p>
-                <p className="text-[13px] font-bold text-white">4 <span className="text-[#64748B] font-normal">/ 7 Solved</span></p>
+                <p className="text-[13px] font-medium text-[#94A3B8]">{weeklyComplete ? "Weekly quest complete" : <>Solve <span className="text-white font-bold">{weeklyRemaining} more {weeklyRemaining === 1 ? "problem" : "problems"}</span> this week</>}</p>
+                <p className="text-[13px] font-bold text-white">{weeklySolved} <span className="text-[#64748B] font-normal">/ {weeklyTarget} Solved</span></p>
               </div>
               <div className="h-2.5 w-full rounded-full bg-[#1C2230] overflow-hidden border border-[#1E2736]">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FBBF24]"
                   initial={{ width: 0 }}
-                  animate={{ width: `${(4 / 7) * 100}%` }}
+                  animate={{ width: `${(weeklySolved / weeklyTarget) * 100}%` }}
                   transition={{ duration: 1, delay: 0.5 }}
                 />
               </div>
@@ -1324,6 +1331,9 @@ export default function ProfileClient({ profile: initialProfile, isOwner }: Prof
                 <Trophy className="h-3.5 w-3.5" /> +10 Coins
               </div>
             </div>
+                </>
+              );
+            })()}
           </div>
         </motion.div>
 

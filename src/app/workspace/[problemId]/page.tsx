@@ -7,7 +7,7 @@ import { useApp } from "@/context/AppContext";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { languageById, SUPPORTED_LANGUAGES, type JudgeLanguage } from "@/lib/languages";
 import type { Problem, ProblemSummary, SolveRewardResult } from "@/lib/mockData";
-import SubmissionCelebrations, { type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
+import SubmissionCelebrations, { type StreakTransitionData, type SubmissionCelebrationData, type SubmissionToastData } from "@/components/SubmissionCelebrations";
 import { calculateTrustScore, createReplayPayload, normalizeReplayEvents, type ReplayEvent } from "@/lib/replay";
 import {
   BookOpenCheck,
@@ -172,7 +172,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
   const [submissionSummary, setSubmissionSummary] = useState<SubmissionSummary | null>(null);
   const [toast, setToast] = useState<SubmissionToastData | null>(null);
   const [celebration, setCelebration] = useState<SubmissionCelebrationData | null>(null);
-  const [streakToast, setStreakToast] = useState<string | null>(null);
+  const [streakToast, setStreakToast] = useState<StreakTransitionData | null>(null);
   const [levelToast, setLevelToast] = useState<{ from: number; to: number; title: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [leaders, setLeaders] = useState<ProblemLeaderboardRow[]>([]);
@@ -551,8 +551,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
       if (reward.awarded) {
         const beforeLevel = reward.levelBefore ?? Math.max(1, Math.floor(beforeXp / 200) + 1);
         const afterLevel = reward.levelAfter ?? Math.max(1, Math.floor((beforeXp + reward.xpGained) / 200) + 1);
-        if ((reward.currentStreak ?? beforeStreak) > beforeStreak) {
-          setStreakToast(`🔥 ${reward.currentStreak} Day Streak!`);
+        const currentStreak = reward.currentStreak ?? beforeStreak;
+        const previousPersistedStreak = reward.previousStreak ?? beforeStreak;
+        const streakWasReset = currentStreak === 1 && previousPersistedStreak > 1;
+        if (currentStreak > beforeStreak || streakWasReset) {
+          setStreakToast({
+            from: streakWasReset ? 0 : beforeStreak,
+            to: currentStreak,
+            reset: streakWasReset,
+          });
         }
         if (afterLevel > beforeLevel) {
           setLevelToast({
@@ -929,12 +936,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
         onToastDismiss={() => setToast(null)}
         celebration={celebration}
         onCelebrationClose={() => setCelebration(null)}
+        streakTransition={streakToast}
       />
-      {streakToast && (
-        <div className="pointer-events-none fixed bottom-24 right-4 z-40 max-w-[calc(100vw-2rem)] rounded-full border border-reward/30 bg-reward/10 px-4 py-2 text-sm font-bold text-reward shadow-[0_15px_30px_rgba(245,158,11,0.14)] xp-pop sm:right-6">
-          {streakToast}
-        </div>
-      )}
       {levelToast && (
         <div className="pointer-events-none fixed left-1/2 top-16 z-40 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-center text-sm font-bold text-success shadow-[0_15px_30px_rgba(34,197,94,0.14)] rank-up">
           ⭐ LEVEL UP! Level {levelToast.from} → Level {levelToast.to}

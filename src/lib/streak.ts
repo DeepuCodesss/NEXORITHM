@@ -14,6 +14,21 @@ export const calendarDaysBetween = (currentDayKey: string, previousDayKey: strin
   return Math.round((current - previous) / 86_400_000);
 };
 
+export const getEffectiveCurrentStreak = (
+  currentStreak: number,
+  lastSolvedAt: Date | null,
+  now = new Date(),
+) => {
+  if (currentStreak <= 0 || !lastSolvedAt) return currentStreak;
+
+  const daysSinceLastSolve = calendarDaysBetween(
+    getDateKeyInTimeZone(now),
+    getDateKeyInTimeZone(lastSolvedAt),
+  );
+
+  return daysSinceLastSolve > 1 ? 0 : currentStreak;
+};
+
 export const nextStreakValue = (currentStreak: number, lastSolvedAt: Date | null, now = new Date()) => {
   if (!lastSolvedAt) return 1;
 

@@ -27,11 +27,18 @@ export interface SubmissionCelebrationData {
   showCash?: boolean;
 }
 
+export interface StreakTransitionData {
+  from: number;
+  to: number;
+  reset?: boolean;
+}
+
 interface SubmissionCelebrationsProps {
   toast: SubmissionToastData | null;
   onToastDismiss: () => void;
   celebration: SubmissionCelebrationData | null;
   onCelebrationClose: () => void;
+  streakTransition: StreakTransitionData | null;
 }
 
 const toastVariants = {
@@ -51,6 +58,7 @@ export default function SubmissionCelebrations({
   onToastDismiss,
   celebration,
   onCelebrationClose,
+  streakTransition,
 }: SubmissionCelebrationsProps) {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -94,6 +102,55 @@ export default function SubmissionCelebrations({
 
   return (
     <>
+      <AnimatePresence>
+        {streakTransition && (
+          <motion.div
+            key={`${streakTransition.from}-${streakTransition.to}-${streakTransition.reset ? "reset" : "up"}`}
+            initial={{ opacity: 0, y: -24, scale: 0.82, rotateX: -18 }}
+            animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+            exit={{ opacity: 0, y: -16, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 360, damping: 22 }}
+            className="pointer-events-none fixed left-1/2 top-20 z-[60] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="relative overflow-hidden rounded-[24px] border border-orange-300/30 bg-[#17120d]/95 px-5 py-4 text-center shadow-[0_24px_70px_rgba(245,158,11,0.3)] backdrop-blur-xl">
+              <motion.div
+                className="absolute -left-8 -top-10 h-28 w-28 rounded-full bg-orange-400/20 blur-2xl"
+                animate={{ scale: [1, 1.35, 1], opacity: [0.45, 0.8, 0.45] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <div className="relative flex items-center justify-center gap-2 text-orange-200">
+                <motion.div
+                  animate={{ scale: [1, 1.18, 1], rotate: [-5, 5, -5] }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <Flame className="h-6 w-6 fill-orange-400 text-orange-400" />
+                </motion.div>
+                <span className="text-xs font-black uppercase tracking-[0.2em]">
+                  {streakTransition.reset ? "Streak rebuilt" : "Streak extended"}
+                </span>
+              </div>
+              <div className="relative mt-2 flex items-center justify-center gap-3">
+                <span className="text-3xl font-black text-white">{streakTransition.from}</span>
+                <motion.span
+                  animate={{ x: [0, 5, 0] }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="text-xl font-black text-orange-300"
+                >
+                  →
+                </motion.span>
+                <span className="text-4xl font-black text-orange-300">{streakTransition.to}</span>
+                <span className="self-end pb-1 text-xs font-bold text-orange-100/70">days</span>
+              </div>
+              <div className="relative mt-1 text-xs font-medium text-orange-100/70">
+                {streakTransition.reset ? "A missed day reset your streak. Start strong again." : "Keep solving every day to keep the flame alive."}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
         aria-live="polite"
         aria-atomic="true"
