@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/db";
 import { apiError } from "@/lib/apiResponse";
 import { apiSuccess } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
-import { MOCK_PROBLEMS } from "@/lib/mockData";
+import { getProblemFromDatabase } from "@/lib/problemCatalog";
 
 export const runtime = "nodejs";
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   const endsAt = new Date(body?.endsAt);
   const isActive = Boolean(body?.isActive);
 
-  if (!MOCK_PROBLEMS.some((problem) => problem.id === problemId) || !Number.isFinite(rewardMoney) || rewardMoney <= 0 || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+  if (!(await getProblemFromDatabase(problemId)) || !Number.isFinite(rewardMoney) || rewardMoney <= 0 || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
     return apiError("Invalid live reward payload.", 400);
   }
 

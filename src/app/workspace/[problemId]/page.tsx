@@ -44,6 +44,7 @@ type JudgeResponse = {
     saved?: boolean;
     submissionId?: string | null;
     databaseError?: string | null;
+    reward?: SolveRewardResult;
     cases?: Array<{
       id: number;
       input: string;
@@ -62,6 +63,7 @@ type JudgeResponse = {
   saved?: boolean;
   submissionId?: string | null;
   databaseError?: string | null;
+  reward?: SolveRewardResult;
   cases?: Array<{
     id: number;
     input: string;
@@ -128,7 +130,7 @@ const createProblemPlaceholder = (summary: ProblemSummary): Problem => ({
 
 export default function WorkspacePage({ params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = use(params);
-  const { problems, solveProblem, user, liveReward } = useApp();
+  const { problems, user, liveReward, refreshUser } = useApp();
   const { user: clerkUser, isLoaded } = useUser();
   const isGuest = isLoaded && !clerkUser;
 
@@ -536,7 +538,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ problemId:
     if (endpoint === "/api/submissions" && result.status === "Accepted" && result.saved) {
       const beforeStreak = user.currentStreak;
       const beforeXp = user.xp;
-      reward = solveProblem(problem.id);
+      reward = result.reward ?? {
+        awarded: false,
+        alreadySolved: false,
+        xpGained: 0,
+        coinsGained: 0,
+        moneyGainedInr: 0,
+        reputationGained: 0,
+      };
+      await refreshUser();
       const status = (result.status as SubmissionStatus) ?? "Unknown";
       if (reward.awarded) {
         const beforeLevel = reward.levelBefore ?? Math.max(1, Math.floor(beforeXp / 200) + 1);

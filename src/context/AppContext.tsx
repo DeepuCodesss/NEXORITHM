@@ -1,16 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import type {
   UserState,
   ProblemSummary,
   Mission,
-  SolveRewardResult,
 } from "@/lib/mockData";
 import { INITIAL_USER, MOCK_MISSIONS } from "@/lib/appData";
-import { nextStreakValue } from "@/lib/streak";
 
 export interface LiveRewardConfig {
   problemId: string;
@@ -46,11 +44,9 @@ interface AppContextType {
   isPro: boolean;
   isAuthenticated: boolean;
   isUserSynced: boolean;
+  refreshUser: () => Promise<void>;
   solvedCount: number;
   isProblemSolved: (problemId: string) => boolean;
-  buyStreakShield: () => boolean;
-  upgradeToPro: () => void;
-  solveProblem: (problemId: string) => SolveRewardResult;
   saveLiveReward: (config: LiveRewardConfig) => void;
   announceLiveRewardResults: () => void;
   saveProblemBoardConfig: (config: ProblemBoardConfig) => void;
@@ -132,17 +128,9 @@ const dbUserToState = (dbUser: DbUserSnapshot): UserState => ({
   avatarTheme: dbUser.avatarTheme || "violet",
 });
 
-const emptyReward = (): SolveRewardResult => ({
-  awarded: false,
-  alreadySolved: false,
-  xpGained: 0,
-  coinsGained: 0,
-  moneyGainedInr: 0,
-  reputationGained: 0,
-});
-
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
   const pathname = usePathname();
   const [user, setUser] = useState<UserState>(INITIAL_USER);
   const [isUserSynced, setIsUserSynced] = useState(false);
@@ -228,68 +216,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     void syncUser();
   }, [clerkUser, isLoaded, isSignedIn]);
 
-  const buyStreakShield = (): boolean => {
-    return false;
-  };
-
-  const upgradeToPro = () => undefined;
-
   const isProblemSolved = (problemId: string) => user.solvedProblemIds.includes(problemId);
 
-  const signOut = () => undefined;
-
-  const solveProblem = (problemId: string): SolveRewardResult => {
-    const problem = problems.find((item) => item.id === problemId);
-    if (!problem) return emptyReward();
-
-    const alreadySolved = isProblemSolved(problemId);
-    if (alreadySolved) {
-      return {
-        ...emptyReward(),
-        alreadySolved: true,
-      };
+  const refreshUser = async () => {
+    if (!isLoaded || !isSignedIn) {
+      setUser(INITIAL_USER);
+      setIsUserSynced(true);
+      return;
     }
 
-    const xpGained = problem.xpReward;
-    const coinsGained = problem.coinReward;
-    const liveRewardActive =
-      liveReward?.isActive &&
-      liveReward.problemId === problemId &&
-      new Date(liveReward.startsAt).getTime() <= Date.now() &&
-      new Date(liveReward.endsAt).getTime() > Date.now();
-    const moneyGainedInr = liveRewardActive ? liveReward.rewardMoneyInr : 0;
-    const reputationGained = Math.max(5, Math.floor(xpGained / 10));
-    const nextXp = user.xp + xpGained;
-    const nextStreak = nextStreakValue(user.currentStreak, user.lastSolvedAt ? new Date(user.lastSolvedAt) : null);
-    const nextLevel = Math.max(1, Math.floor(nextXp / 200) + 1);
-    const currentLevel = Math.max(1, Math.floor(user.xp / 200) + 1);
+    const response = await fetch("/api/me", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = (await response.json()) as { data?: { user?: DbUserSnapshot | null } };
+    if (payload.data?.user) setUser(dbUserToState(payload.data.user));
+    setIsUserSynced(true);
+  };
 
-    setUser((current) => ({
-      ...current,
-      xp: current.xp + xpGained,
-      coins: current.coins + coinsGained,
-      moneyEarnedInr: current.moneyEarnedInr + moneyGainedInr,
-      reputation: current.reputation + reputationGained,
-      devRank: Math.floor((current.xp + xpGained) / 200),
-      currentStreak: nextStreak,
-      longestStreak: Math.max(current.longestStreak, nextStreak),
-      lastSolvedAt: new Date().toISOString(),
-      solvedProblemIds: [...current.solvedProblemIds, problemId],
-    }));
-
-    return {
-      awarded: true,
-      alreadySolved: false,
-      xpGained,
-      coinsGained,
-      moneyGainedInr,
-      reputationGained,
-      currentStreak: nextStreak,
-      previousStreak: user.currentStreak,
-      levelBefore: currentLevel,
-      levelAfter: nextLevel,
-      unlockedTitle: problem.title,
-    };
+  const signOut = () => {
+    setUser(INITIAL_USER);
+    void clerkSignOut();
   };
 
   const saveLiveReward = (config: LiveRewardConfig) => {
@@ -352,11 +297,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isPro: user.isPro,
         isAuthenticated: isSignedIn || user.authProvider !== "guest",
         isUserSynced,
+        refreshUser,
         solvedCount: user.solvedProblemIds.length,
         isProblemSolved,
-        buyStreakShield,
-        upgradeToPro,
-        solveProblem,
         saveLiveReward,
         announceLiveRewardResults,
         saveProblemBoardConfig,

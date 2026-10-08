@@ -1,6 +1,6 @@
 import { judgeSubmission } from "@/lib/judge";
 import { isJudgeLanguage } from "@/lib/languages";
-import { MOCK_PROBLEMS } from "@/lib/mockData";
+import { getProblemFromDatabase } from "@/lib/problemCatalog";
 import { currentUser } from "@clerk/nextjs/server";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { apiError } from "@/lib/apiResponse";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const problemId = typeof body?.problemId === "string" ? body.problemId : "";
   const language = body?.language;
   const code = typeof body?.code === "string" ? body.code : "";
-  const problem = MOCK_PROBLEMS.find((item) => item.id === problemId);
+  const problem = await getProblemFromDatabase(problemId);
 
   if (!problem) {
     return apiError("Problem not found.", 404);

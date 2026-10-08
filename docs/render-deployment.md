@@ -32,6 +32,7 @@ npm start
 - `CLERK_AFTER_SIGN_UP_URL`
 - `JUDGE_USE_DOCKER`
 - `JAVA_JUDGE_SERVICE_URL`
+- `JUDGE_SERVICE_SECRET` (the same private value on the main app and judge service)
 
 ## PostgreSQL Migration Steps
 
@@ -48,6 +49,7 @@ npm start
 - Java submissions are sent to `JAVA_JUDGE_SERVICE_URL`.
 - The Docker deployment exposes the Java judge endpoint at `/api/java-judge`.
 - Set `JAVA_JUDGE_SERVICE_URL` on the main website to `https://nexorithm-docker.onrender.com/api/java-judge`.
+- Set `JUDGE_SERVICE_SECRET` on both Render services; never expose it to the browser.
 - The Next.js app still judges C, C++, Python, and JavaScript in-process.
 
 ## Notes

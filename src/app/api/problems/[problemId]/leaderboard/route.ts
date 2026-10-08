@@ -1,13 +1,13 @@
 import { getPrisma } from "@/lib/db";
 import { apiError, apiSuccess } from "@/lib/apiResponse";
 import { calculatePasteContribution } from "@/lib/replay";
-import { MOCK_PROBLEMS } from "@/lib/mockData";
+import { getProblemFromDatabase } from "@/lib/problemCatalog";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request, { params }: { params: Promise<{ problemId: string }> }) {
   const { problemId } = await params;
-  if (!MOCK_PROBLEMS.some((problem) => problem.id === problemId)) {
+  if (!(await getProblemFromDatabase(problemId))) {
     return apiError("Problem not found.", 404);
   }
 

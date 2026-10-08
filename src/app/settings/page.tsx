@@ -105,6 +105,31 @@ const COUNTRIES = [
   "Australia", "Germany", "Japan", "France", "Netherlands", "United Arab Emirates"
 ];
 
+type ClerkSessionSnapshot = {
+  id: string;
+  latestActivity?: {
+    isMobile?: boolean | null;
+    browserName?: string | null;
+    osName?: string | null;
+    ipAddress?: string | null;
+    country?: string | null;
+  } | null;
+  revoke: () => Promise<unknown>;
+};
+
+type SettingsMetadata = {
+  dailyMission?: boolean;
+  weeklyMission?: boolean;
+  contestReminders?: boolean;
+  emailNotifications?: boolean;
+  pushNotifications?: boolean;
+  twoFactorEnabled?: boolean;
+  uiAnimations?: boolean;
+  reduceMotion?: boolean;
+  compactLayout?: boolean;
+  cardHoverEffects?: boolean;
+};
+
 export default function SettingsPage() {
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const { session: currentSession } = useSession();
@@ -173,7 +198,7 @@ export default function SettingsPage() {
   const [pushSupported, setPushSupported] = useState(true);
 
   // 5. Security fields
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<ClerkSessionSnapshot[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -203,6 +228,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!clerkUser || !dbUser) return;
 
+    // Mirror remote Clerk/database values into the editable local form.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFirstName(clerkUser.firstName || "");
     setLastName(clerkUser.lastName || "");
     setUsername(clerkUser.username || "");
@@ -222,18 +249,7 @@ export default function SettingsPage() {
     setShowCollege(dbUser.showCollege !== false);
     setShowStats(dbUser.showStats !== false);
 
-    const meta = (clerkUser.unsafeMetadata || {}) as {
-      dailyMission?: boolean;
-      weeklyMission?: boolean;
-      contestReminders?: boolean;
-      emailNotifications?: boolean;
-      pushNotifications?: boolean;
-      twoFactorEnabled?: boolean;
-      uiAnimations?: boolean;
-      reduceMotion?: boolean;
-      compactLayout?: boolean;
-      cardHoverEffects?: boolean;
-    };
+    const meta = (clerkUser.unsafeMetadata || {}) as SettingsMetadata;
 
     setDailyMission(meta.dailyMission !== false);
     setWeeklyMission(meta.weeklyMission !== false);
@@ -267,6 +283,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (clerkUser && activeTab === "security") {
+      // Fetching here updates the session list asynchronously.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void fetchClerkSessions();
     }
   }, [clerkUser, activeTab]);
@@ -274,6 +292,8 @@ export default function SettingsPage() {
   // Instant username availability checker (debounced)
   useEffect(() => {
     if (!username || username === clerkUser?.username) {
+      // Reset validation state when the source input changes.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUsernameAvailable(null);
       setUsernameError("");
       return;
@@ -355,7 +375,7 @@ export default function SettingsPage() {
 
   const isNotificationsChanged = () => {
     if (!clerkUser) return false;
-    const meta = (clerkUser.unsafeMetadata || {}) as any;
+    const meta = (clerkUser.unsafeMetadata || {}) as SettingsMetadata;
     return (
       dailyMission !== (meta.dailyMission !== false) ||
       weeklyMission !== (meta.weeklyMission !== false) ||
@@ -367,7 +387,7 @@ export default function SettingsPage() {
 
   const isAppearanceChanged = () => {
     if (!clerkUser) return false;
-    const meta = (clerkUser.unsafeMetadata || {}) as any;
+    const meta = (clerkUser.unsafeMetadata || {}) as SettingsMetadata;
     return (
       uiAnimations !== (meta.uiAnimations !== false) ||
       reduceMotion !== (meta.reduceMotion || false) ||
@@ -782,7 +802,7 @@ export default function SettingsPage() {
   };
 
   // Revoke Session Handler
-  const handleRevokeSession = async (sess: any) => {
+  const handleRevokeSession = async (sess: ClerkSessionSnapshot) => {
     try {
       await sess.revoke();
       triggerStatus("success", "Workspace session revoked.");

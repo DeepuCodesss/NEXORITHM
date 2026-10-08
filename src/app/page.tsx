@@ -143,14 +143,13 @@ function RewardCountdown({ active }: { active: boolean }) {
 }
 
 function DashboardPreview() {
-  const { problems, liveReward, solveProblem } = useApp();
+  const { liveReward } = useApp();
   const [consoleMessage, setConsoleMessage] = useState("Ready to test sample cases.");
   const [submitMessage, setSubmitMessage] = useState("");
   const [runCount, setRunCount] = useState(0);
   const [isMobile, setIsMobile] = useState(isMobileWidth);
   const [isEditorHovered, setIsEditorHovered] = useState(false);
 
-  const heroProblemId = liveReward?.problemId || problems[0]?.id;
   const typedCode = codeText;
 
   useEffect(() => {
@@ -166,20 +165,14 @@ function DashboardPreview() {
   }, []);
 
   const handleRunCode = () => {
-    const result = heroProblemId ? solveProblem(heroProblemId) : null;
     setRunCount((current) => current + 1);
     setSubmitMessage("");
-    setConsoleMessage(
-      result?.awarded
-        ? `Accepted on samples. +${result.xpGained} XP, +${result.coinsGained} coins added.`
-        : "Accepted on samples. XP already claimed for this demo problem.",
-    );
+    setConsoleMessage("Accepted on samples. Sign in and submit a real solution to earn rewards.");
   };
 
   const handleSubmit = () => {
-    const result = heroProblemId ? solveProblem(heroProblemId) : null;
     setConsoleMessage("All hidden tests passed. Submission accepted.");
-    const cashReward = result?.moneyGainedInr ?? 0;
+    const cashReward = 0;
     setSubmitMessage(
       cashReward > 0
         ? `You topped the leaderboard at #1. Claim your ₹${cashReward} reward.`

@@ -528,6 +528,7 @@ const runRemoteJavaJudge = async (problem: Problem, code: string) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(process.env.JUDGE_SERVICE_SECRET ? { "x-judge-service-secret": process.env.JUDGE_SERVICE_SECRET } : {}),
     },
     body: JSON.stringify({
       problemId: problem.id,
@@ -586,6 +587,7 @@ const runRemoteDockerJudge = async (problem: Problem, language: RemoteJudgeLangu
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(process.env.JUDGE_SERVICE_SECRET ? { "x-judge-service-secret": process.env.JUDGE_SERVICE_SECRET } : {}),
     },
     body: JSON.stringify({
       problemId: problem.id,

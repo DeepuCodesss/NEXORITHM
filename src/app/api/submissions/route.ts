@@ -1,7 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { judgeSubmission } from "@/lib/judge";
 import { isJudgeLanguage } from "@/lib/languages";
-import { MOCK_PROBLEMS } from "@/lib/mockData";
+import { getProblemFromDatabase } from "@/lib/problemCatalog";
 import { currentUser } from "@clerk/nextjs/server";
 import { upsertClerkUser } from "@/lib/userSync";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -25,6 +25,15 @@ const getStreakReward = (streakDay: number) => {
   return { coins: 50, cash: 5 };
 };
 
+const noReward = (alreadySolved = false) => ({
+  awarded: false,
+  alreadySolved,
+  xpGained: 0,
+  coinsGained: 0,
+  moneyGainedInr: 0,
+  reputationGained: 0,
+});
+
 export async function POST(request: Request) {
   const requestStartedAt = Date.now();
   await ensureJudgeBootstrapLogged();
@@ -33,7 +42,7 @@ export async function POST(request: Request) {
   const language = body?.language;
   const code = typeof body?.code === "string" ? body.code : "";
   const replayPayload = body?.replay as ReplayPayload | undefined;
-  const problem = MOCK_PROBLEMS.find((item) => item.id === problemId);
+  const problem = await getProblemFromDatabase(problemId);
 
   if (!problem) {
     return apiError("Problem not found.", 404);
@@ -64,6 +73,7 @@ export async function POST(request: Request) {
   let submissionId: string | null = null;
   let saved = false;
   let databaseError: string | null = null;
+  let rewardResult = noReward();
   const clerkUser = await currentUser();
 
   if (!clerkUser) {
@@ -149,14 +159,14 @@ export async function POST(request: Request) {
       });
 
       if (result.status !== "Accepted") {
-        return { createdSubmission };
+        return { createdSubmission, reward: noReward() };
       }
 
       const currentSolvedProblemIds = Array.isArray(lockedUser.solvedProblemIds)
         ? lockedUser.solvedProblemIds.filter((value): value is string => typeof value === "string")
         : [];
       if (currentSolvedProblemIds.includes(problem.id)) {
-        return { createdSubmission };
+        return { createdSubmission, reward: noReward(true) };
       }
 
       const lastSolvedAt = lockedUser.lastSolvedAt ? new Date(lockedUser.lastSolvedAt) : null;
@@ -185,7 +195,7 @@ export async function POST(request: Request) {
           WHERE "id" = ${liveReward.id} AND "winnerUserId" IS NULL`,
         );
         if (claimResult === 0) {
-          return { createdSubmission };
+          return { createdSubmission, reward: noReward() };
         }
       }
       const cashReward = streakReward.cash + Number(liveReward?.rewardMoney ?? 0);
@@ -193,6 +203,8 @@ export async function POST(request: Request) {
       const nextXp = lockedUser.xp + xpReward;
       const nextCoins = lockedUser.coins + coinReward + streakReward.coins;
       const nextCash = lockedUser.moneyEarnedInr + cashReward;
+      const currentLevel = Math.max(1, Math.floor(lockedUser.xp / 200) + 1);
+      const nextLevel = Math.max(1, Math.floor(nextXp / 200) + 1);
 
       await tx.user.update({
         where: { id: user.id },
@@ -236,10 +248,26 @@ export async function POST(request: Request) {
         );
       }
 
-      return { createdSubmission };
+      return {
+        createdSubmission,
+        reward: {
+          awarded: true,
+          alreadySolved: false,
+          xpGained: xpReward,
+          coinsGained: coinReward + streakReward.coins,
+          moneyGainedInr: cashReward,
+          reputationGained: reputationReward,
+          currentStreak: nextStreak,
+          previousStreak: lockedUser.currentStreak,
+          levelBefore: currentLevel,
+          levelAfter: nextLevel,
+          unlockedTitle: problem.title,
+        },
+      };
     });
 
     submissionId = submissionResult.createdSubmission.id;
+    rewardResult = submissionResult.reward;
     saved = true;
     if (result.status === "Accepted" && replayPayload?.events && Array.isArray(replayPayload.events) && replayPayload.stats) {
       await (async () => {
@@ -344,6 +372,10 @@ export async function POST(request: Request) {
     });
   }
 
+  if (databaseError) {
+    return apiError("Submission was judged but could not be saved. Please retry.", 503);
+  }
+
   logger.info("submission.total_duration", {
     route: "/api/submissions",
     language,
@@ -356,6 +388,7 @@ export async function POST(request: Request) {
     submissionId,
     saved,
     databaseError,
+    reward: rewardResult,
     ...result,
   });
 }

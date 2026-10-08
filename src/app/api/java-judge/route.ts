@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { authorizeJudgeService } from "@/lib/judgeServiceAuth";
 
 export const runtime = "nodejs";
 
@@ -259,6 +260,8 @@ const buildResult = (testCases: JavaJudgeTestCase[], startedAt: number, results:
 };
 
 export async function POST(request: Request) {
+  const authorizationError = await authorizeJudgeService(request);
+  if (authorizationError) return authorizationError;
   const startedAt = Date.now();
   logger.info("java_judge.request_received", { route: "/api/java-judge" });
   logger.info("java_judge.request_cpu_memory", {

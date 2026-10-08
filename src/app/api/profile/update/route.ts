@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { currentUser } from "@clerk/nextjs/server";
 import { apiError, apiSuccess } from "@/lib/apiResponse";
+import { upsertClerkUser } from "@/lib/userSync";
 
 export const runtime = "nodejs";
 
@@ -170,12 +171,13 @@ export async function POST(request: Request) {
     }
 
     const prisma = getPrisma();
-    const user = await prisma.user.update({
-      where: { clerkId: clerkUser.id },
+    const user = await upsertClerkUser(clerkUser);
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
       data: updates,
     });
 
-    return apiSuccess({ user });
+    return apiSuccess({ user: updatedUser });
   } catch (err: unknown) {
     console.error("Failed to update profile:", err);
     return apiError(err instanceof Error ? err.message : "Failed to update profile", 500);
